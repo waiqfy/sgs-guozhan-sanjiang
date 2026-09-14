@@ -1391,30 +1391,189 @@ const skill = {
 
 	// ============ 庞统 ============
 	// 连环：你可以将一张♣手牌当【铁索连环】使用或重铸。你使用【铁索连环】可以指定至多四个目标。
-	// 参考: skill_refer/shenhua/skill.js 的 lianhuan技能
-	// 存疑未改：卡面写的是"当【铁索连环】使用或重铸"，但当前实现只有enable:["chooseToUse",
-	// "chooseToRespond"]，没有重铸(recast)分支——官方shenhua版通过filterCard里判断
-	// event.type=="phase"&&player.canRecast(card)来允许重铸，这里没有照抄这部分，"重铸"功能
-	// 可能缺失。不确定这个引擎版本重铸功能的标准写法，未擅自修改，需要确认后再补上。
+	// 参考: skill_refer/shenhua/skill.js 的 lianhuan技能——这是"连环"这个技能在官方全部
+	// 25个包里唯一的真实代码实现（skill_refer/refresh的ollianhuan、skill_refer/mobile的
+	// xinlianhuan都是inherit:"lianhuan"复用它），filterCard/filterTarget/selectTarget/
+	// filterOk/viewAs/precontent/content照抄（"使用或重铸"二选一靠这几个函数配合
+	// event._backup/ui.selected实现，是这个引擎里"一张viewAs牌可以同时支持使用与重铸"的
+	// 标准写法，没有更简单的等价API）。
+	// 修复：1. 原实现enable:["chooseToUse","chooseToRespond"]，完全没有走上面这套filterCard/
+	// filterOk流程，"重铸"这半句卡面描述在游戏里没有对应按钮——现按官方写法换成
+	// enable:"chooseToUse"+完整的filterCard/filterTarget/selectTarget/filterOk。
+	// 2. 原实现想用mod:{selectTarget(){return [range[0],4]}}把目标数上限从2改成4，但
+	// "selectTarget"在这个引擎里根本不是任何地方用过的mod钩子名（本项目、25个官方包、国战
+	// 模式全都没有这个用法），对UI的目标选择数量完全不起作用。真正官方的"追加目标"写法是
+	// skill_refer/mobile的xinlianhuan_add（新连环，用useCard2触发在牌结算前追加一个目标）：
+	// 铁索连环卡本身selectTarget是[1,2]，让初次选择维持官方的[1,2]，改用同款useCard2追加
+	// 目标的子技能lianhuan_add一次性补齐到最多4个，而不是徒劳地改一个不存在的mod钩子。
 	lianhuan: {
 		aiShowTag: "support",
 		audio: 2,
-		enable: ["chooseToUse", "chooseToRespond"],
-		viewAs: { name: "tiesuo" },
-		viewAsFilter(player) {
-			if (!player.countCards("hs", card => get.suit(card) == "club")) {
+		hiddenCard(player, name) {
+			return name == "tiesuo" && player.hasCard(card => get.suit(card) == "club", "sh");
+		},
+		enable: "chooseToUse",
+		filter(event, player) {
+			if (!player.hasCard(card => get.suit(card) == "club", "sh")) {
 				return false;
 			}
-		},
-		filterCard(card) {
-			return get.suit(card) == "club";
+			return event.type == "phase" || event.filterCard(get.autoViewAs({ name: "tiesuo" }, "unsure"), player, event);
 		},
 		position: "hs",
-		mod: {
-			selectTarget(card, player, range) {
-				if (card.name == "tiesuo" && Array.isArray(range)) {
-					return [range[0], 4];
+		filterCard(card, player, event) {
+			if (!event) {
+				event = _status.event;
+			}
+			if (get.suit(card) != "club") {
+				return false;
+			}
+			if (event.type == "phase" && get.position(card) != "s" && player.canRecast(card)) {
+				return true;
+			} else {
+				if (game.checkMod(card, player, "unchanged", "cardEnabled2", player) === false) {
+					return false;
 				}
+				const cardx = get.autoViewAs({ name: "tiesuo" }, [card]);
+				return event._backup.filterCard(cardx, player, event);
+			}
+		},
+		filterTarget(fuck, player, target) {
+			const card = ui.selected.cards[0],
+				event = _status.event,
+				backup = event._backup;
+			if (!card || game.checkMod(card, player, "unchanged", "cardEnabled2", player) === false) {
+				return false;
+			}
+			const cardx = get.autoViewAs({ name: "tiesuo" }, [card]);
+			return backup.filterCard(cardx, player, event) && backup.filterTarget(cardx, player, target);
+		},
+		selectTarget() {
+			const card = ui.selected.cards[0],
+				event = _status.event,
+				player = event.player,
+				backup = event._backup;
+			let recast = false,
+				use = false;
+			const cardx = get.autoViewAs({ name: "tiesuo" }, [card]);
+			if (event.type == "phase" && player.canRecast(card)) {
+				recast = true;
+			}
+			if (card && game.checkMod(card, player, "unchanged", "cardEnabled2", player) !== false) {
+				if (backup.filterCard(cardx, player, event)) {
+					use = true;
+				}
+			}
+			if (!use) {
+				return [0, 0];
+			} else {
+				const select = backup.selectTarget(cardx, player);
+				if (recast && select[0] > 0) {
+					select[0] = 0;
+				}
+				return select;
+			}
+		},
+		filterOk() {
+			const card = ui.selected.cards[0],
+				event = _status.event,
+				player = event.player,
+				backup = event._backup;
+			const selected = ui.selected.targets.length;
+			let recast = false,
+				use = false;
+			const cardx = get.autoViewAs({ name: "tiesuo" }, [card]);
+			if (event.type == "phase" && player.canRecast(card)) {
+				recast = true;
+			}
+			if (card && game.checkMod(card, player, "unchanged", "cardEnabled2", player) !== false) {
+				if (backup.filterCard(cardx, player, event)) {
+					use = true;
+				}
+			}
+			if (recast && selected == 0) {
+				return true;
+			} else if (use) {
+				const select = backup.selectTarget(cardx, player);
+				if (select[0] <= -1) {
+					return true;
+				}
+				return selected >= select[0] && selected <= select[1];
+			}
+		},
+		ai1(card) {
+			return 6 - get.value(card);
+		},
+		ai2(target) {
+			const player = get.player();
+			const card = ui.selected.cards[0],
+				event = _status.event,
+				backup = event._backup;
+			if (!card || game.checkMod(card, player, "unchanged", "cardEnabled2", player) === false) {
+				return 0;
+			}
+			const cardx = get.autoViewAs({ name: "tiesuo" }, [card]);
+			if (backup.filterCard(cardx, player, event) && backup.filterTarget(cardx, player, target)) {
+				return get.effect(target, { name: "tiesuo" }, player, player);
+			}
+			return 0;
+		},
+		discard: false,
+		lose: false,
+		delay: false,
+		viewAs(cards, player) {
+			return {
+				name: "tiesuo",
+			};
+		},
+		prepare: () => true,
+		async precontent(event, trigger, player) {
+			const result = event.result;
+			if (!result?.targets?.length) {
+				delete result.card;
+			}
+		},
+		async content(event, trigger, player) {
+			await player.recast(event.cards);
+		},
+		group: "lianhuan_add",
+		subSkill: {
+			add: {
+				charlotte: true,
+				trigger: { player: "useCard2" },
+				filter(event, player) {
+					if (event.card.name != "tiesuo" || event.targets.length >= 4) {
+						return false;
+					}
+					return game.hasPlayer(current => !event.targets.includes(current) && lib.filter.targetEnabled2(event.card, player, current));
+				},
+				forced: true,
+				popup: false,
+				async content(event, trigger, player) {
+					const max = 4 - trigger.targets.length;
+					const result = await player
+						.chooseTarget(
+							max > 1 ? [1, max] : 1,
+							get.prompt("lianhuan"),
+							"为" + get.translation(trigger.card) + "额外指定至多" + get.cnNumber(max) + "个目标",
+							(card, player, target) => {
+								return !_status.event.sourcex.includes(target) && lib.filter.targetEnabled2(_status.event.card, player, target);
+							}
+						)
+						.set("sourcex", trigger.targets)
+						.set("ai", target => {
+							const player = _status.event.player;
+							return get.effect(target, _status.event.card, player, player);
+						})
+						.set("card", trigger.card)
+						.forResult();
+					if (!result.bool || !result.targets?.length) {
+						return;
+					}
+					const targets = result.targets;
+					player.logSkill("lianhuan_add", targets);
+					trigger.targets.addArray(targets);
+					game.log(targets, "也成为了", trigger.card, "的目标");
+				},
 			},
 		},
 		ai: {
@@ -6748,7 +6907,15 @@ const skill = {
 		},
 		logTarget: "target",
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("zhenwei")).forResult();
+			event.result = await player
+				.chooseBool(get.prompt2("zhenwei"))
+				.set("ai", () => {
+					if (!trigger.target.isFriendOf(player)) {
+						return false;
+					}
+					return player.hasCard(card => get.type(card) == "basic", "h");
+				})
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			const parent = trigger.getParent();
@@ -11113,7 +11280,7 @@ const skill = {
 		},
 		async content(event, trigger, player) {
 			const target = event.target;
-			player.storage.congcha_target = target;
+			player.storage.congcha2 = target;
 			player.addTempSkill("congcha2", { player: "phaseBegin" });
 		},
 		subfrequent: ["draw"],
@@ -11139,7 +11306,7 @@ const skill = {
 		forced: true,
 		onremove: true,
 		filter(event, player) {
-			return event.player == player.storage.congcha_target;
+			return event.player == player.storage.congcha2;
 		},
 		logTarget: "player",
 		async content(event, trigger, player) {
@@ -16378,6 +16545,15 @@ const skill = {
 	// 引叛：出牌阶段限一次，你可以选择一名角色，令所有与其势力不同的角色依次选择是否对其使用
 	// 一张无距离次数限制的【杀】，结算完成后，该角色于其下个回合使用【杀】的次数+X，若其进入过
 	// 濒死状态，其回复1点体力（X为其以损失的体力值）。
+	// 参考: skill_refer_guozhan/_merged_guozhan.md 的 gz_chengong-gzyinpan（技能名：引叛），
+	// 主体流程（选一名角色，所有与其势力不同的角色依次选择是否对其使用无距离次数限制的杀，结算后
+	// 下回合杀的使用次数上限+X，若进入过濒死则回复1点体力）与本项目一致；官方X为"以此法受到的
+	// 伤害次数"，本项目按卡面改为"以此法损失的体力值"，属数值定义上的卡面差异，保留。
+	// 修复：判断"是否进入过濒死状态"，原实现用了game.getGlobalHistory("dying", ...)——但
+	// globalHistory只记录cardMove/custom/useCard/changeHp/everything这几类，根本没有"dying"
+	// 这个分类，取到的history是undefined，调用.filter直接崩溃。改用官方gzyinpan同款思路：
+	// 濒死时机由引擎在damage事件本身打上event._dyinged标记（见content.ts里player.dying()
+	// 调用前的赋值），改成对比"每次使用杀之前/之后victim被标记过_dyinged的伤害次数"是否变化。
 	yinpan: {
 		aiShowTag: "defense",
 		audio: 2,
@@ -16392,7 +16568,7 @@ const skill = {
 				return;
 			}
 			const hpBefore = victim.hp;
-			const dyingBefore = game.getGlobalHistory("dying", evt => evt.player === victim).length;
+			let everDying = false;
 			const others = game.filterPlayer(current => current.isEnemyOf(victim));
 			for (const other of others) {
 				if (!victim.isIn() || !other.isIn()) {
@@ -16404,11 +16580,15 @@ const skill = {
 				}
 				const result = await other.chooseBool(`引叛：是否对${get.translation(victim)}使用一张无距离次数限制的【杀】？`).forResult();
 				if (result.bool && victim.isIn() && other.canUse(card, victim, false)) {
+					const dyingBefore = victim.getHistory("damage", evt => evt._dyinged).length;
 					await other.useCard(card, victim, false);
+					const dyingAfter = victim.getHistory("damage", evt => evt._dyinged).length;
+					if (dyingAfter > dyingBefore) {
+						everDying = true;
+					}
 				}
 			}
-			const dyingAfter = game.getGlobalHistory("dying", evt => evt.player === victim).length;
-			if (dyingAfter > dyingBefore && victim.isIn()) {
+			if (everDying && victim.isIn()) {
 				await victim.recover();
 			}
 			if (victim.isIn()) {
