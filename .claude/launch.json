@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "noname-gz3-dev",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set", "PATH=C:\\Program Files\\nodejs;%APPDATA%\\npm;%PATH%", "&&", "pnpm", "dev"],
+      "port": 8081
+    }
+  ]
+}

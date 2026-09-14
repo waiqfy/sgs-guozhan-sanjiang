@@ -1,0 +1,22 @@
+dist
+output
+node_modules
+package-lock.json
+
+# 未被 homebrew 武将包引用的原版素材（图片/音频），仅本地保留供以后需要时取用，不进仓库
+apps/core/_unused_assets/
+
+# IDE
+.idea/
+.vscode/
+
+# macOS
+._*
+.Spotlight-V100
+.Trashes
+.DS_Store
+.DS_Store?
+
+# Windows
+ehthumbs.db
+Thumbs.db
