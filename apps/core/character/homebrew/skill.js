@@ -8,11 +8,18 @@ function hasLianhengTag(card, owner) {
 	if (!card) {
 		return false;
 	}
+	// 与国战模式自带的_lianheng判定保持一致：牌面印刷的合纵标记(card.hasTag("lianheng"))
+	// 与技能赋予的"_lianheng"获得标记都算
+	if (typeof card.hasTag === "function" && card.hasTag("lianheng")) {
+		return true;
+	}
 	if (typeof card.hasGaintag === "function" && card.hasGaintag("_lianheng")) {
 		return true;
 	}
-	if (owner && ["tao", "wugufengdeng"].includes(get.name(card))) {
-		return game.hasPlayer(current => current.isIn() && current.hasSkill("jiahe") && current.group && owner.group && current.group == owner.group);
+	// 五谷丰登的卡牌id是wugu
+	if (owner && ["tao", "wugu"].includes(get.name(card))) {
+		// isFriendOf 对未明置（势力未定）的一方返回 false，正好满足"与你势力相同"的要求
+		return game.hasPlayer(current => current.isIn() && current.hasSkill("jiahe") && typeof current.isFriendOf === "function" && current.isFriendOf(owner));
 	}
 	return false;
 }

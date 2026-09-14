@@ -174,7 +174,13 @@ export class GetGuozhan extends Get {
 				return parseInt(i);
 			}
 		}
-		return 0;
+		// gz3: homebrew 武将不在上面的 gz_ 名单里，退回到 character/rank.js 的通用强度分级
+		// （get.rank 的 1~9 分映射到国战 0~8 分），没配置等级的按中位数处理，
+		// 让 AI 选主副将/选第三将时至少有个强度参考，而不是一律 0。
+		if (lib.rank && Object.values(lib.rank).some(list => Array.isArray(list) && list.includes(name))) {
+			return Math.max(0, Math.min(8, get.rank(name, true) - 1));
+		}
+		return 4;
 	}
 
 	/**

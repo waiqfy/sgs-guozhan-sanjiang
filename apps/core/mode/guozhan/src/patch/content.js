@@ -650,9 +650,31 @@ export const chooseThirdCharacter = async playerFirst => {
 
 		const skills = lib.character[picked][3];
 		for (const skill of skills) {
-			if (lib.skill[skill]) {
-				player.addSkill(skill);
+			const info = lib.skill[skill];
+			if (!info) {
+				continue;
 			}
+			// addSkill 内部会经 addSkillTrigger 执行技能的 init（initedSkills 去重），不用再补
+			player.addSkill(skill);
+		}
+
+		// gz3: 第三将从一开始就是明置的，但没有走 showCharacter 流程，所有"当你明置此武将牌后"
+		// 类技能（首次明置拿标记/摸牌/初始化）在第三将上永远触发不到。这里补发一个只用于
+		// 触发时机的 showCharacter 事件（content 为空，不改任何明暗/势力状态），toShow 里只有
+		// 这名武将，让 `event.toShow.includes("xxx")` 的技能能正常走一遍；没有这类技能就不发。
+		const expanded = game.expandSkills(skills.slice(0));
+		const needsShowEvent = expanded.some(skill => {
+			const info = lib.skill[skill];
+			return info && info.trigger && JSON.stringify(info.trigger).includes("showCharacter");
+		});
+		if (needsShowEvent) {
+			const next = game.createEvent("showCharacter");
+			next.player = player;
+			next.toShow = [picked];
+			next.num = 3;
+			next.gz3Virtual = true;
+			next.setContent(async () => {});
+			await next;
 		}
 	}
 

@@ -146,6 +146,14 @@ export function applyAiShowGates(skillDict) {
 				// 已经全部明置了，不涉及"要不要冒险暴露"这件事。
 				return true;
 			}
+			// 只有"属于暗置武将牌"的技能发动时才会亮将（引擎 checkShow 对已在 getSkills() 里的
+			// 技能不会触发明置）。已明置那张武将牌的技能、三将规则里第三将的技能（addSkill 加上的）
+			// 都不涉及暴露，不应被压制。国战 patch 用 player.hiddenSkills 记录暗置武将的技能。
+			const hidden = Array.isArray(player.hiddenSkills) ? player.hiddenSkills : [];
+			const sourceSkill = info.sourceSkill || (lib.skill[name] && lib.skill[name].sourceSkill);
+			if (!hidden.includes(name) && !(sourceSkill && hidden.includes(sourceSkill))) {
+				return true;
+			}
 			const tag = info.aiShowClassify ? info.aiShowClassify(event, player) : info.aiShowTag;
 			return shouldRiskShow(player, tag, {
 				target: event?.target,
