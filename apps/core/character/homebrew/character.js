@@ -873,7 +873,7 @@ export default {
 		sex: "female",
 		group: "wu",
 		hp: 3,
-		skills: ["guose", "guose2", "liuli"],
+		skills: ["guose", "liuli"],
 		names: "桥|null",
 	},
 	sunshangxiang: {
@@ -892,7 +892,7 @@ export default {
 		sex: "male",
 		group: "wu",
 		hp: 4,
-		skills: ["scjiang", "scjiang_pd", "scyingyang"],
+		skills: ["scjiang", "scyingyang"],
 	},
 	xiaoqiao: {
 		sex: "female",
