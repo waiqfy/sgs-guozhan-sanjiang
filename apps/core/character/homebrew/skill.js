@@ -32,6 +32,95 @@ function findExternalActor(event, self) {
 	return null;
 }
 
+// 徐庶"举荐"专用：交换两名角色"第三个武将"（name3，国战三将/sanjiang模式专属槽位）。
+// 引擎的player.transCharacter/changeCharacter/reinitCharacter都只支持主将(1)/副将(2)
+// 两个槽位，没有第三个武将的官方换将实现。这里逐行照抄官方transCharacter
+// （mode/guozhan/src/patch/content.js）的技能转移结构（getSkills找出即将失去的
+// 无标签技能、收放其expansion卡、继承awakenedSkills），只是把官方用来"确定新一对
+// 主副将"的player.reinitCharacter(name1,name2)——这行本身就限定在主/副槽位——换成
+// 手动的player.name3=/target.name3=赋值，再照chooseThirdCharacter选将时同款的
+// node.avatar3g/node.name3更新界面并用addSkill/removeSkill同步技能列表。name3从
+// 选出的那一刻就是直接展示的（没有"暗置的第三个武将"，isUnseen也不支持第3个槽位），
+// 所以这里不用处理明置/暗置。
+async function xushuTransThird(player, target) {
+	const name1 = player.name3,
+		name2 = target.name3;
+	const getSkills = (current, name) => {
+		return get.character(name, 3).filter(skillId => {
+			if (!current.hasSkill(skillId, null, null, false)) {
+				return false;
+			}
+			const info = lib.skill[skillId];
+			return info && !info.charlotte && get.skillInfoTranslation(skillId, current).length > 0;
+		});
+	};
+	const map1 = new Map();
+	const skills1 = getSkills(player, name1);
+	for (const skillId of skills1) {
+		const cards = player.getExpansions(skillId);
+		if (cards && cards.length) {
+			map1.set(skillId, cards);
+			await player.lose(cards, ui.special).set("getlx", false);
+		}
+	}
+	const map2 = new Map();
+	const skills2 = getSkills(target, name2);
+	for (const skillId of skills2) {
+		const cards = target.getExpansions(skillId);
+		if (cards && cards.length) {
+			map2.set(skillId, cards);
+			await target.lose(cards, ui.special).set("getlx", false);
+		}
+	}
+	for (const skillId of skills1) {
+		if (player.awakenedSkills?.includes(skillId)) {
+			player.restoreSkill(skillId);
+			target.awakenSkill(skillId);
+		}
+		player.removeSkill(skillId);
+	}
+	for (const skillId of skills2) {
+		if (target.awakenedSkills?.includes(skillId)) {
+			target.restoreSkill(skillId);
+			player.awakenSkill(skillId);
+		}
+		target.removeSkill(skillId);
+	}
+	player.name3 = name2;
+	target.name3 = name1;
+	if (player.node.avatar3g) {
+		player.node.avatar3g.setBackground(name2, "character");
+		player.node.name3.innerHTML = get.slimName(name2);
+	}
+	if (target.node.avatar3g) {
+		target.node.avatar3g.setBackground(name1, "character");
+		target.node.name3.innerHTML = get.slimName(name1);
+	}
+	for (const skillId of get.character(name2, 3)) {
+		if (lib.skill[skillId]) {
+			player.addSkill(skillId);
+		}
+	}
+	for (const skillId of get.character(name1, 3)) {
+		if (lib.skill[skillId]) {
+			target.addSkill(skillId);
+		}
+	}
+	for (const [skillId, cards] of map1) {
+		if (target.hasSkill(skillId, null, null, false) && cards.length) {
+			target.$addToExpansion(cards, null, skillId);
+			target.markSkill(skillId);
+		}
+	}
+	for (const [skillId, cards] of map2) {
+		if (player.hasSkill(skillId, null, null, false) && cards.length) {
+			player.$addToExpansion(cards, null, skillId);
+			player.markSkill(skillId);
+		}
+	}
+	game.log(player, "与", target, "进行了第三个武将的易位");
+}
+
 const skill = {
 
 // 甚贤：当其他角色于你的回合外因弃置而失去基本牌后，若你的手牌数不大于体力上限的两倍，你可以摸一张牌。
@@ -2212,6 +2301,16 @@ const skill = {
 	// 槽位号的武将牌——不是固定"是主将就换主将槽、否则一律换副将槽"。原实现只判断
 	// player.name1=="xin_xushu"，如果徐庶其实被摆在第三个武将（name3，三将/sanjiang模式）
 	// 也会被误判成"副将"进而错误地换了副将槽。现按自己实际所在槽位（1/2/3）计算。
+	// 第三个武将(name3)的换将：引擎的player.transCharacter/changeCharacter/reinitCharacter
+	// 都只认1(主将)/2(副将)两个槽位，name3是国战三将/sanjiang模式在patch层加的第三槽位，
+	// 完全没有配套的换将API可直接调用。下面xushuTransThird()是仿照官方transCharacter
+	// （mode/guozhan/src/patch/content.js）的结构手写的第三槽位版本：技能转移这段
+	// （getSkills/expansion卡的收放/awakenedSkills继承）逐行照抄官方写法，只是把
+	// player.reinitCharacter(name1,name2)这行（只支持主/副槽位）换成手动的
+	// player.name3=/target.name3=赋值+按官方chooseThirdCharacter同款的
+	// node.avatar3g/node.name3更新界面+addSkill/removeSkill同步技能。因为name3从
+	// chooseThirdCharacter选出时就是直接展示的（没有"暗置的第三个武将"这个概念，isUnseen
+	// 也不支持第3个槽位），这里不需要处理明置/暗置状态。
 	xinjujian: {
 		aiShowTag: "support",
 		audio: 2,
@@ -2240,12 +2339,8 @@ const skill = {
 				await player.transCharacter(target, myPos, myPos);
 				return;
 			}
-			// 待确认: 引擎的transCharacter(guozhan/src/patch/player.js)只支持1(主将)/2(副将)
-			// 两个槽位的换将，没有第三个武将(name3，三将/sanjiang模式专属)可抄的官方换将实现；
-			// 手写name3互换涉及技能授予/取消、体力上限重算等一连串副作用，贸然实现风险较高，
-			// 故徐庶自己身处第三个武将位时暂不结算，等确认更完整的三将换将写法后再补。
-			if (myPos == 3) {
-				game.log(player, "的【举荐】：徐庶身为第三个武将时暂不支持交换，本次跳过");
+			if (myPos == 3 && target.name3) {
+				await xushuTransThird(player, target);
 			}
 		},
 	},
