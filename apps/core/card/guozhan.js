@@ -1709,6 +1709,16 @@ export default {
 				return true;
 			},
 			prompt: "出牌阶段限一次，你可以弃置至多X张牌（X为你的体力上限），然后摸等量的牌",
+			// gz3修复：homebrew的character/homebrew/skill.js把"zhiheng"(孙权制衡)重写成了自带
+			// chooseToDiscard的自包含content（弃光手牌额外摸一张的卡面加成），不再是原版"顶层
+			// filterCard/selectCard自动弃牌，content只管摸牌"的结构。这个技能靠inherit:"zhiheng"
+			// 复用content，结果变成：先由这里的filterCard/selectCard弃了一次牌，content又继承了
+			// homebrew版本、再弹一次弃牌框——玩家看到的现象就是"弃牌后没有摸牌"（其实是卡在了
+			// 第二次弃牌提示上，不弃就不摸）。改成显式给出与原版一致的content，不再依赖inherit
+			// 带来的这个content，避免被homebrew对zhiheng的改动连累。
+			async content(event, trigger, player) {
+				await player.draw(event.cards.length);
+			},
 		},
 		g_dinglanyemingzhu_ai: {
 			ai: {

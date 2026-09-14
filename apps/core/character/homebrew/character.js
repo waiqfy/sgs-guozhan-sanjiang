@@ -57,7 +57,7 @@ zhangxingcai: {
 	guanyu: {
 		sex: "male",
 		group: "shu",
-		hp: 4,
+		hp: 5,
 		skills: ["wuhun", "wusheng", "yijue"],
 	},
 	// 张飞

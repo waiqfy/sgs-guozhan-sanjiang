@@ -553,15 +553,22 @@ const skill = {
 	},
 
 	// ============ 关羽（guanyu） ============
-	// 武魂：锁定技，杀死你的角色，本局游戏无法通过【桃】和【桃园结义】回复体力。
+	// 武魂：游戏开始时，你可以明置此武将。锁定技，杀死你的角色，本局游戏无法通过【桃】和
+	// 【桃园结义】回复体力。
 	// 原创技能，无官方参考（skill_refer/extra里同名的wuhun/new_wuhun实为"杀死你的角色会被
 	// 反噬/连带伤害"等完全不同的效果，并非"杀死你的角色无法用桃回血"，非有效参考）
+	// 修复：之前完全漏掉了"游戏开始时你可以明置此武将"这半句——这部分是主动技（"你可以"，
+	// 需要玩家自己选择），"锁定技"只修饰后半段"杀死你的角色无法用桃回血"的debuff，两段不是
+	// 同一性质，原实现只做了后半段。gameStart在国战模式main.js里确认是在game.gameDraw()
+	// 发完初始手牌之后才trigger的（"游戏开始时"应理解为发牌结束后的时点），可以直接用。
 	wuhun: {
 		aiShowTag: "control",
-		trigger: { source: "dieAfter", global: "recoverBegin" },
-		forced: true,
+		trigger: { player: "gameStart", source: "dieAfter", global: "recoverBegin" },
 		popup: false,
 		filter(event, player, name) {
+			if (name == "gameStart") {
+				return player.isUnseen();
+			}
 			if (name == "recoverBegin") {
 				if (!event.card || (event.card.name != "tao" && event.card.name != "taoyuanjieyi")) {
 					return false;
@@ -570,8 +577,20 @@ const skill = {
 			}
 			return true;
 		},
+		async cost(event, trigger, player) {
+			if (event.triggername == "gameStart") {
+				event.result = await player.chooseBool("武魂：是否明置武将牌？").forResult();
+			} else {
+				event.result = { bool: true };
+			}
+		},
 		async content(event, trigger, player) {
-			if (event.triggername == "recoverBegin") {
+			if (event.triggername == "gameStart") {
+				await player.showCharacter(0);
+				if (player.name2) {
+					await player.showCharacter(1);
+				}
+			} else if (event.triggername == "recoverBegin") {
 				trigger.cancel();
 			} else {
 				trigger.player.storage.wuhun_marked = true;
@@ -2189,6 +2208,10 @@ const skill = {
 	// 举荐：限定技，准备阶段，你可以选择一名其他角色，将此武将牌与其对应位置的一张武将牌交换。
 	// 原创技能，无官方参考（skill_refer/yijiang与sixiang里同名的xinjujian/jujian/stdjujian都是
 	// 与"交换武将牌"完全无关的弃牌类技能，key和中文名"举荐"的巧合，非有效参考）
+	// 修复："对应位置"指徐庶自己在自己的主/副/第三个武将里所处的槽位号，交换目标对应同一
+	// 槽位号的武将牌——不是固定"是主将就换主将槽、否则一律换副将槽"。原实现只判断
+	// player.name1=="xin_xushu"，如果徐庶其实被摆在第三个武将（name3，三将/sanjiang模式）
+	// 也会被误判成"副将"进而错误地换了副将槽。现按自己实际所在槽位（1/2/3）计算。
 	xinjujian: {
 		aiShowTag: "support",
 		audio: 2,
@@ -2212,8 +2235,18 @@ const skill = {
 		async content(event, trigger, player) {
 			const target = event.targets[0];
 			player.awakenSkill(event.name);
-			const num1 = player.name1 == "xin_xushu" ? 1 : 2;
-			await player.transCharacter(target, num1);
+			const myPos = player.name1 == "xin_xushu" ? 1 : player.name2 == "xin_xushu" ? 2 : player.name3 == "xin_xushu" ? 3 : null;
+			if (myPos == 1 || myPos == 2) {
+				await player.transCharacter(target, myPos, myPos);
+				return;
+			}
+			// 待确认: 引擎的transCharacter(guozhan/src/patch/player.js)只支持1(主将)/2(副将)
+			// 两个槽位的换将，没有第三个武将(name3，三将/sanjiang模式专属)可抄的官方换将实现；
+			// 手写name3互换涉及技能授予/取消、体力上限重算等一连串副作用，贸然实现风险较高，
+			// 故徐庶自己身处第三个武将位时暂不结算，等确认更完整的三将换将写法后再补。
+			if (myPos == 3) {
+				game.log(player, "的【举荐】：徐庶身为第三个武将时暂不支持交换，本次跳过");
+			}
 		},
 	},
 
@@ -3929,7 +3962,10 @@ const skill = {
 		trigger: { player: "showCharacterAfter" },
 		forced: true,
 		filter(event, player) {
-			return !!(event.toShow && event.toShow.includes(player.name1)) && !player.storage.jugu_drawn;
+			// 修复：用player.name1判断"首次明置此武将"，若糜竺被作为副将（name2）使用则永远
+			// 不会触发（name1watch的是另一张牌）。改用固定角色key"mizhu"，跟xiaolian/caoang等
+			// 已确认正确的写法保持一致，不受主/副将槽位影响。
+			return !!(event.toShow && event.toShow.includes("mizhu")) && !player.storage.jugu_drawn;
 		},
 		async content(event, trigger, player) {
 			player.storage.jugu_drawn = true;
@@ -7069,7 +7105,7 @@ const skill = {
 				return;
 			}
 			if (event.control == "交给一名其他角色一张基本牌") {
-				const targetResult = await player.chooseTarget(true, "征辟：选择一名其他角色", (card, player, target) => target != player).forResult();
+				const targetResult = await player.chooseTarget(true, "征辟：选择一名有明置武将牌的其他角色", (card, player, target) => target != player && !target.isUnseen()).forResult();
 				const target = targetResult.targets && targetResult.targets[0];
 				if (!target || !target.isIn()) {
 					return;
@@ -7099,7 +7135,7 @@ const skill = {
 					await target.give(backResult.cards, player);
 				}
 			} else {
-				const targetResult = await player.chooseTarget(true, "征辟：选择一名角色，本回合你对其使用牌无距离和次数限制", () => true).forResult();
+				const targetResult = await player.chooseTarget(true, "征辟：选择一名未确定势力的角色，直到其明置武将牌或此回合结束，你对其使用牌无距离和次数限制", (card, player, target) => target.isUnseen()).forResult();
 				const target = targetResult.targets && targetResult.targets[0];
 				if (target) {
 					player.storage.zhengbi_target = target;
@@ -7119,6 +7155,21 @@ const skill = {
 			},
 			cardUsable(card, player) {
 				return Infinity;
+			},
+		},
+		group: "zhengbi_buff_end",
+		subSkill: {
+			end: {
+				charlotte: true,
+				trigger: { global: "showCharacterAfter" },
+				forced: true,
+				popup: false,
+				filter(event, player) {
+					return event.player == player.storage.zhengbi_target;
+				},
+				async content(event, trigger, player) {
+					player.removeSkill("zhengbi_buff");
+				},
 			},
 		},
 	},
@@ -8509,13 +8560,16 @@ const skill = {
 			content: "拥有#枚“先驱”标记，可在一名角色的准备阶段移去1枚令其成为“先辅”目标",
 		},
 	},
-	// 先辅辅助：任意角色准备阶段，可移去1枚"先驱"标记选定该角色
+	// 先辅辅助：与你势力相同的角色准备阶段，可移去1枚"先驱"标记选定该角色
+	// 修复：卡面（用户核对卡图后确认）限定目标须与戏志才同势力，原实现"任意角色"未做此限制；
+	// 没有同势力角色时应完全不发动（不消耗标记），只有isFriendOf(player)为真的事件才会
+	// 通过filter，天然满足"没有队友就不发动"。
 	xianfu_choose: {
 		charlotte: true,
 		sourceSkill: "xianfu",
 		trigger: { global: "phaseZhunbeiBegin" },
 		filter(event, player) {
-			return (player.storage.xianfu || 0) > 0 && event.player != player && !(player.storage.xianfu_targets || []).includes(event.player);
+			return (player.storage.xianfu || 0) > 0 && event.player != player && event.player.isFriendOf(player) && !(player.storage.xianfu_targets || []).includes(event.player);
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseBool(get.prompt2("xianfu", trigger.player)).forResult();
@@ -9145,6 +9199,8 @@ const skill = {
 	// 这里改为"借用"其他角色技能的机制。受限于单主公将引擎无法安全地泛化调用任意技能的
 	// cost/多步骤流程，这里将候选范围限定为"锁定技（forced，且用现代async写法实现）"，
 	// 并只监听下列一批常见的全局触发点。
+	// 修复：卡面"场上一名明置角色"被误写成current.isTurnedOver()（"翻面"/叠置状态，与本文件
+	// 陈到/关索等叠置技能是同一套完全不同的机制），已改为!current.isUnseen()正确匹配"明置"。
 	shanzhuan: {
 		aiShowTag: "response",
 		group: ["shanzhuan_reset"],
@@ -9191,7 +9247,7 @@ const skill = {
 				}
 				return typeof info.filter != "function" || info.filter(event, player, name);
 			};
-			return game.hasPlayer(current => current != player && !current.isTurnedOver() && current.getSkills(null, false).some(isCandidate));
+			return game.hasPlayer(current => current != player && !current.isUnseen() && current.getSkills(null, false).some(isCandidate));
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseBool(get.prompt2("shanzhuan")).forResult();
@@ -9212,7 +9268,7 @@ const skill = {
 				}
 				return typeof info.filter != "function" || info.filter(trigger, player, name);
 			};
-			const owners = game.filterPlayer(current => current != player && !current.isTurnedOver() && current.getSkills(null, false).some(isCandidate));
+			const owners = game.filterPlayer(current => current != player && !current.isUnseen() && current.getSkills(null, false).some(isCandidate));
 			if (!owners.length) {
 				return;
 			}
@@ -9694,9 +9750,10 @@ const skill = {
 	// ============ 羊祜（dc_yanghu） ============
 	// 参考: skill_refer/huicui/_merged.md 的 dc_yanghu-dcdeshao（技能名：德劭），核心机制一致
 	// （成为其他角色使用黑色牌的目标后，按体力值相关的限次可弃置其一张牌）。
-	// 德劭：每回合限X次（X为你的体力值），当你成为其他角色使用黑色牌的唯一目标后，若该
-	// 角色未处于翻面状态，你可以弃置其一张牌。（原版"明置的武将牌数不大于你"依单主公将
-	// 机制改写为"未处于翻面状态"）
+	// 德劭：每回合限X次（X为你的体力值），当你成为其他角色使用黑色牌的唯一目标后，若其
+	// 明置的武将牌数不大于你，你可以弃置其一张牌。
+	// 修复：原实现把"明置的武将牌数不大于你"错写成了!event.player.isTurnedOver()（"翻面"/
+	// 叠置状态，跟明置完全是两套机制），改用numShown()统计双方明置的武将牌槽位数量比较。
 	dcdeshao: {
 		aiShowTag: "support",
 		group: ["dcdeshao_reset"],
@@ -9713,7 +9770,8 @@ const skill = {
 			if ((player.storage.dcdeshao_count || 0) >= player.hp) {
 				return false;
 			}
-			return !event.player.isTurnedOver();
+			const numShown = p => (p.isUnseen(0) ? 0 : 1) + (p.name2 && !p.isUnseen(1) ? 1 : 0);
+			return numShown(event.player) <= numShown(player);
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseBool(get.prompt2("dcdeshao", trigger.player)).forResult();
@@ -9792,9 +9850,12 @@ const skill = {
 	// ============ 曹髦（caomao） ============
 	// 与 skill_refer/xianding 包（"轩辕"）的同名技能"决讨"效果不同（官方版为"限定技，体力值
 	// 为1时可选一名角色，反复亮出并使用牌堆底的牌直到不可用或其死亡"，与本地"成为【杀】的
-	// 目标后令其不可响应并令使用者亮出武将牌/手牌"完全不同机制），非参考，效果为本地全新设计。
-	// 决讨：当你成为【杀】的目标后，你可以令此【杀】不可响应，然后令使用者展示一张手牌。
-	// （原版"明置一张武将牌"依单主公将机制改写为"展示一张手牌"）
+	// 目标后令其不可响应并令使用者明置武将牌"完全不同机制），非参考，效果为本地全新设计。
+	// 决讨：当你成为【杀】的目标后，你可以令此【杀】不可响应，然后令使用者明置一张武将牌。
+	// 修复：此前误以为"本项目非单主公模式不支持明置武将牌机制"，把卡面"明置一张武将牌"
+	// 错改成了"展示一张手牌"——这个假设本身就是错的，showCharacter/isUnseen等明置相关API
+	// 在本项目里全程可用（见jinxian/congcha2等已用过的写法），现按卡面改回明置武将牌：若
+	// 使用者两张武将牌都暗置，由其自选明置哪一张；若只有一张暗置，直接明置那一张。
 	juetao: {
 		aiShowTag: "support",
 		aiShowCost: true,
@@ -9809,11 +9870,16 @@ const skill = {
 		async content(event, trigger, player) {
 			trigger.directHit.add(player);
 			const source = trigger.player;
-			if (source && source.isIn() && source.countCards("h")) {
-				const result = await source.chooseCard("h", true, "决讨：展示一张手牌").forResult();
-				if (result && result.bool && result.cards && result.cards.length) {
-					await source.showCards(result.cards, `${get.translation(source)}因【决讨】被迫展示的牌`);
-				}
+			if (!source || !source.isIn()) {
+				return;
+			}
+			if (source.isUnseen(0) && source.isUnseen(1)) {
+				const ctrl = await source.chooseControl("主将", "副将").set("prompt", "决讨：请明置一张武将牌").forResult();
+				await source.showCharacter(ctrl.control == "主将" ? 0 : 1);
+			} else if (source.isUnseen(0)) {
+				await source.showCharacter(0);
+			} else if (source.isUnseen(1)) {
+				await source.showCharacter(1);
 			}
 		},
 	},
@@ -10677,57 +10743,61 @@ const skill = {
 
 	// ============ 曹植（caozhi） ============
 	// 原创技能，无官方参考（skill_refer/yijiang 包曹植的实际技能为"落英"(luoying)，效果为
-	// "获得他人因弃置/判定而进入弃牌堆的梅花牌"，与本地"诗酒"效果不同，character.js已注明
-	// 两个技能均为新名全新设计）。
+	// "获得他人因弃置/判定而进入弃牌堆的梅花牌"，与本地"诗酒"效果不同；guozhan官方271名武将里
+	// 也没有"曹植"这名角色，故"诗酒"确实是原创无参考技能）。
+	// 修复：原实现整个技能都写错了——凭空发明了"亮出一张手牌称为'诗'"的机制，这个说法在
+	// translate.js里从未出现过。诗酒真实的卡面效果是两个完全独立的触发：①你明置一张武将牌
+	// 后，若当前回合角色能使用【酒】，你可令其视为使用之；②当你受到伤害后，若你的武将牌均
+	// 明置，你可以重铸任意张牌并暗置此武将牌。不是"先亮'诗'再重铸"的单一流程。现按
+	// translate.js重写；"暗置此武将牌"选哪张的写法参考jinxian(近谀)的chooseControl("主将","副将")。
 	shijiu: {
 		aiShowTag: "support",
-		aiShowCost: true,
-		group: ["shijiu_recast"],
 		audio: 2,
-		enable: "phaseUse",
-		usable: 1,
+		trigger: { player: "showCharacterAfter" },
 		filter(event, player) {
-			return player.countCards("h") > 0;
-		},
-		async content(event, trigger, player) {
-			const result = await player.chooseCard("h", true, "诗酒：亮出一张手牌，称为“诗”").forResult();
-			if (!result || !result.bool || !result.cards || !result.cards.length) {
-				return;
-			}
-			const card = result.cards[0];
-			player.showCards([card], get.translation(player) + "亮出的“诗”");
-			player.storage.shijiu_marks = (player.storage.shijiu_marks || []).concat(card);
 			const current = _status.currentPhase;
-			if (!current || !current.isIn()) {
-				return;
-			}
-			const jiuCard = { name: "jiu", isCard: true };
-			if (!current.canUse(jiuCard, current)) {
-				return;
-			}
-			const useResult = await player.chooseBool("诗酒：是否令" + get.translation(current) + "视为使用一张【酒】？").forResult();
-			if (useResult.bool) {
-				await current.useCard(jiuCard);
-			}
-		},
-	},
-	shijiu_recast: {
-		aiShowTag: "defense",
-		charlotte: true,
-		onremove: "storage",
-		trigger: { player: "damageEnd" },
-		filter(event, player) {
-			return !!(player.storage.shijiu_marks && player.storage.shijiu_marks.length);
+			return !!(current && current.isIn() && current.canUse({ name: "jiu", isCard: true }, current));
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool("诗酒：是否重铸你亮出的所有“诗”？").forResult();
+			const current = _status.currentPhase;
+			event.result = await player.chooseBool(`诗酒：是否令${get.translation(current)}视为使用一张【酒】？`).forResult();
 		},
 		async content(event, trigger, player) {
-			const cards = (player.storage.shijiu_marks || []).filter(card => player.hasCard(cardx => cardx === card, "hej"));
-			player.storage.shijiu_marks = [];
-			if (cards.length) {
-				await player.recast(cards);
+			const current = _status.currentPhase;
+			if (current.isIn() && current.canUse({ name: "jiu", isCard: true }, current)) {
+				await current.useCard({ name: "jiu", isCard: true });
 			}
+		},
+		group: "shijiu_recast",
+		subSkill: {
+			recast: {
+				aiShowTag: "defense",
+				charlotte: true,
+				trigger: { player: "damageEnd" },
+				filter(event, player) {
+					return !player.isUnseen(2);
+				},
+				async cost(event, trigger, player) {
+					event.result = await player.chooseBool("诗酒：是否重铸任意张牌，然后暗置此武将牌？").forResult();
+				},
+				async content(event, trigger, player) {
+					if (player.countCards("he")) {
+						const result = await player.chooseCard("he", [0, player.countCards("he")], "诗酒：选择任意张牌重铸（可不选）", true).forResult();
+						if (result && result.bool && result.cards && result.cards.length) {
+							await player.recast(result.cards);
+						}
+					}
+					if (!player.isIn()) {
+						return;
+					}
+					let slot = 0;
+					if (player.name2) {
+						const ctrl = await player.chooseControl("主将", "副将").set("prompt", "诗酒：请暗置一张武将牌").forResult();
+						slot = ctrl.control == "主将" ? 0 : 1;
+					}
+					await player.hideCharacter(slot);
+				},
+			},
 		},
 	},
 	// 原创技能，无官方参考（同上，与yijiang包曹植"落英"效果不同）。
@@ -10748,7 +10818,11 @@ const skill = {
 			event.result = await player.chooseBool(get.prompt2("zongjiang")).forResult();
 		},
 		async content(event, trigger, player) {
-			const cards = trigger.cards.filter(card => card.isInD && card.isInD() && (get.type(card) == "trick" || ["equip3", "equip4"].includes(get.subtype(card))));
+			// 修复：原来用 card.isInD && card.isInD() 判断"是否在弃牌堆里"，但isInD在整个
+			// 引擎里根本不存在（是凭空编的方法名），恒为undefined，导致这里永远过滤成空数组，
+			// 弃牌堆判定卡的锦囊/坐骑就是这样"提示发动却什么都获得不到"。参考yijiang包官方
+			// luoying的写法，改用get.position(card, true) == "d"来判断。
+			const cards = trigger.cards.filter(card => get.position(card, true) == "d" && (get.type(card) == "trick" || ["equip3", "equip4"].includes(get.subtype(card))));
 			if (cards.length) {
 				await player.gain(cards, "gain2");
 			}
@@ -13110,7 +13184,7 @@ const skill = {
 			player.addTempSkill("dcshangyi_reset", "phaseAfter");
 			await target.viewHandcards(player);
 			const { control } = await player
-				.chooseControl(["观看其手牌并弃置一张黑色牌", "观看其装备区和判定区的牌并获得其中一张"])
+				.chooseControl(["观看其手牌并弃置一张黑色牌", "观看其所有暗置的武将牌，可以明置其中一张（然后本回合不能再发动尚义）"])
 				.set("prompt", "尚义：请选择")
 				.forResult();
 			if (control == 0 && target.countCards("h")) {
@@ -13505,7 +13579,10 @@ const skill = {
 			return game.hasPlayer(current => current != player && current.countCards("he") > 0);
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseTarget(lib.filter.notMe, "旋略：选择一名其他角色，弃置其一张牌").forResult();
+			event.result = await player
+				.chooseTarget(lib.filter.notMe, "旋略：选择一名其他角色，弃置其一张牌")
+				.set("ai", target => -get.attitude(player, target))
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			const target = event.targets[0];
@@ -18441,7 +18518,9 @@ const skill = {
 		audio: 2,
 		trigger: { player: "showCharacterAfter" },
 		filter(event, player) {
-			return !!(event.toShow && event.toShow.includes(player.name1));
+			// 修复：同jugu(糜竺)的问题，用player.name1判断华雄若被摆在副将位就永远不会触发，
+			// 改用固定角色key"huaxiong"。
+			return !!(event.toShow && event.toShow.includes("huaxiong"));
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseBool(get.prompt2("hwyangwei")).forResult();
@@ -20858,12 +20937,31 @@ const skill = {
 	// 凶镶：当你首次明置此武将牌后，你获得3枚“暴戾”。出牌阶段，你可以交给一名没有
 	// “暴戾”且与你势力不同的其他角色1枚“暴戾”。你对有“暴戾”的其他角色造成的伤害+1
 	// （每回合每名角色限一次），且其出牌阶段开始时，弃其“暴戾”并随机执行一项。
+	// 修复：初始3枚"暴戾"供应量原来用init(player)在角色进入游戏时就直接发放，未按卡面
+	// "首次明置此武将牌后"的条件（若徐荣作为暗置的副将登场，会在未明置前就提前拿到），
+	// 与许攸nzry_huaiju曾经同款的bug一致，已改为showCharacterAfter监听首次明置再发放；
+	// 被动的xinfu_xionghuo_dmg（伤害+1）本身不依赖是否已明置（要等对方已经持有"暴戾"才
+	// 会生效，明置前不可能有人持有"暴戾"），继续保留在init里授予不受影响。
 	xinfu_xionghuo: {
 		aiShowTag: "support",
 		init(player) {
-			player.storage.xrbaoli_supply = 3;
 			player.addSkill("xinfu_xionghuo_dmg");
 		},
+		audio: "xionghuo",
+		trigger: { player: "showCharacterAfter" },
+		forced: true,
+		popup: false,
+		group: "xinfu_xionghuo_give",
+		filter(event, player) {
+			return !!(event.toShow && event.toShow.includes("xurong")) && player.storage.xrbaoli_supply == null;
+		},
+		async content(event, trigger, player) {
+			player.storage.xrbaoli_supply = 3;
+		},
+	},
+	xinfu_xionghuo_give: {
+		charlotte: true,
+		sourceSkill: "xinfu_xionghuo",
 		audio: "xionghuo",
 		enable: "phaseUse",
 		filter(event, player) {
