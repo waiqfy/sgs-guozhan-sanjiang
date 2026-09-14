@@ -246,7 +246,7 @@ export default {
 		sex: "male",
 		group: "shu",
 		hp: 3,
-		skills: ["qiangzhi", "xiantu", "xiantu_mark"],
+		skills: ["qiangzhi", "xiantu"],
 	},
 	zhoucang: {
 		sex: "male",
@@ -276,7 +276,7 @@ export default {
 		sex: "male",
 		group: "shu",
 		hp: 3,
-		skills: ["xiemu", "naman", "naman_gain"],
+		skills: ["xiemu", "naman"],
 	},
 
 	mizhu: {
