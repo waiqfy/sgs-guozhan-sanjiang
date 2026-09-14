@@ -2,15 +2,14 @@
 // （靠package.js/characters列表里homebrew排在被覆盖的官方包之后生效），
 // 技能名字沿用官方版本，但数值/判定条件按自己的卡牌重新设计。
 export default {
-
-zhangxingcai: {
+	zhangxingcai: {
 		sex: "female",
 		group: "shu",
 		hp: 3,
 		skills: ["shenxian", "qiangwu"],
 	},
 
-// 张苞（原型：sixiang 包 std_zhangbao，"标张苞"——同名同技能的重铸版，直接沿用其id/技能id）
+	// 张苞（原型：sixiang 包 std_zhangbao，"标张苞"——同名同技能的重铸版，直接沿用其id/技能id）
 	std_zhangbao: {
 		sex: "male",
 		group: "shu",
@@ -82,7 +81,7 @@ zhangxingcai: {
 		skills: ["longdan", "chongzhen"],
 	},
 
-machao: {
+	machao: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
@@ -146,7 +145,7 @@ machao: {
 		names: "甘|null",
 	},
 
-// 国战UI.SHU017 持节不语 徐庶 —— 对应"一将成名"包的 xin_xushu（技能名"无言/举荐"与本地一致）
+	// 国战UI.SHU017 持节不语 徐庶 —— 对应"一将成名"包的 xin_xushu（技能名"无言/举荐"与本地一致）
 	xin_xushu: {
 		sex: "male",
 		group: "shu",
@@ -218,7 +217,7 @@ machao: {
 		skills: ["zhengxian"],
 	},
 
-guanping: {
+	guanping: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
@@ -280,7 +279,7 @@ guanping: {
 		skills: ["xiemu", "naman", "naman_gain"],
 	},
 
-mizhu: {
+	mizhu: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
@@ -337,7 +336,7 @@ mizhu: {
 		skills: ["xinfu_zuilun", "xinfu_fuyin"],
 	},
 
-hb_meifang: {
+	hb_meifang: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
@@ -386,7 +385,7 @@ hb_meifang: {
 		skills: ["qiuan", "liangfan"],
 	},
 
-// 郝昭（原型：shenhua包 haozhao。技能"镇骨"与原技能drlt_zhengu同名同效，沿用其id）
+	// 郝昭（原型：shenhua包 haozhao。技能"镇骨"与原技能drlt_zhengu同名同效，沿用其id）
 	haozhao: {
 		sex: "male",
 		group: "wei",
@@ -457,7 +456,7 @@ hb_meifang: {
 		skills: ["qiangxix"],
 	},
 
-// 国战UI.WEI013 驱虎吞狼 荀彧 —— 对应神话再临包的 xunyu（技能名"驱虎/节命"与本地一致）
+	// 国战UI.WEI013 驱虎吞狼 荀彧 —— 对应神话再临包的 xunyu（技能名"驱虎/节命"与本地一致）
 	xunyu: {
 		sex: "male",
 		group: "wei",
@@ -530,7 +529,7 @@ hb_meifang: {
 		skills: ["jieyue", "yizhong"],
 	},
 
-// 牛金（原型：sp 包 niujin，"牛金"——同名同技能沿用其id/技能id）
+	// 牛金（原型：sp 包 niujin，"牛金"——同名同技能沿用其id/技能id）
 	niujin: {
 		sex: "male",
 		group: "wei",
@@ -602,7 +601,7 @@ hb_meifang: {
 		skills: ["danlao", "jilei"],
 	},
 
-// 程昱（原型：sp包 chengyu。技能"设伏"沿用其id但重新设计；卡面第二技能"益兵"与原技能"贲育"不同名，视为全新技能）
+	// 程昱（原型：sp包 chengyu。技能"设伏"沿用其id但重新设计；卡面第二技能"益兵"与原技能"贲育"不同名，视为全新技能）
 	chengyu: {
 		sex: "male",
 		group: "wei",
@@ -675,7 +674,7 @@ hb_meifang: {
 		skills: ["weicheng", "daoshu"],
 	},
 
-// 曹爽（原型：sp 包 caoshuang，"曹爽"——技能名"擅专/托孤"与本地一致，但均为全新触发方式）
+	// 曹爽（原型：sp 包 caoshuang，"曹爽"——技能名"擅专/托孤"与本地一致，但均为全新触发方式）
 	caoshuang: {
 		sex: "male",
 		group: "wei",
@@ -734,7 +733,7 @@ hb_meifang: {
 		skills: ["fankui", "guicai"],
 	},
 
-// 曹操（原型：standard 包 caocao）
+	// 曹操（原型：standard 包 caocao）
 	caocao: {
 		sex: "male",
 		group: "wei",
@@ -809,7 +808,7 @@ hb_meifang: {
 		skills: ["qizhi", "jinqu"],
 	},
 
-dingfeng: {
+	dingfeng: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
@@ -870,7 +869,7 @@ dingfeng: {
 		skills: ["yingzi", "fanjian", "yanhui"],
 	},
 
-daqiao: {
+	daqiao: {
 		sex: "female",
 		group: "wu",
 		hp: 3,
@@ -935,7 +934,7 @@ daqiao: {
 		skills: ["dcshangyi", "dcniaoxiang"],
 	},
 
-zhugejin: {
+	zhugejin: {
 		sex: "male",
 		group: "wu",
 		hp: 3,
@@ -998,7 +997,7 @@ zhugejin: {
 		skills: ["gongji", "jiefan"],
 	},
 
-panzhangmazhong: {
+	panzhangmazhong: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
@@ -1062,7 +1061,7 @@ panzhangmazhong: {
 		dieAudios: ["sunluyu"],
 	},
 
-// 步骘（原型：sp 包 buzhi，技能名"弘德/定叛"与本地一致，沿用其id）
+	// 步骘（原型：sp 包 buzhi，技能名"弘德/定叛"与本地一致，沿用其id）
 	buzhi: {
 		sex: "male",
 		group: "wu",
@@ -1138,7 +1137,7 @@ panzhangmazhong: {
 		skills: ["nzry_kuizhu", "nzry_lijun"],
 	},
 
-xugong: {
+	xugong: {
 		sex: "male",
 		group: "wu",
 		hp: 3,
@@ -1186,7 +1185,6 @@ xugong: {
 		hp: 4,
 		skills: ["yaoyan", "bazheng"],
 	},
-
 
 	// 国战UI.QUN&WEI028 一战而就 陈宫（原型：yijiang 包 chengong。技能"智迟"与本地一致，沿用其id；
 	// "引叛"为全新技能，卡面未展示官方"明策"，故不沿用）
@@ -1270,7 +1268,6 @@ xugong: {
 		skills: ["wansha", "luanwu", "weimu"],
 	},
 
-
 	pangde: {
 		sex: "male",
 		group: "qun",
@@ -1332,7 +1329,6 @@ xugong: {
 		hp: 4,
 		skills: ["kuangfu"],
 	},
-
 
 	re_zoushi: {
 		sex: "female",
@@ -1398,7 +1394,6 @@ xugong: {
 		skills: ["gsxunxi", "gsshejia", "jinjiu"],
 	},
 
-
 	jsrg_liubiao: {
 		sex: "male",
 		group: "qun",
@@ -1461,7 +1456,6 @@ xugong: {
 		hp: 3,
 		skills: ["zhaohuo", "yixiang", "yirang"],
 	},
-
 
 	// 麹义（原型：sp 包 quyi，技能名"伏骑/骄恣"与本地一致，沿用其id/技能id fuqi/jiaozi）
 	quyi: {
@@ -1534,7 +1528,6 @@ xugong: {
 		hp: 3,
 		skills: ["guowu", "zhuangrong", "llqshenwei"],
 	},
-
 
 	// QUN094 据土筹谋 刘璋 —— 对应"史迹"包的 liuzhang（同名同势力同体力，沿用其id；
 	// 技能"引戈/施仁/据益"与原技能"据土/邀虎/怀璧"不同名，视为全新技能）
