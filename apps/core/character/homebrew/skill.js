@@ -2538,11 +2538,10 @@ const skill = {
 	guixiu_draw: {
 		aiShowTag: "draw",
 		sourceSkill: "guixiu",
-		trigger: { player: "showCharacterAfter", global: "gameStart" },
-		filter(event, player, name) {
-			if (name == "gameStart") {
-				return player.name3 == "mifuren";
-			}
+		// 三将规则下第三将由 mode 补发一个 showCharacter 事件（patch/content.js chooseThirdCharacter），
+		// 这里不需要再走 gameStart，否则会触发两次。
+		trigger: { player: "showCharacterAfter" },
+		filter(event, player) {
 			return !!(event.toShow && event.toShow.includes("mifuren"));
 		},
 		async cost(event, trigger, player) {
