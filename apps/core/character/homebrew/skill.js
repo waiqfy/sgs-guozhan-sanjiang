@@ -564,61 +564,97 @@ const skill = {
 	},
 
 	// ============ 刘备（liubei） ============
-	// 仁德：出牌阶段每名角色限一次，你可以将任意张手牌交给一名其他角色；本阶段以此法给出第二张牌时，
-	// 你可以视为使用一张基本牌（简化为【无中生有】）。
-	// 参考: skill_refer/standard/skill.js 的 rende技能
-	rende_clear: {
-		trigger: { player: "phaseUseBegin" },
-		silent: true,
-		charlotte: true,
-		sourceSkill: "rende",
-		async content(event, trigger, player) {
-			player.storage.rende_used = [];
-			player.storage.rende_given = 0;
-		},
-	},
+	// 仁德：出牌阶段，你可以将至少一张手牌交给其他角色，然后你于此阶段内不能再以此法交给该角色牌；
+	// 若你于此阶段内给出的牌首次达到两张，你可以视为使用一张基本牌（任选，非固定无中生有）。
+	// 参考: skill_refer_guozhan 的 gz_rende技能，逐字照抄后仅将技能名从 gz_rende 改为 rende
 	rende: {
-		aiShowTag: "support",
+		audio: 2,
 		enable: "phaseUse",
+		filter(event, player) {
+			return player.countCards("h") > 0 && game.hasPlayer(current => get.info("rende").filterTarget?.(null, player, current));
+		},
+		filterTarget(card, player, target) {
+			if (player == target) return false;
+			return !player.getStorage("rende_targeted").includes(target);
+		},
 		filterCard: true,
 		selectCard: [1, Infinity],
 		allowChooseAll: true,
 		discard: false,
 		lose: false,
-		group: "rende_clear",
-		filterTarget(card, player, target) {
-			return player != target && !(player.storage.rende_used || []).includes(target);
-		},
+		delay: false,
 		check(card) {
-			return 6 - get.value(card);
-		},
-		async content(event, trigger, player) {
-			const { target, cards } = event;
-			if (!player.storage.rende_used) {
-				player.storage.rende_used = [];
-			}
-			// 按“本阶段以此法给出的牌数”累计，而非按发动次数计数，避免一次给出2张以上时不弹出/多次给出1张时错位触发
-			const before = player.storage.rende_given || 0;
-			await player.give(cards, target);
-			player.storage.rende_used.push(target);
-			player.storage.rende_given = before + cards.length;
-			if (before < 2 && player.storage.rende_given >= 2) {
-				const result = await player.chooseBool("仁德：是否视为使用一张【无中生有】？").forResult();
-				if (result.bool) {
-					const useCard = { name: "wuzhongshengyou", isCard: true };
-					if (player.canUse(useCard)) {
-						await player.useCard(useCard);
+			if (ui.selected.cards.length && ui.selected.cards[0].name == "du") return 0;
+			if (!ui.selected.cards.length && card.name == "du") return 20;
+			const player = get.owner(card);
+			if (player == null) return 0;
+			if (ui.selected.cards.length >= Math.max(2, player.countCards("h") - player.hp)) return 0;
+			if (player.hp == player.maxHp || player.storage.rende < 0 || player.countCards("h") <= 1) {
+				const players = game.filterPlayer(lib.filter.all);
+				for (let i = 0; i < players.length; i++) {
+					if (players[i].hasSkill("haoshi") && !players[i].isTurnedOver() && !players[i].hasJudge("lebu") && get.attitude(player, players[i]) >= 3 && get.attitude(players[i], player) >= 3) {
+						return 11 - get.value(card);
 					}
 				}
+				if (player.countCards("h") > player.hp) return 10 - get.value(card);
+				if (player.countCards("h") > 2) return 6 - get.value(card);
+				return -1;
+			}
+			return 10 - get.value(card);
+		},
+		async content(event, trigger, player) {
+			const { target, cards, name } = event;
+			player.addTempSkill(name + "_targeted", "phaseUseAfter");
+			player.markAuto(name + "_targeted", [target]);
+			let num = 0;
+			player.getHistory("lose", evt => {
+				if (evt.getParent(2)?.name == name) {
+					num += evt.cards.length;
+				}
+				return true;
+			});
+			await player.give(cards, target);
+			const list = get.inpileVCardList(info => {
+				return get.type(info[2]) == "basic" && player.hasUseTarget(new lib.element.VCard({ name: info[2], nature: info[3], isCard: true }), void 0, true);
+			});
+			if (num < 2 && num + cards.length > 1 && list.length) {
+				const { links } = await player
+					.chooseButton(["是否视为使用一张基本牌？", [list, "vcard"]])
+					.set("ai", button => {
+						return get.player().getUseValue({ name: button.link[2], nature: button.link[3], isCard: true });
+					})
+					.forResult();
+				if (!links?.length) return;
+				await player.chooseUseTarget(get.autoViewAs({ name: links[0][2], nature: links[0][3], isCard: true }), true);
 			}
 		},
 		ai: {
-			order: 5,
+			fireAttack: true,
+			order(skill, player) {
+				if (player == null) return 0;
+				if (player.hp < player.maxHp && player.storage.rende < 2 && player.countCards("h") > 1) {
+					return 10;
+				}
+				return 1;
+			},
 			result: {
 				target(player, target) {
-					return get.attitude(player, target) > 0 ? 1 : -1;
+					if (target.hasSkillTag("nogain")) return 0;
+					if (ui.selected.cards.length && ui.selected.cards[0].name == "du") {
+						return target.hasSkillTag("nodu") ? 0 : -10;
+					}
+					if (target.hasJudge("lebu")) return 0;
+					const nh = target.countCards("h");
+					const np = player.countCards("h");
+					if (player.hp == player.maxHp || player.storage.rende < 0 || player.countCards("h") <= 1) {
+						if (nh >= np - 1 && np <= player.hp && !target.hasSkill("haoshi")) {
+							return 0;
+						}
+					}
+					return Math.max(1, 5 - nh);
 				},
 			},
+			threaten: 0.8,
 		},
 	},
 	// 振鞘：锁定技，攻击范围+1；出牌阶段第一次使用【杀】指定目标后，若装备区无武器牌，此【杀】伤害+1。
