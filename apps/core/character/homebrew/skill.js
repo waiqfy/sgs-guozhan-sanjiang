@@ -567,6 +567,16 @@ const skill = {
 	// 仁德：出牌阶段每名角色限一次，你可以将任意张手牌交给一名其他角色；本阶段以此法给出第二张牌时，
 	// 你可以视为使用一张基本牌（简化为【无中生有】）。
 	// 参考: skill_refer/standard/skill.js 的 rende技能
+	rende_clear: {
+		trigger: { player: "phaseUseBegin" },
+		silent: true,
+		charlotte: true,
+		sourceSkill: "rende",
+		async content(event, trigger, player) {
+			player.storage.rende_used = [];
+			player.storage.rende_given = 0;
+		},
+	},
 	rende: {
 		aiShowTag: "support",
 		enable: "phaseUse",
@@ -575,6 +585,7 @@ const skill = {
 		allowChooseAll: true,
 		discard: false,
 		lose: false,
+		group: "rende_clear",
 		filterTarget(card, player, target) {
 			return player != target && !(player.storage.rende_used || []).includes(target);
 		},
@@ -583,13 +594,15 @@ const skill = {
 		},
 		async content(event, trigger, player) {
 			const { target, cards } = event;
-			await player.give(cards, target);
 			if (!player.storage.rende_used) {
 				player.storage.rende_used = [];
 			}
+			// 按“本阶段以此法给出的牌数”累计，而非按发动次数计数，避免一次给出2张以上时不弹出/多次给出1张时错位触发
+			const before = player.storage.rende_given || 0;
+			await player.give(cards, target);
 			player.storage.rende_used.push(target);
-			player.storage.rende_count = (player.storage.rende_count || 0) + 1;
-			if (player.storage.rende_count == 2) {
+			player.storage.rende_given = before + cards.length;
+			if (before < 2 && player.storage.rende_given >= 2) {
 				const result = await player.chooseBool("仁德：是否视为使用一张【无中生有】？").forResult();
 				if (result.bool) {
 					const useCard = { name: "wuzhongshengyou", isCard: true };
