@@ -770,7 +770,7 @@ const skill = {
 				return;
 			}
 			const card = result.cards[0];
-			target.showCards([card], `${get.translation(target)}展示的牌`);
+			await target.showCards([card], `${get.translation(target)}展示的牌`);
 			if (get.color(card, target) == "black") {
 				const slots = target.name2 ? [0, 1] : [0];
 				const available = slots.filter(slot => !target.isUnseen(slot));
@@ -1215,7 +1215,7 @@ const skill = {
 				return;
 			}
 			const card = cardResult.cards[0];
-			player.showCards(card, `${get.translation(target)}因【追命】被展示`);
+			await player.showCards(card, `${get.translation(target)}因【追命】被展示`);
 			if (get.color(card) != color) {
 				return;
 			}
@@ -2327,6 +2327,13 @@ const skill = {
 					prompt: get.prompt2("xinjujian"),
 					filterTarget(card, player, target) {
 						return target != player;
+					},
+					ai(target) {
+						const plyr = get.player();
+						if (target.isUnseen()) {
+							return -1;
+						}
+						return -get.attitude(plyr, target);
 					},
 				})
 				.forResult();
@@ -6942,7 +6949,7 @@ const skill = {
 			const { cards, targets } = event;
 			const card = cards[0];
 			const target = targets[0];
-			player.showCards(cards, get.translation(player) + "展示的牌");
+			await player.showCards(cards, get.translation(player) + "展示的牌");
 			await player.give(cards, target);
 			const type = get.type(card, target);
 			if (type == "trick") {
@@ -10433,63 +10440,72 @@ const skill = {
 	},
 
 	// ============ 张辽（zhangliao） ============
-	// 参考: skill_refer/standard/_merged.md 的 zhangliao-tuxi（技能名：突袭），核心构思一致
-	// （少摸牌换取获得其他角色手牌），本地按卡面改写为"每回合限两次，获得的牌可再弃置换取
-	// 获得等量其他角色各一张手牌"的两段式实现（tuxi + tuxi_convert）。
+	// 参考: skill_refer/sb/skill.js 的 sbtuxi（"谋张辽"/sb_zhangliao的"突袭"改版），逐行仿照
+	// 官方结构实现：触发时机是"你回合内因任意方式获得牌后"（不限于摸牌阶段本身），排除因
+	// 本技能自己结算而获得的牌以防自我递归（官方用event.getParent("sbtuxi").player===player
+	// 判断，这里对应技能名"tuxi"），弃置数量由玩家自选任意张（selectCard:[1,cards.length]），
+	// 再获得至多等量其他角色各一张手牌。
+	// 修复：此前的实现整体套用的是标准版突袭"摸牌阶段放弃摸牌换取偷1~2张"的经典机制
+	// （trigger:phaseDrawBegin1），与卡面"你的回合限两次，当你不因此技能获得牌后……"的触发
+	// 条件完全对不上，还额外拆了一个tuxi_convert子技能试图弥补，但主技能本身的机制基础就
+	// 错了。现整体替换为忠于官方sbtuxi的单一实现，不再区分主/子技能。
 	tuxi: {
 		aiShowTag: "support",
-		group: ["tuxi_convert"],
 		audio: 2,
-		trigger: { player: "phaseDrawBegin1" },
-		filter(event, player) {
-			return !event.numFixed && game.hasPlayer(current => current != player && current.countCards("h") > 0);
-		},
-		async cost(event, trigger, player) {
-			const num = Math.min(2, game.countPlayer(current => current != player && current.countCards("h") > 0));
-			event.result = await player
-				.chooseTarget(get.prompt2("tuxi"), [1, num], (card, player, target) => target != player && target.countCards("h") > 0)
-				.forResult();
-		},
-		async content(event, trigger, player) {
-			trigger.changeToZero();
-			const result = await player.gainMultiple(event.targets, "give").forResult();
-			const cards = (result && result.cards) || [];
-			for (const card of cards) {
-				card.gaintag.add("tuxi_marked");
-			}
-		},
-		ai: {
-			threaten: 2,
-		},
-	},
-	tuxi_convert: {
-		aiShowTag: "support",
-		charlotte: true,
-		trigger: { player: ["gainAfter", "gainAsyncAfter"] },
+		trigger: { player: "gainAfter", global: "loseAsyncAfter" },
 		usable: 2,
 		filter(event, player) {
-			return event.cards.some(card => !(card.gaintag && card.gaintag.includes("tuxi_marked")) && player.getCards("he").includes(card));
+			if (player != _status.currentPhase) {
+				return false;
+			}
+			const parent = event.getParent("tuxi");
+			if (parent && parent.player == player) {
+				return false;
+			}
+			return event.getg(player).length > 0;
 		},
 		async cost(event, trigger, player) {
-			const pool = trigger.cards.filter(card => !(card.gaintag && card.gaintag.includes("tuxi_marked")) && player.getCards("he").includes(card));
+			const cards = trigger.getg(player).filter(card => get.owner(card) == player);
+			if (!cards.length) {
+				event.result = { bool: false };
+				return;
+			}
 			event.result = await player
-				.chooseCard(card => pool.includes(card), [1, pool.length], "突袭：是否将任意张刚获得的牌置入弃牌堆，然后获得等量其他角色各一张手牌？")
+				.chooseCard({
+					prompt: get.prompt("tuxi"),
+					prompt2: "将本次获得的任意张牌置于弃牌堆，然后获得至多等量名其他角色的各一张手牌",
+					filterCard: card => cards.includes(card),
+					selectCard: [1, cards.length],
+					allowChooseAll: true,
+				})
+				.set("cards", cards)
 				.forResult();
 		},
 		async content(event, trigger, player) {
 			const cards = event.cards;
-			await player.discard(cards);
-			const num = Math.min(cards.length, game.countPlayer(current => current != player && current.countCards("h") > 0));
-			if (num <= 0) {
+			const num = cards.length;
+			await player.loseToDiscardpile(cards);
+			if (!game.hasPlayer(current => current != player && current.countGainableCards(player, "h"))) {
 				return;
 			}
 			const result = await player
-				.chooseTarget([1, num], (card, player, target) => target != player && target.countCards("h") > 0)
-				.set("prompt", "突袭：获得至多" + num + "名其他角色各一张手牌")
+				.chooseTarget({
+					prompt: `获得至多${get.cnNumber(num)}名其他角色的各一张手牌`,
+					filterTarget: (card, plyr, target) => plyr != target && target.countGainableCards(plyr, "h"),
+					selectTarget: [1, num],
+					forced: true,
+				})
+				.set("ai", target => {
+					const plyr = get.player();
+					return get.effect(target, { name: "shunshou_copy2" }, plyr, plyr);
+				})
 				.forResult();
 			if (result && result.bool && result.targets && result.targets.length) {
-				await player.gainMultiple(result.targets, "give");
+				await player.gainMultiple(result.targets.sortBySeat());
 			}
+		},
+		ai: {
+			threaten: 2,
 		},
 	},
 
@@ -11951,7 +11967,7 @@ const skill = {
 				return;
 			}
 			const card = result.links[0];
-			player.showCards([card]);
+			await player.showCards([card]);
 			const choice = await player.chooseBool("是否将此牌置于牌堆顶？（否则弃置）").forResult();
 			if (choice && choice.bool) {
 				target.loseTo(card, ui.cardPile, "insert");
@@ -12106,7 +12122,7 @@ const skill = {
 		async content(event, trigger, player) {
 			const card = event.cards[0];
 			const target = event.target;
-			player.showCards([card]);
+			await player.showCards([card]);
 			await target.gain([card], player, "give");
 			await target.link(true);
 			const choice = await target
@@ -12116,7 +12132,11 @@ const skill = {
 				.forResult();
 			if (choice.control == "show") {
 				const hs = target.getCards("h");
-				target.showCards(hs);
+				// 修复：这里之前漏了await——showCards()和后面discard()都是各自独立的
+				// GameEvent，不await就意味着"展示"这个事件才刚排进队列，代码已经往下走去
+				// discard了，两个事件谁先跑完是不确定的，玩家看到的观感就是"展示"没有真正
+				// 展示出来、直接变成了弃置。
+				await target.showCards(hs);
 				const suit = get.suit(card, target);
 				const same = target.getCards("h", c => get.suit(c, target) == suit);
 				if (same.length) {
@@ -12147,11 +12167,16 @@ const skill = {
 		},
 		async content(event, trigger, player) {
 			const target = trigger.target;
-			const result = await player.choosePlayerCard(target, "h", true).forResult();
-			if (!result || !result.bool || !result.cards || !result.cards.length) {
+			if (!target.isIn() || !target.countCards("h")) {
 				return;
 			}
-			const card = result.cards[0];
+			// 修复：这里原来用choosePlayerCard(target,"h",true)——这个API是"从目标手牌里
+			// 盲选一张牌"的选牌界面（给弃牌/获得类效果用的，比如discardPlayerCard/
+			// gainPlayerCard复用的同一套UI），本身不会把选中的牌广播展示给所有人，"展示"
+			// 这个效果根本没有真的发生。改成随机抽一张后用showCards公开展示（并且await，
+			// 否则展示这个事件才刚排队，下面discard就抢跑了，观感上就是"展示"变成了"弃置"）。
+			const card = target.getCards("h").randomGet();
+			await target.showCards([card], `${get.translation(target)}因〖焰洄〗展示的牌`);
 			if (!player.storage.yanhui_shown) {
 				player.storage.yanhui_shown = [];
 			}
@@ -12911,7 +12936,7 @@ const skill = {
 			await next;
 			const cards = player.getExpansions("buqu"),
 				num = get.number(card);
-			player.showCards(cards, "不屈");
+			await player.showCards(cards, "不屈");
 			for (let i = 0; i < cards.length; i++) {
 				if (cards[i] != card && get.number(cards[i]) == num) {
 					await player.loseToDiscardpile(card);
@@ -19957,6 +19982,10 @@ const skill = {
 		async cost(event, trigger, player) {
 			event.result = await player
 				.chooseTarget(get.prompt2("zhidao"), (card, player, target) => target != player)
+				.set("ai", target => {
+					const plyr = get.player();
+					return -get.attitude(plyr, target);
+				})
 				.forResult();
 		},
 		async content(event, trigger, player) {

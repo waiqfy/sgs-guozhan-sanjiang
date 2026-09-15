@@ -715,7 +715,6 @@ hb_meifang: {
 		sex: "male",
 		group: "wei",
 		hp: 3,
-		maxHp: 4,
 		skills: ["juetao", "qianlong", "fensi"],
 	},
 	// 曹芳（原型：轩辕 包 caofang，"曹芳"——技能"诏图/惊惧"取自集换 包"合曹芳"jsrg_caofang 的同名技能，
