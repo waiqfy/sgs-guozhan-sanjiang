@@ -10611,6 +10611,9 @@ export class Player extends HTMLDivElement {
 		if (typeof name == "object") {
 			name = name.name;
 		}
+		if (!name) {
+			return;
+		}
 		var node;
 		if (name.startsWith("unknown")) {
 			node = ui.create.div(".card.mark.drawinghidden");
