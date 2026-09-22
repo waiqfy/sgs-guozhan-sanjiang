@@ -7714,7 +7714,7 @@ export default {
 	// 夷灭：每回合限一次，当你于回合内对其他角色造成伤害时，你可以失去1点体力，然后令此伤害增加至其体力值，结算完成后，若其未死亡，其回复等同于伤害增加值的体力。 参考yimie(yingbian)
 	yimie: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "water",
 		audio: 2,
 		usable: 1,
 		preHidden: true,
@@ -7851,7 +7851,7 @@ export default {
 	// 凶竖：每回合限一次，一名角色使用【杀】或伤害类锦囊牌指定目标后，若你为此牌的使用者，你可以摸一张牌，然后令一名其他角色代替你成为此牌的伤害来源，若你不为此牌的使用者，你可以弃一张牌，然后代替使用者成为此牌的伤害来源。 参考skill_old.js
 	xiongshu: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "water",
 		aiShowTag: "response",
 		aiShowCost: true,
 		audio: 2,
@@ -7970,7 +7970,7 @@ export default {
 	// 清俭：每回合限一次，当你于摸牌阶段外获得牌后，你可以展示任意张牌并将这些牌交给一名其他角色。 参考qingjian(refresh)
 	qingjian: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "water",
 		audio: 2,
 		trigger: { player: "gainAfter" },
 		direct: true,
@@ -8151,7 +8151,7 @@ export default {
 	// 神赋：每轮限一次，当你失去最后一张手牌时，你可以发动一次"洛神"。 参考skill_old.js
 	shenfu: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "water",
 		aiShowTag: "defense",
 		audio: 2,
 		round: 1,
@@ -10262,7 +10262,7 @@ export default {
 	// 仁心：每轮限一次，当一名其他角色受到致命伤害时，你可以翻面并弃置一张装备牌，然后防止此伤害，本回合内，其防止受到的所有伤害。 参考renxin(yijiang)
 	renxin: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "water",
 		trigger: { global: "damageBegin4" },
 		audio: 2,
 		audioname: ["re_caochong"],
@@ -11251,7 +11251,7 @@ export default {
 	// 改为用guozhan模式引擎自带的通用"先驱"标记(xianqu_mark，见apps/core/mode/guozhan/src/patch/player.js里"全场第一个明置武将的角色获得先驱标记"的规则、rest.js里_guozhan_marks的通用弃置先驱标记效果)：明置本武将牌时获得1枚，与全场"先驱"共用同一个计数器，若戏志才本人恰好是全场第一个明置武将的角色，会按国战规则额外再计入1枚，两者自然叠加。有几枚先驱标记，先辅2就能对几名角色分别发动(每次消耗1枚)。
 	xianfu: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "water",
 		audio: 6,
 		trigger: { player: "showCharacterAfter" },
 		filter(event, player) {
@@ -11532,7 +11532,7 @@ export default {
 	// 孝廉：当你首次明置此武将时，你可以移动场上的一张装备牌。 参考skill_old.js
 	xiaolian: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "water",
 		aiShowTag: "support",
 		audio: 2,
 		trigger: { player: "showCharacterAfter" },
@@ -11826,7 +11826,7 @@ export default {
 	// 卫境：每轮限一次，当你需要使用一张基本牌时，你可以视为使用之。 参考weijing(sp)
 	weijing: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "water",
 		audio: 2,
 		enable: "chooseToUse",
 		filter(event, player) {
@@ -12332,7 +12332,7 @@ export default {
 	// 望归：每回合限一次，当你造成伤害后，你可以对一名与你势力不同的其他角色造成1点伤害；当你受到伤害后，你可以令所有与你势力相同的角色各摸一张牌。 参考wanggui(huicui)
 	wanggui: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "water",
 		audio: 2,
 		trigger: {
 			player: "damageEnd",
@@ -12375,7 +12375,7 @@ export default {
 	// 息兵：每回合限一次，当其他角色于其出牌阶段内使用黑色【杀】或黑色普通锦囊牌指定唯一目标后，你可以：令该角色将手牌摸至体力值（至多摸至五）。若其因此摸牌，其本回合不能再使用牌。 参考fakexibing(guozhan)
 	xibing: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "water",
 		audio: "xibing",
 		usable: 1,
 		filter(event, player) {
@@ -12983,7 +12983,7 @@ export default {
 	// 诏图：每轮限一次，你可以将一张红色非锦囊牌当【乐不思蜀】使用，此回合结束后，目标执行一个手牌上限-2的额外回合。 参考jsrgzhaotu(jsrg)
 	zhaotu: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "water",
 		enable: "chooseToUse",
 		viewAs: { name: "lebu" },
 		position: "hes",
@@ -15220,7 +15220,7 @@ export default {
 	// 国色：你可以将一张♦牌当【乐不思蜀】使用。每回合限一次，你可以将场上的一张【乐不思蜀】移动至另一名角色的判定区。 参考guose(standard)
 	guose: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "wood",
 		audio: 2,
 		filter(event, player) {
 			return player.hasCards("hes", { suit: "diamond" });
@@ -16199,7 +16199,7 @@ export default {
 	// 固政：每回合限一次，当一名角色一次性弃置至少两张牌后，你可以令其获得其中一张弃置的牌。若其不是你，你获得其余弃置的牌。 参考olguzheng(refresh)
 	guzheng: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "wood",
 		audio: 2,
 		trigger: {
 			global: ["loseAfter", "loseAsyncAfter"],
@@ -17670,7 +17670,7 @@ export default {
 	// 胆守：每回合限一次，当你成为基本牌或锦囊牌的目标后，你可以摸X张牌（X为你本回合成为基本牌或锦囊牌的目标的次数）。 参考xindanshou
 	danshou: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "wood",
 		audio: 2,
 		trigger: { target: "useCardToTargeted" },
 		usable: 1,
@@ -17741,7 +17741,7 @@ export default {
 	// 除异：每轮限一次，当一名其他角色对与你势力不同的角色造成伤害时，你可以令此伤害+1。若伤害来源为男性，你可以流失1点体力，令此伤害额外+1。 参考skill_old.js
 	chuyi: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "wood",
 		aiShowTag: "support",
 		audio: 2,
 		trigger: { global: "damageBegin1" },
@@ -18746,7 +18746,7 @@ export default {
 	// 弘德：每回合限一次，当你一次性得到或失去至少两张牌后，你可以令一名其他角色摸等量的牌（至多为4）。 参考hongde(sp)
 	hongde: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "wood",
 		audio: 2,
 		usable: 1,
 		trigger: {
@@ -19663,7 +19663,7 @@ export default {
 	// 怀橘：锁定技，你首次明置此武将时，你获得3枚“阴阳鱼”标记；当同势力角色受到伤害时，其可以弃1枚“阴阳鱼”标记，防止此伤害。 参考skill_old.js
 	huaiju: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "wood",
 		aiShowTag: "support",
 		audio: 2,
 		trigger: { player: "showCharacterAfter" },
@@ -20007,7 +20007,7 @@ export default {
 	// 已改用trigger.excluded.add(player)，仅令此牌对发动者自己无效。
 	zhente: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "wood",
 		aiShowTag: "support",
 		audio: 2,
 		trigger: { target: "useCardToTargeted" },
@@ -20320,7 +20320,7 @@ export default {
 	// 官方版限定"敌对势力"目标、弃牌数为"其体力上限"，本项目按卡面改为不限势力、弃牌数对齐至我方手牌数。
 	yusui: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "wood",
 		aiShowTag: "offense",
 		aiShowCost: true,
 		audio: 2,
@@ -21324,7 +21324,7 @@ export default {
 	// 双雄：出牌阶段开始时，你可以令一名角色弃置一张牌，然后本回合你可以将与结果颜色不同的一张手牌当【决斗】使用。每回合限一次，当你因【决斗】受到伤害后，你可以获得此次【决斗】中其他角色打出的【杀】。 参考shuangxiong(shenhua，改写)
 	shuangxiong: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "qun",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
 		filter(event, player) {
@@ -21739,7 +21739,7 @@ export default {
 	// 役鬼：当你首次明置此武将牌后，你获得两张未加入游戏的武将牌作为"魂"牌；每种牌名每回合限一次，你可以移去一张"魂"牌，视为使用任意一张基本牌或普通锦囊牌，且目标必须为与此"魂"牌势力相同或未确定势力的角色。 参考fake_yigui(guozhan，简化改写)
 	yigui: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "qun",
 		audio: "yigui",
 		trigger: { player: "showCharacterAfter" },
 		forced: true,
@@ -22911,7 +22911,7 @@ export default {
 	// 扬威：限定技，当你首次明置此武将牌时，你可以摸两张牌、体力上限+2并回复2点体力，然后其他角色依次可对你使用一张无距离限制的【杀】。 参考skill_old.js
 	yangwei: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "qun",
 		aiShowTag: "response",
 		limited: true,
 		audio: 2,
@@ -24458,7 +24458,7 @@ export default {
 	// 米道：当一名角色的判定牌生效前，你可以打出一张“米”代替之。每回合限一次，当有角色使用【杀】或伤害类锦囊牌指定目标时，你可以移去一张“米”，然后更改此次使用牌的花色和造成伤害属性。 参考midao(sp)
 	midao: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "qun",
 		aiShowTag: "recover",
 		audio: 2,
 		trigger: { global: "judge" },
@@ -24928,7 +24928,7 @@ export default {
 	// 盈门：锁定技，当你首次明置此武将牌时，你在剩余武将牌堆中将四张武将牌置于你的武将牌上，称为“访客”；当你受到或造成伤害后，你获得一张“访客”；回合开始前，你可以移去任意张“访客”，然后从剩余武将牌堆将“访客”补至四张。 参考sbyingmen(jsrg，改写数量与获得时机)
 	yingmen: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "qun",
 		init(player) {
 			if (!_status.characterlist) {
 				game.initCharacterList();
@@ -25474,7 +25474,7 @@ export default {
 	// 暗涌：每回合限一次，当与你势力相同的角色对另一名其他角色造成伤害时，你可以令此伤害值翻倍，然后若受伤角色：武将牌均明置，你失去1点体力且此技能本轮失效；仅明置一张武将牌，你弃置两张牌。 参考anyong(huicui，改写判定条件与效果)
 	anyong: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "qun",
 		aiShowTag: "support",
 		aiShowCost: true,
 		audio: "anyong",
@@ -25519,7 +25519,7 @@ export default {
 	// 凶镶：当你首次明置此武将牌后，你获得3枚“暴戾”。出牌阶段，你可以交给一名没有“暴戾”且与你势力不同的其他角色1枚“暴戾”。你对有“暴戾”的其他角色造成的伤害+1（每回合每名角色限一次），且其出牌阶段开始时，弃其“暴戾”并随机执行一项：1.受到你造成的1点火焰伤害且本回合不能对你使用【杀】；2.失去1点体力且本回合手牌上限-1；3.你获得其一张装备区里的牌和一张手牌。 参考xinfu_xionghuo(xinfu，沿用暴戾机制并按卡面重做数值)
 	xionghuo: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "qun",
 		aiShowTag: "support",
 		init(player) {
 			player.storage.xionghuo_supply = 3;
@@ -25699,7 +25699,7 @@ export default {
 	// 帼武：出牌阶段开始时，你可以展示全部手牌，根据你展示的类别数，你获得对应效果：至少一类，从弃牌堆获得一张【杀】；至少两类，此阶段使用牌无距离限制；至少三类，此阶段使用【杀】可以多指定两名角色为目标（此效果每回合限一次）。 参考guowu(huicui)
 	guowu: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "qun",
 		aiShowTag: "support",
 		audio: "guowu",
 		trigger: { player: ["phaseUseBegin", "phaseZhunbeiBegin"] },
@@ -25847,7 +25847,7 @@ export default {
 	// 施仁：每回合限一次，当你成为其他角色使用【杀】的目标后，你可以摸两张牌，然后交给该角色一张牌。 参考lz_shiren(原创，未见对应官方技能)
 	shiren: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "qun",
 		aiShowTag: "draw",
 		audio: 2,
 		trigger: { target: "useCardToTargeted" },
@@ -26380,7 +26380,7 @@ export default {
 	// 修正了之前homebrew重写版本丢掉的细节：可选区域是"hse"(含展示区)不是"he"；【杀】要分火/雷属性分别列出候选；排除了万箭齐发等几张选完牌还要另外处理目标的复杂锦囊。
 	miewu: {
 		skillAnimation: true,
-		animationColor: "soil",
+		animationColor: "qun",
 		audio: 2,
 		enable: ["chooseToUse", "chooseToRespond"],
 		filter(event, player) {
