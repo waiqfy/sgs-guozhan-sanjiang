@@ -11617,6 +11617,8 @@ export default {
 	caishi: {
 		aiShowTag: "support",
 		audio: 2,
+		skillAnimation: true,
+		animationColor: "water",
 		limited: true,
 		enable: "chooseToUse",
 		group: ["caishi_change"],
@@ -18030,6 +18032,8 @@ export default {
 	// 宴诛：限定技，出牌阶段，你可以选择一名其他角色，你获得其装备区里的所有牌。 参考mobileyanzhu
 	yanzhu: {
 		audio: 2,
+		skillAnimation: true,
+		animationColor: "wood",
 		limited: true,
 		enable: "phaseUse",
 		filterTarget(card, player, target) {
@@ -21482,6 +21486,8 @@ export default {
 	// 暴凌：限定技，出牌阶段，若你有副将，你可以移除之，然后增加3点体力上限，回复3点体力并获得"崩坏"。 参考fake_baoling(guozhan)
 	baoling: {
 		audio: "baoling",
+		skillAnimation: true,
+		animationColor: "qun",
 		enable: "phaseUse",
 		limited: true,
 		filter(event, player) {
