@@ -12309,6 +12309,11 @@ export default {
 		usable: 1,
 		async cost(event, trigger, player) {
 			if (trigger.player == player) {
+				event.result = await player.chooseBool("望归：是否令与你势力相同的角色各摸一张牌？").forResult();
+				event.result.targets = game.filterPlayer(current => {
+					return current.isFriendOf(player);
+				});
+			} else {
 				event.result = await player
 					.chooseTarget(get.prompt(event.skill), "望归：是否对与你势力不同的一名角色造成1点伤害？", (card, player, target) => {
 						return diffGroup(player, target);
@@ -12318,21 +12323,16 @@ export default {
 						return get.damageEffect(target, player, player);
 					})
 					.forResult();
-			} else {
-				event.result = await player.chooseBool("望归：是否令与你势力相同的角色各摸一张牌？").forResult();
-				event.result.targets = game.filterPlayer(current => {
-					return current.isFriendOf(player);
-				});
 			}
 		},
 		async content(event, trigger, player) {
 			if (trigger.player == player) {
-				const target = event.targets[0];
-				target.damage("nocard");
-			} else {
 				const targets = event.targets;
 				targets.sortBySeat();
 				await game.asyncDraw(targets);
+			} else {
+				const target = event.targets[0];
+				target.damage("nocard");
 			}
 		},
 		ai: {
