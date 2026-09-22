@@ -18139,6 +18139,7 @@ export default {
 			return game.hasPlayer(target => target != player && target.countCards("e") > 0);
 		},
 		async content(event, trigger, player) {
+			player.awakenSkill(event.name);
 			const { target } = event;
 			const es = target.getCards("e");
 			await player.gain(es, target, "give");
