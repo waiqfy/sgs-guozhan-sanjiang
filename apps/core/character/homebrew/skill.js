@@ -6729,34 +6729,25 @@ export default {
 	chengshang: {
 		audio: "chengshang",
 		trigger: { player: "useCardAfter" },
-		group: ["chengshang_reset"],
 		filter(event, player) {
 			if (player.hasHistory("sourceDamage", evt => evt.card === event.card)) {
 				return false;
 			}
-			const used = player.storage.chengshang_used || [];
-			return event.targets?.some(i => i.isIn() && diffGroup(player, i) && !used.includes(i));
+			return event.targets?.some(i => i.isIn() && diffGroup(player, i));
 		},
+		usable: 1,
 		async content(event, trigger, player) {
-			const used = player.storage.chengshang_used || [];
-			const target = trigger.targets.find(i => i.isIn() && diffGroup(player, i) && !used.includes(i));
-			player.storage.chengshang_used = used.concat(target);
 			const cards = Array.from(ui.discardPile.childNodes).filter(card => get.suit(card, false) == get.suit(trigger.card, false));
 			if (!cards.length) {
+				player.getStat("triggerSkill").chengshang--;
 				return;
 			}
-			await player.gain(cards[0], "gain2");
-		},
-		subSkill: {
-			reset: {
-				charlotte: true,
-				trigger: { global: "roundStart" },
-				forced: true,
-				popup: false,
-				content() {
-					delete player.storage.chengshang_used;
-				},
-			},
+			const result = await player.chooseCardButton("承赏：是否获得其中一张牌？", cards).set("ai", button => 6 - get.value(button)).forResult();
+			if (!result.bool || !result.links?.length) {
+				player.getStat("triggerSkill").chengshang--;
+				return;
+			}
+			await player.gain(result.links[0], "gain2");
 		},
 		ai: {
 			effect: {
