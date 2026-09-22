@@ -12311,7 +12311,7 @@ export default {
 			if (trigger.player == player) {
 				event.result = await player
 					.chooseTarget(get.prompt(event.skill), "望归：是否对与你势力不同的一名角色造成1点伤害？", (card, player, target) => {
-						return target.isEnemyOf(player);
+						return diffGroup(player, target);
 					})
 					.set("ai", target => {
 						let player = _status.event.player;
@@ -21116,13 +21116,7 @@ export default {
 		frequent: true,
 		preHidden: true,
 		async content(event, trigger, player) {
-			const damaged = new Set();
-			game.getGlobalHistory("everything", evt => {
-				if (evt.name == "damage" && evt.player && evt.getParent("phase") && evt.getParent("phase").player === player) {
-					damaged.add(evt.player);
-				}
-			});
-			await player.draw(Math.min(4, damaged.size + 1));
+			await player.draw(Math.min(4, game.countPlayer2(current => current.hasHistory("damage")) + 1));
 		},
 	},
 
