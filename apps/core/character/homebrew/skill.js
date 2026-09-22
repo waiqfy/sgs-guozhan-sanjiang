@@ -9929,12 +9929,8 @@ export default {
 		limited: true,
 		skillAnimation: "epic",
 		animationColor: "gray",
-		filter(event, player) {
-			return !player.storage.cuorui_used;
-		},
 		async content(event, trigger, player) {
 			player.awakenSkill("cuorui");
-			player.storage.cuorui_used = true;
 			await player.drawTo(5);
 			const stat = player.getStat().card;
 			for (const name in stat) {
@@ -9979,11 +9975,10 @@ export default {
 		trigger: { source: "dieAfter" },
 		forced: true,
 		filter(event, player) {
-			return player.storage.cuorui_used;
+			return player.awakenedSkills.includes("cuorui");
 		},
-		content() {
-			player.storage.cuorui_used = false;
-			player.markSkill("cuorui");
+		content(event, trigger, player) {
+			player.restoreSkill("cuorui");
 		},
 	},
 
@@ -10028,6 +10023,10 @@ export default {
 		logTarget: "player",
 		check(event, player) {
 			if (event.getParent().excluded.includes(player)) {
+				return false;
+			}
+			const baseDamage = event.card.baseDamage ?? get.info(event.card)?.baseDamage ?? 1;
+			if (baseDamage <= 1) {
 				return false;
 			}
 			return get.attitude(player, event.player) <= 0;
@@ -21088,13 +21087,13 @@ export default {
 				}
 				const drawList = [];
 				const selfResult = await player.chooseToDiscard("he", true).forResult();
-				if (selfResult.bool && selfResult.cards && selfResult.cards.length) {
+				if (selfResult.bool && selfResult.cards?.length && selfResult.cards.some(card => get.suit(card) == "spade")) {
 					drawList.push(player);
 				}
 				for (const target of targets.targets) {
 					if (target.countCards("he") > 0) {
 						const result = await player.discardPlayerCard(target, "he", true).forResult();
-						if (result.bool && result.cards && result.cards.length) {
+						if (result.bool && result.cards?.length && result.cards.some(card => get.suit(card) == "spade")) {
 							drawList.push(target);
 						}
 					}
