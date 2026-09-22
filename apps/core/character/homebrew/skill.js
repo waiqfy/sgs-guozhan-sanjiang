@@ -15063,6 +15063,8 @@ export default {
 	fanjian: {
 		aiShowTag: "offense",
 		audio: 2,
+		skillAnimation: true,
+		animationColor: "wood",
 		enable: "phaseUse",
 		usable: 1,
 		filterCard: true,
@@ -25327,7 +25329,10 @@ export default {
 			return !!(event.card && get.type(event.card) != "basic" && event.targets && event.targets.length);
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt("tushe"), "是否展示所有手牌，查看能否摸一张牌？").forResult();
+			event.result = await player
+				.chooseBool(get.prompt("tushe"), "是否展示所有手牌，查看能否摸一张牌？")
+				.set("ai", () => !get.player().countCards("h", card => get.type(card) == "basic"))
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			if (player.countCards("h")) {

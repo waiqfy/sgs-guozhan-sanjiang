@@ -865,7 +865,7 @@ dingfeng: {
 	zhouyu: {
 		sex: "male",
 		group: "wu",
-		hp: 3,
+		hp: 4,
 		skills: ["yingzi", "fanjian", "yanhui"],
 	},
 

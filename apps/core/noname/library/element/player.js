@@ -13625,6 +13625,13 @@ export class Player extends HTMLDivElement {
 				return "vice";
 			}
 		}
+		var name3 = this.name3;
+		if (lib.character[name3] && !showonly) {
+			var skills = game.expandSkills(lib.character[name3][3].slice(0));
+			if (skills.includes(skill)) {
+				return "third";
+			}
+		}
 		return false;
 	}
 	/**
@@ -16309,6 +16316,10 @@ export class Player extends HTMLDivElement {
 			if (avatar == "vice") {
 				if (lib.character[this.name2]) {
 					avatar = this.node.avatar2;
+				}
+			} else if (avatar == "third") {
+				if (lib.character[this.name3]) {
+					avatar = this.node.avatar3g;
 				}
 			} else {
 				if (lib.character[this.name]) {
