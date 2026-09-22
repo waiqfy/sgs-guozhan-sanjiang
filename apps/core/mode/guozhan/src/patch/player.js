@@ -834,7 +834,8 @@ export class PlayerGuozhan extends lib.element.Player {
 		// （⌈3⌉-1=2），同势力最多能凑到这么多人，多出来的才会被挤去野心家；
 		// 保底不低于1，避免人数很少时算出0/负数。正常模式的阈值不受影响。
 		// @ts-expect-error 类型就是这么写的
-		return get.totalPopulation(group) + numOfReadyToShow <= (_status.separatism ? Math.max(Math.ceil(get.population() / 2) - 1, 1) : get.population() / 2);
+		// return get.totalPopulation(group) + numOfReadyToShow <= (_status.separatism ? Math.max(Math.ceil(get.population() / 2) - 1, 1) : get.population() / 2);
+		return get.totalPopulation(group) + numOfReadyToShow <= get.population() / 2;
 	}
 
 	/**

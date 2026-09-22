@@ -1028,6 +1028,17 @@ export default {
 				if (player.hasSkillTag("maixie_hp") || player.hp <= 2) {
 					return "选项一";
 				}
+				// gz3: 敕令强制明置前，同样得考虑"能不能安全组队"——己方势力已有人
+				// 且明置不会被挤成野心家时，应当更倾向于明置而不是弃装/掉血，跟
+				// 平时"亮将"意愿(_mingzhi)保持一致，而不是无脑五五开。
+				const group = lib.character[player.name1][1];
+				const popu = get.population(group);
+				if (popu >= 2 || (popu == 1 && game.players.length <= 4)) {
+					return "选项一";
+				}
+				if (popu > 0 && player.wontYe()) {
+					return Math.random() < 0.8 ? "选项一" : "选项二";
+				}
 				return Math.random() < 0.5 ? "选项一" : "选项二";
 			},
 			async content(event, trigger, player) {
@@ -1709,6 +1720,29 @@ export default {
 				return true;
 			},
 			prompt: "出牌阶段限一次，你可以弃置至多X张牌（X为你的体力上限），然后摸等量的牌",
+			// gz3修复：homebrew的character/homebrew/skill.js把"zhiheng"(孙权制衡)重写成了自带
+			// chooseToDiscard的自包含content（弃光手牌额外摸一张的卡面加成），不再是原版"顶层
+			// filterCard/selectCard自动弃牌，content只管摸牌"的结构。这个技能靠inherit:"zhiheng"
+			// 复用content，结果变成：先由这里的filterCard/selectCard弃了一次牌，content又继承了
+			// homebrew版本、再弹一次弃牌框——玩家看到的现象就是"弃牌后没有摸牌"（其实是卡在了
+			// 第二次弃牌提示上，不弃就不摸）。改成显式给出与原版一致的content，不再依赖inherit
+			// 带来的这个content，避免被homebrew对zhiheng的改动连累。
+			async content(event, trigger, player) {
+				const { cards } = event;
+				let num = 1;
+				const hs = player.getCards("h");
+				if (!hs.length) {
+					num = 0;
+				}
+				for (let i = 0; i < hs.length; i++) {
+					if (!cards.includes(hs[i])) {
+						num = 0;
+						break;
+					}
+				}
+				await player.discard(cards);
+				await player.draw(num + cards.length);
+			},
 		},
 		g_dinglanyemingzhu_ai: {
 			ai: {

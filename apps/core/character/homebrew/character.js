@@ -10,22 +10,22 @@ zhangxingcai: {
 		skills: ["shenxian", "qiangwu"],
 	},
 
-// 张苞（原型：sixiang 包 std_zhangbao，"标张苞"——同名同技能的重铸版，直接沿用其id/技能id）
-	std_zhangbao: {
+// 张苞（原型：sixiang 包 zhangbao，"标张苞"——同名同技能的重铸版，直接沿用其id/技能id）
+	zhangbao: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
-		skills: ["stdjuezhu", "stdchengji"],
+		skills: ["juezhu", "chengji"],
 	},
-	// 刘琦（原型：sp2 包 sp_liuqi）。原势力为群，本批次统一按 shu 处理。
-	sp_liuqi: {
+	// 刘琦（原型：sp2 包 liuqi）。原势力为群，本批次统一按 shu 处理。
+	liuqi: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
-		skills: ["rewenji", "sptunjiang"],
+		skills: ["wenji", "tunjiang"],
 	},
-	// 彭羕（原型：sp 包 ol_pengyang，"彭羕"）
-	ol_pengyang: {
+	// 彭羕（原型：sp 包 pengyang，"彭羕"）
+	pengyang: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
@@ -39,7 +39,7 @@ zhangxingcai: {
 		skills: ["baolie"],
 	},
 	// 傅士仁：未找到以此为名的官方角色（仅有"糜芳傅士仁"合体卡），视为全新角色。
-	hb_fushiren: {
+	fushiren: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
@@ -57,7 +57,7 @@ zhangxingcai: {
 	guanyu: {
 		sex: "male",
 		group: "shu",
-		hp: 4,
+		hp: 5,
 		skills: ["wuhun", "wusheng", "yijue"],
 	},
 	// 张飞
@@ -94,28 +94,28 @@ machao: {
 		hp: 3,
 		skills: ["jizhi", "qicai"],
 	},
-	re_huangzhong: {
+	huangzhong: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
-		skills: ["xinliegong", "cuifeng"],
+		skills: ["liegong", "cuifeng"],
 	},
-	re_weiyan: {
+	weiyan: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
-		skills: ["xinkuanggu", "wusi"],
+		skills: ["kuanggu", "wusi"],
 	},
 	pangtong: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
-		skills: ["lianhuan", "oldniepan"],
+		skills: ["lianhuan", "niepan"],
 	},
 	jiangwei: {
 		sex: "male",
 		group: "shu",
-		hp: 4,
+		hp: 3,
 		skills: ["tiaoxin", "yizhi"],
 	},
 	liushan: {
@@ -142,38 +142,38 @@ machao: {
 		sex: "female",
 		group: "shu",
 		hp: 3,
-		skills: ["shenzhi", "stdshushen"],
+		skills: ["shenzhi", "shushen"],
 		names: "甘|null",
 	},
 
-// 国战UI.SHU017 持节不语 徐庶 —— 对应"一将成名"包的 xin_xushu（技能名"无言/举荐"与本地一致）
-	xin_xushu: {
+// 国战UI.SHU017 持节不语 徐庶 —— 对应"一将成名"包的 xushu（技能名"无言/举荐"与本地一致）
+	xushu: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
-		skills: ["xinwuyan", "xinjujian"],
+		skills: ["wuyan", "jujian"],
 	},
 	// 国战UI.SHU018 群策谋策 蒋琬&费祎 —— 未找到同名官方合体武将（仅有蒋琬/费祎的单独或组合语音提示），视为全新合体武将
-	hb_jiangwanfeiyi: {
+	jiangwanfeiyi: {
 		sex: "male",
 		group: "shu",
-		hp: 4,
+		hp: 3,
 		skills: ["shengxi", "shoucheng"],
 		names: "蒋|琬-费|祎",
 	},
-	// 国战UI.SHU019 平北将军 马岱 —— 对应"一将成名"包的 old_madai（技能名"潜袭/马术"与本地一致）
-	old_madai: {
+	// 国战UI.SHU019 平北将军 马岱 —— 对应"一将成名"包的 madai（技能名"潜袭/马术"与本地一致）
+	madai: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
 		skills: ["qianxi", "mashu"],
 	},
-	// 国战UI.SHU020 骁勇金衔 沙摩柯 —— 对应SP包的 shamoke（技能名"蒺藜"与本地gzjili一致）
+	// 国战UI.SHU020 骁勇金衔 沙摩柯 —— 对应SP包的 shamoke（技能名"蒺藜"与本地jili2一致）
 	shamoke: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
-		skills: ["gzjili"],
+		skills: ["jili2"],
 	},
 	// 国战UI.SHU021 乱世沉香 糜夫人 —— 对应SP包的 mifuren（标题"乱世沉香"、技能名"闺秀/存嗣"与本地一致）
 	mifuren: {
@@ -182,12 +182,12 @@ machao: {
 		hp: 3,
 		skills: ["guixiu", "cunsi"],
 	},
-	// 国战UI.SHU022 军略才器 马谡 —— 对应"一将成名"包的 xin_masu（技能名"散谣/制蛮"与本地olsanyao/rezhiman一致）
-	xin_masu: {
+	// 国战UI.SHU022 军略才器 马谡 —— 对应"一将成名"包的 masu（技能名"散谣/制蛮"与本地sanyao/rezhiman一致）
+	masu: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
-		skills: ["olsanyao", "zhiman"],
+		skills: ["sanyao", "zhiman"],
 	},
 	// 国战UI.SHU023 镇北柱国 王平 —— 对应神话再临包的 wangping（技能"将略"为全新技能，与原技能无关）
 	wangping: {
@@ -196,15 +196,15 @@ machao: {
 		hp: 4,
 		skills: ["jianglve"],
 	},
-	// 国战UI.SHU024 陈筹画策 法正 —— 对应"一将成名"包的 xin_fazheng（技能名"眩惑/恩怨"与本地一致）
-	xin_fazheng: {
+	// 国战UI.SHU024 陈筹画策 法正 —— 对应"一将成名"包的 fazheng（技能名"眩惑/恩怨"与本地一致）
+	fazheng: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
-		skills: ["fzxuanhuo", "fzenyuan"],
+		skills: ["xuanhuo", "enyuan"],
 	},
 	// 国战UI.SHU026A 同心并力 关兴 —— 官方均为"关兴张苞"合体武将，无单独关兴，视为全新单人武将
-	hb_guanxing: {
+	guanxing: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
@@ -231,7 +231,7 @@ guanping: {
 		skills: ["qiaoshui", "jyzongshi"],
 	},
 	// 寇封：官方无同名武将，全新设计
-	hb_koufeng: {
+	koufeng: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
@@ -241,7 +241,7 @@ guanping: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
-		skills: ["olbenxi", "zhuanzheng"],
+		skills: ["benxi", "zhuanzheng"],
 	},
 	zhangsong: {
 		sex: "male",
@@ -253,7 +253,7 @@ guanping: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
-		skills: ["xinzhongyong"],
+		skills: ["zhongyong"],
 	},
 	liuchen: {
 		sex: "male",
@@ -296,20 +296,20 @@ mizhu: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
-		skills: ["rezhiyi"],
+		skills: ["zhiyi"],
 	},
-	dc_lifeng: {
+	lifeng: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
-		skills: ["liangcang", "dcshuliang"],
+		skills: ["liangcang", "shuliang"],
 	},
 	// 赵统&赵广：官方无同名（合体）武将，参考赵统/赵广二人共有的"翊赞"设计为全新合体武将
-	hb_zhaotongguang: {
+	zhaotongguang: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
-		skills: ["zj_yizan"],
+		skills: ["yizan"],
 		names: "赵|统-赵|广",
 	},
 	qinmi: {
@@ -328,22 +328,22 @@ mizhu: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
-		skills: ["dcwanglie"],
+		skills: ["wanglie"],
 	},
 	zhugezhan: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
-		skills: ["xinfu_zuilun", "xinfu_fuyin"],
+		skills: ["zuilun", "fuyin"],
 	},
 
-hb_meifang: {
+meifang: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
-		skills: ["hb_huoe", "hb_tanlin"],
+		skills: ["huoe", "tanlin"],
 	},
-	re_dengzhi: {
+	dengzhi: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
@@ -355,11 +355,11 @@ hb_meifang: {
 		hp: 3,
 		skills: ["zyqiao", "chengshang"],
 	},
-	dc_liuba: {
+	liuba: {
 		sex: "male",
 		group: "shu",
 		hp: 3,
-		skills: ["dctongdu", "dcguiyin"],
+		skills: ["tongdu", "guiyin"],
 	},
 	yangwan: {
 		sex: "female",
@@ -379,7 +379,7 @@ hb_meifang: {
 		hp: 3,
 		skills: ["longyi", "zhenjue"],
 	},
-	pe_mengda: {
+	mengda: {
 		sex: "male",
 		group: "shu",
 		hp: 4,
@@ -393,22 +393,22 @@ hb_meifang: {
 		hp: 4,
 		skills: ["drlt_zhengu"],
 	},
-	// 司马昭（原型：mobile包 simazhao。技能"昭然/筹伐"与yingbian包jin_simazhao的zhaoran/xinchoufa同名同效，沿用技能id）
+	// 司马昭（原型：mobile包 simazhao。技能"昭然/筹伐"与yingbian包jin_simazhao的zhaoran/choufa同名同效，沿用技能id）
 	simazhao: {
 		sex: "male",
 		group: "wei",
 		hp: 3,
-		skills: ["zhaoran", "xinchoufa"],
+		skills: ["zhaoran", "choufa"],
 	},
 	// 司马师（原型：mobile包 simashi。卡面技能名与原版技能不同，视为全新技能）
 	simashi: {
 		sex: "male",
 		group: "wei",
-		hp: 4,
+		hp: 3,
 		skills: ["yimie", "tairan"],
 	},
-	// 贾充（原型：huicui包 dc_jiachong。卡面技能名与原版技能不同，视为全新技能）
-	dc_jiachong: {
+	// 贾充（原型：huicui包 jiachong。卡面技能名与原版技能不同，视为全新技能）
+	jiachong: {
 		sex: "male",
 		group: "wei",
 		hp: 3,
@@ -440,10 +440,10 @@ hb_meifang: {
 		sex: "male",
 		group: "wei",
 		hp: 4,
-		skills: ["qiaobian"],
+		skills: ["qiaobian1", "qiaobian2"],
 	},
-	// 曹仁（原型：shenhua包 old_caoren。技能"据守"沿用其id但完全重新设计；"严整"为全新技能）
-	old_caoren: {
+	// 曹仁（原型：shenhua包 caoren。技能"据守"沿用其id但完全重新设计；"严整"为全新技能）
+	caoren: {
 		sex: "male",
 		group: "wei",
 		hp: 4,
@@ -453,7 +453,7 @@ hb_meifang: {
 	dianwei: {
 		sex: "male",
 		group: "wei",
-		hp: 4,
+		hp: 5,
 		skills: ["qiangxix"],
 	},
 
@@ -476,11 +476,11 @@ hb_meifang: {
 	dengai: {
 		sex: "male",
 		group: "wei",
-		hp: 4,
+		hp: 3,
 		skills: ["tuntian", "jixi"],
 	},
-	// 国战UI.WEI017 儒雅之风 李典 —— 对应标准包的 old_re_lidian（技能名"恂恂/忘隙"与本地一致）
-	old_re_lidian: {
+	// 国战UI.WEI017 儒雅之风 李典 —— 对应标准包的 lidian（技能名"恂恂/忘隙"与本地一致）
+	lidian: {
 		sex: "male",
 		group: "wei",
 		hp: 3,
@@ -515,12 +515,12 @@ hb_meifang: {
 		skills: ["zhengbi", "fengying"],
 		names: "崔|琰-毛|玠",
 	},
-	// 国战UI.WEI023 节度青徐 臧霸 —— 对应"绘萃"(huicui)包的 zangba（技能名"横江"沿用同角色技能id rehengjiang，效果按本卡重新设计）
+	// 国战UI.WEI023 节度青徐 臧霸 —— 对应"绘萃"(huicui)包的 zangba（技能名"横江"沿用同角色技能id hengjiang，效果按本卡重新设计）
 	zangba: {
 		sex: "male",
 		group: "wei",
 		hp: 4,
-		skills: ["rehengjiang"],
+		skills: ["hengjiang"],
 	},
 	// 国战UI.WEI024 驰援襄樊 于禁 —— 对应"一将成名"包的 yujin（技能名"节钺/毅重"沿用"旧版"(old)包 xin_yujin/re_yujin 二将各自的技能id jieyue/yizhong，合并为一将双技能）
 	yujin: {
@@ -535,7 +535,7 @@ hb_meifang: {
 		sex: "male",
 		group: "wei",
 		hp: 4,
-		skills: ["olcuorui", "liewei"],
+		skills: ["cuorui", "liewei"],
 	},
 	// 张春华（原型：一将成名 包 zhangchunhua，技能名"绝情/伤逝"与本地一致）
 	zhangchunhua: {
@@ -563,7 +563,7 @@ hb_meifang: {
 		sex: "male",
 		group: "wei",
 		hp: 3,
-		skills: ["rejingce"],
+		skills: ["jingce"],
 	},
 	// 满宠（原型：一将成名 包 manchong，技能名"峻刑/御策"与本地一致）
 	manchong: {
@@ -577,7 +577,7 @@ hb_meifang: {
 		sex: "male",
 		group: "wei",
 		hp: 4,
-		skills: ["xinsidi"],
+		skills: ["sidi"],
 	},
 	// 韩浩&史涣（原型：一将成名 包 hanhaoshihuan，技能名"慎断/勇略"与本地一致）
 	hanhaoshihuan: {
@@ -630,12 +630,12 @@ hb_meifang: {
 		hp: 3,
 		skills: ["tiandu", "xianfu", "chouce"],
 	},
-	// 王朗（原型：xianding包 wanglang，非ol_wanglang——译名"王朗"精确匹配。技能"鼓舌""激词"沿用其id regushe/rejici，重新设计效果）
+	// 王朗（原型：xianding包 wanglang，非ol_wanglang——译名"王朗"精确匹配。技能"鼓舌""激词"沿用其id gushe/jici，重新设计效果）
 	wanglang: {
 		sex: "male",
 		group: "wei",
 		hp: 3,
-		skills: ["regushe", "rejici"],
+		skills: ["gushe", "jici"],
 	},
 	// 辛宪英（原型：yijiang包 xinxianying——与xianding包re_xinxianying、diy包ns_xinxianying同名"辛宪英"的候选中，
 	// 技能名"忠鉴/才识"与yijiang版一致，选用其id。卡面技能效果均为全新设计）
@@ -680,14 +680,14 @@ hb_meifang: {
 		sex: "male",
 		group: "wei",
 		hp: 4,
-		skills: ["shanzhuan", "retuogu"],
+		skills: ["shanzhuan", "tuogu"],
 	},
 	// 华歆（原型：荟萃 包 huaxin，"华歆"——技能名"望归/息兵"与本地一致）
 	huaxin: {
 		sex: "male",
 		group: "wei",
 		hp: 3,
-		skills: ["spwanggui", "xibing"],
+		skills: ["wanggui", "xibing"],
 	},
 	// 田豫（原型：sp 包 tianyu，"田豫"——技能名"扫狄"与本地一致，未沿用"追讨"）
 	tianyu: {
@@ -696,26 +696,25 @@ hb_meifang: {
 		hp: 4,
 		skills: ["saodi"],
 	},
-	// 董昭（原型：荟萃 包 dc_dongzhao，"董昭"——技能"劝进/凿运"为全新设计，与原技能"移驾/定基"无关）
-	dc_dongzhao: {
+	// 董昭（原型：荟萃 包 dongzhao，"董昭"——技能"劝进/凿运"为全新设计，与原技能"移驾/定基"无关）
+	dongzhao: {
 		sex: "male",
 		group: "wei",
 		hp: 3,
 		skills: ["quanjin", "zaoyun"],
 	},
-	// 羊祜（原型：荟萃 包 dc_yanghu，"羊祜"——技能名"德劭/明伐"与本地一致）
-	dc_yanghu: {
+	// 羊祜（原型：荟萃 包 yanghu，"羊祜"——技能名"德劭/明伐"与本地一致）
+	yanghu: {
 		sex: "male",
 		group: "wei",
 		hp: 3,
-		skills: ["dcdeshao", "dcmingfa"],
+		skills: ["deshao", "mingfa"],
 	},
 	// 曹髦（原型：轩辕 包 caomao，"曹髦"——技能名"决讨/潜龙/忿肆"与本地一致，未沿用主公技"助势"）
 	caomao: {
 		sex: "male",
 		group: "wei",
 		hp: 3,
-		maxHp: 4,
 		skills: ["juetao", "qianlong", "fensi"],
 	},
 	// 曹芳（原型：轩辕 包 caofang，"曹芳"——技能"诏图/惊惧"取自集换 包"合曹芳"jsrg_caofang 的同名技能，
@@ -724,7 +723,7 @@ hb_meifang: {
 		sex: "male",
 		group: "wei",
 		hp: 4,
-		skills: ["jsrgzhaotu", "jsrgjingju"],
+		skills: ["zhaotu", "jingju"],
 	},
 	// 司马懿（原型：标准 包 simayi，"司马懿"——技能名"反馈/鬼才"与本地一致）
 	simayi: {
@@ -761,10 +760,10 @@ hb_meifang: {
 		sex: "male",
 		group: "wei",
 		hp: 3,
-		skills: ["gjtiandu", "yiji"],
+		skills: ["tiandu2", "yiji"],
 	},
-	// 徐晃（原型：shenhua 包 re_xuhuang，技能"治严"为全新设计，替换原技能）
-	re_xuhuang: {
+	// 徐晃（原型：shenhua 包 xuhuang，技能"治严"为全新设计，替换原技能）
+	xuhuang: {
 		sex: "male",
 		group: "wei",
 		hp: 4,
@@ -777,8 +776,8 @@ hb_meifang: {
 		hp: 4,
 		skills: ["xiaoguo"],
 	},
-	// 卞夫人（原型：sp 包 ol_bianfuren；"约俭"与官方一致沿用id，"挽危"为新名新技能）
-	ol_bianfuren: {
+	// 卞夫人（原型：sp 包 bianfuren；"约俭"与官方一致沿用id，"挽危"为新名新技能）
+	bianfuren: {
 		sex: "female",
 		group: "wei",
 		hp: 3,
@@ -798,7 +797,7 @@ hb_meifang: {
 	zhonghui: {
 		sex: "male",
 		group: "wei",
-		hp: 4,
+		hp: 3,
 		skills: ["quanji", "paiyi", "yaopan"],
 	},
 	// 王基（原型：shenhua 包 wangji，技能名"奇制/进趋"与官方一致，沿用其技能id）
@@ -813,7 +812,7 @@ dingfeng: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
-		skills: ["reduanbing", "refenxun"],
+		skills: ["duanbing", "fenxun"],
 	},
 	lvfan: {
 		sex: "male",
@@ -821,7 +820,7 @@ dingfeng: {
 		hp: 3,
 		skills: ["diaodu", "diancai"],
 	},
-	jin_zhouchu: {
+	zhouchu: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
@@ -831,7 +830,7 @@ dingfeng: {
 		sex: "male",
 		group: "wu",
 		hp: 3,
-		skills: ["congcha", "xinfu_gongqing"],
+		skills: ["congcha", "gongqing"],
 	},
 	sunquan: {
 		sex: "male",
@@ -849,19 +848,19 @@ dingfeng: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
-		skills: ["qixi", "gnfenwei"],
+		skills: ["qixi", "fenwei"],
 	},
 	lvmeng: {
 		sex: "male",
 		group: "wu",
-		hp: 4,
+		hp: 3,
 		skills: ["keji", "duojing"],
 	},
 	huanggai: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
-		skills: ["kurou", "hgzhaxiang"],
+		skills: ["kurou", "zhaxiang"],
 	},
 	zhouyu: {
 		sex: "male",
@@ -887,7 +886,7 @@ daqiao: {
 		sex: "male",
 		group: "wu",
 		hp: 5,
-		skills: ["gzyinghun", "yipo"],
+		skills: ["yinghun", "yipo"],
 	},
 	sunce: {
 		sex: "male",
@@ -899,7 +898,7 @@ daqiao: {
 		sex: "female",
 		group: "wu",
 		hp: 3,
-		skills: ["retianxiang", "hongyan"],
+		skills: ["tianxiang", "hongyan"],
 		names: "桥|null",
 	},
 	taishici: {
@@ -909,13 +908,13 @@ daqiao: {
 		skills: ["tianyi", "hanzhan"],
 		names: "太史|慈",
 	},
-	old_zhoutai: {
+	zhoutai: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
 		skills: ["buqu", "fenji"],
 	},
-	re_lusu: {
+	lusu: {
 		sex: "male",
 		group: "wu",
 		hp: 3,
@@ -928,18 +927,18 @@ daqiao: {
 		skills: ["zhijian", "guzheng"],
 		names: "张|昭-张|纮",
 	},
-	dc_jiangqing: {
+	jiangqing: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
-		skills: ["dcshangyi", "dcniaoxiang"],
+		skills: ["shangyi", "niaoxiang"],
 	},
 
 zhugejin: {
 		sex: "male",
 		group: "wu",
 		hp: 3,
-		skills: ["huanshi", "olhongyuan", "olmingzhe"],
+		skills: ["huanshi", "hongyuan", "mingzhe"],
 	},
 	lukang: {
 		sex: "male",
@@ -950,20 +949,20 @@ zhugejin: {
 	xusheng: {
 		sex: "male",
 		group: "wu",
-		hp: 3,
-		skills: ["yicheng", "xinpojun"],
+		hp: 4,
+		skills: ["yicheng", "pojun"],
 	},
 	lingtong: {
 		sex: "male",
 		group: "wu",
-		hp: 3,
+		hp: 4,
 		skills: ["xuanlve", "yongjin"],
 	},
 	chendong: {
 		sex: "male",
 		group: "wu",
-		hp: 3,
-		skills: ["dcduanxie", "fenming"],
+		hp: 4,
+		skills: ["duanxie", "fenming"],
 		names: "陈|武-董|袭",
 	},
 	wuguotai: {
@@ -973,17 +972,17 @@ zhugejin: {
 		skills: ["buyi", "ganlu"],
 		names: "丁|null",
 	},
-	re_sunyi: {
+	sunyi: {
 		sex: "male",
 		group: "wu",
-		hp: 3,
+		hp: 4,
 		skills: ["zaolix"],
 	},
 	bulianshi: {
 		sex: "female",
 		group: "wu",
 		hp: 3,
-		skills: ["old_anxu", "zhuiyi"],
+		skills: ["anxu", "zhuiyi"],
 	},
 	chengpu: {
 		sex: "male",
@@ -994,7 +993,7 @@ zhugejin: {
 	handang: {
 		sex: "male",
 		group: "wu",
-		hp: 3,
+		hp: 4,
 		skills: ["gongji", "jiefan"],
 	},
 
@@ -1033,7 +1032,7 @@ panzhangmazhong: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
-		skills: ["xinanguo"],
+		skills: ["anguo"],
 	},
 	sundeng: {
 		sex: "male",
@@ -1054,11 +1053,11 @@ panzhangmazhong: {
 		skills: ["aocai", "duwu"],
 		names: "诸葛|恪",
 	},
-	re_sunluyu: {
+	sunluyu: {
 		sex: "female",
 		group: "wu",
 		hp: 3,
-		skills: ["remumu", "zhixi"],
+		skills: ["mumu", "zhixi"],
 		dieAudios: ["sunluyu"],
 	},
 
@@ -1075,7 +1074,7 @@ panzhangmazhong: {
 		sex: "male",
 		group: "wu",
 		hp: 5,
-		skills: ["recanshi", "rechouhai", "guiming"],
+		skills: ["canshi", "chouhai", "guiming"],
 	},
 	// 阚泽（原型：sp 包 kanze，技能名"下书/宽释"与本地一致，沿用其id）
 	kanze: {
@@ -1084,19 +1083,19 @@ panzhangmazhong: {
 		hp: 3,
 		skills: ["xiashu", "kuanshi"],
 	},
-	// 吕岱（原型：sp2 包 lvdai，技能名"勤国"与本地一致，沿用其id/技能id xinfu_qinguo）
+	// 吕岱（原型：sp2 包 lvdai，技能名"勤国"与本地一致，沿用其id/技能id qinguo）
 	lvdai: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
-		skills: ["xinfu_qinguo"],
+		skills: ["qinguo"],
 	},
-	// 周鲂（原型：sp 包 zhoufang，技能名"断发/诱敌"与本地一致，沿用其id/技能id xinfu_duanfa/xinfu_youdi）
+	// 周鲂（原型：sp 包 zhoufang，技能名"断发/诱敌"与本地一致，沿用其id/技能id duanfa/youdi）
 	zhoufang: {
 		sex: "male",
 		group: "wu",
 		hp: 3,
-		skills: ["xinfu_duanfa", "xinfu_youdi"],
+		skills: ["duanfa", "youdi"],
 	},
 	// 孙茹（原型：mobile 包 sunru，技能"影箭"与本地一致沿用其id；卡面第二技能与原技能"释衅"不同名，
 	// 视为全新技能）
@@ -1106,36 +1105,36 @@ panzhangmazhong: {
 		hp: 3,
 		skills: ["yingjian", "shijue"],
 	},
-	// 留赞（原型：xianding 包 re_liuzan，技能名"奋音/力激"与本地一致，沿用其id/技能id refenyin/liji）
-	re_liuzan: {
+	// 留赞（原型：xianding 包 liuzan，技能名"奋音/力激"与本地一致，沿用其id/技能id fenyin/liji）
+	liuzan: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
-		skills: ["refenyin", "liji"],
+		skills: ["fenyin", "liji"],
 	},
-	// 薛综（原型：yijiang 包 xuezong，技能名"复难/诫训"与本地一致，沿用其id/技能id funan/xinjiexun）
+	// 薛综（原型：yijiang 包 xuezong，技能名"复难/诫训"与本地一致，沿用其id/技能id funan/jiexun）
 	xuezong: {
 		sex: "male",
 		group: "wu",
 		hp: 3,
-		skills: ["funan", "xinjiexun"],
+		skills: ["funan", "jiexun"],
 	},
-	// 陆绩（原型：shenhua 包 luji，技能名"怀橘/遗礼"与本地一致，沿用其id/技能id nzry_huaiju/nzry_yili；
+	// 陆绩（原型：shenhua 包 luji，技能名"怀橘/遗礼"与本地一致，沿用其id/技能id huaiju/yili；
 	// 未沿用官方第三技能"箴论"，因本卡面仅展示两个技能）
 	luji: {
 		sex: "male",
 		group: "wu",
 		hp: 3,
-		skills: ["nzry_huaiju", "nzry_yili"],
+		skills: ["huaiju", "yili"],
 	},
 	// 孙亮（原型：shenhua 包 sunliang，技能名"溃诛/立军"与本地一致，沿用其id/技能id
-	// nzry_kuizhu/nzry_lijun，效果均为全新设计；未沿用官方第三技能"制政"及isZhugong，
+	// kuizhu/lijun，效果均为全新设计；未沿用官方第三技能"制政"及isZhugong，
 	// 因本卡面仅展示两个非主公技能）
 	sunliang: {
 		sex: "male",
 		group: "wu",
 		hp: 3,
-		skills: ["nzry_kuizhu", "nzry_lijun"],
+		skills: ["kuizhu", "lijun"],
 	},
 
 xugong: {
@@ -1172,15 +1171,15 @@ xugong: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
-		skills: ["dcniji"],
+		skills: ["niji"],
 	},
-	dc_sunchen: {
+	sunchen: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
 		skills: ["zigu", "zuowei"],
 	},
-	hb_sunjun: {
+	sunjun: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
@@ -1202,14 +1201,14 @@ xugong: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["nzry_shicai", "nzry_chenglve"],
+		skills: ["shicai", "chenglve"],
 	},
 	// 国战UI.QUN&WU051 笳箫鼓吹 士燮（原型：sp 包 shixie。技能"避乱""礼下"与本地一致，沿用其id）
 	shixie: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["olbiluan", "relixia"],
+		skills: ["biluan", "lixia"],
 	},
 	// 国战UI.QUN001 悬壶济世 华佗（原型：standard 包 huatuo。技能"急救"与本地一致沿用其id；
 	// "除瘟"为全新技能，替换官方"青囊"）
@@ -1224,8 +1223,8 @@ xugong: {
 	lvbu: {
 		sex: "male",
 		group: "qun",
-		hp: 4,
-		skills: ["wushuang", "wushuang_ext"],
+		hp: 5,
+		skills: ["wushuang"],
 	},
 	// 国战UI.QUN003 幻惑欲影 貂蝉（原型：standard 包 diaochan。技能"离间""闭月"与本地一致，沿用其id）
 	diaochan: {
@@ -1235,9 +1234,9 @@ xugong: {
 		skills: ["lijian", "biyue"],
 		names: "null|null",
 	},
-	// 国战UI.QUN004 号令天下 袁绍（原型：shenhua 包 re_yuanshao。技能"乱击""血裔"与本地一致，沿用其id；
+	// 国战UI.QUN004 号令天下 袁绍（原型：shenhua 包 yuanshao。技能"乱击""血裔"与本地一致，沿用其id；
 	// 卡面未展示主公标识，故不沿用isZhugong）
-	re_yuanshao: {
+	yuanshao: {
 		sex: "male",
 		group: "qun",
 		hp: 4,
@@ -1245,7 +1244,7 @@ xugong: {
 	},
 	// 国战UI.QUN005 土鸡瓦犬 颜良&文丑：官方无同名合体武将（diy/tw 包均为颜良、文丑单独角色），
 	// 视为全新合体武将
-	hb_yanliangwenchou: {
+	yanliangwenchou: {
 		sex: "male",
 		group: "qun",
 		hp: 4,
@@ -1258,7 +1257,7 @@ xugong: {
 	dongzhuo: {
 		sex: "male",
 		group: "qun",
-		hp: 8,
+		hp: 4,
 		skills: ["jiuchi", "hengzheng", "baoling"],
 	},
 	// 国战UI.QUN007 山海异兽 贾诩（原型：shenhua 包 jiaxu。技能"完杀""乱武""帷幕"与本地一致，沿用其id，
@@ -1324,7 +1323,7 @@ xugong: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["sijian", "gzsuishi"],
+		skills: ["sijian", "suishi"],
 	},
 	panfeng: {
 		sex: "male",
@@ -1334,18 +1333,18 @@ xugong: {
 	},
 
 
-	re_zoushi: {
+	zoushi: {
 		sex: "female",
 		group: "qun",
 		hp: 3,
-		skills: ["rehuoshui", "reqingcheng"],
+		skills: ["huoshui", "qingcheng"],
 		names: "邹|null",
 	},
 	huaxiong: {
 		sex: "male",
 		group: "qun",
-		hp: 6,
-		skills: ["yaowu", "hwyangwei"],
+		hp: 4,
+		skills: ["yaowu", "yangwei"],
 	},
 	hetaihou: {
 		sex: "female",
@@ -1367,11 +1366,11 @@ xugong: {
 		skills: ["xiongsuan"],
 		names: "李|傕-郭|汜",
 	},
-	scl_zhangxiu: {
+	zhangxiu: {
 		sex: "male",
 		group: "qun",
 		hp: 4,
-		skills: ["sclfudi", "sclcongjian"],
+		skills: ["fudi", "congjian"],
 	},
 	zhangren: {
 		sex: "male",
@@ -1379,31 +1378,31 @@ xugong: {
 		hp: 4,
 		skills: ["chuanxin", "zfengshi"],
 	},
-	jsrg_hejin: {
+	hejin: {
 		sex: "male",
 		group: "qun",
 		hp: 4,
-		skills: ["jsrgzhaobing", "jsrgyanhuo"],
+		skills: ["zhaobing", "yanhuo"],
 	},
-	re_hansui: {
+	hansui: {
 		sex: "male",
 		group: "qun",
 		hp: 4,
-		skills: ["spniluan", "spweiwu"],
+		skills: ["niluan", "weiwu"],
 	},
 	gaoshun: {
 		sex: "male",
 		group: "qun",
 		hp: 4,
-		skills: ["gsxunxi", "gsshejia", "jinjiu"],
+		skills: ["xunxi", "shejia", "jinjiu"],
 	},
 
 
-	jsrg_liubiao: {
+	liubiao: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["jsrgyansha", "gzzishou"],
+		skills: ["yansha", "zishou"],
 	},
 	fuhuanghou: {
 		sex: "female",
@@ -1411,11 +1410,11 @@ xugong: {
 		hp: 3,
 		skills: ["zhuikong", "qiuyuan"],
 	},
-	hb_liru: {
+	liru: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["hb_liru_juece", "hb_liru_mieji", "hb_liru_fencheng"],
+		skills: ["liru_juece", "liru_mieji", "liru_fencheng"],
 	},
 	caifuren: {
 		sex: "female",
@@ -1446,9 +1445,9 @@ xugong: {
 		sex: "male",
 		group: "qun",
 		hp: 4,
-		skills: ["zhidao", "jili"],
+		skills: ["gzzhidao", "gzyjili"],
 	},
-	std_huangfusong: {
+	huangfusong: {
 		sex: "male",
 		group: "qun",
 		hp: 4,
@@ -1467,7 +1466,7 @@ xugong: {
 	quyi: {
 		sex: "male",
 		group: "qun",
-		hp: 3,
+		hp: 4,
 		skills: ["fuqi", "jiaozi"],
 	},
 	// 卑弥呼（原型：sp2 包 beimihu，仅名字沿用，原技能"纵鬼/蛊咒/拜甲"与卡面不同，视为全新技能）
@@ -1477,19 +1476,19 @@ xugong: {
 		hp: 3,
 		skills: ["guishu", "yuancheng"],
 	},
-	// 许劭（原型：jsrg 包 jsrg_xushao，技能名"盈门/评鉴"与本地一致，沿用其id/技能id sbyingmen/sbpingjian）
-	jsrg_xushao: {
+	// 许劭（原型：jsrg 包 xushao，技能名"盈门/评鉴"与本地一致，沿用其id/技能id yingmen/pingjian）
+	xushao: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["sbyingmen", "sbpingjian"],
+		skills: ["yingmen", "pingjian"],
 	},
-	// 祢衡（原型：huicui 包 re_miheng，技能名"狂才/舌剑"与本地一致，沿用其id/技能id rekuangcai/reshejian）
-	re_miheng: {
+	// 祢衡（原型：huicui 包 miheng，技能名"狂才/舌剑"与本地一致，沿用其id/技能id kuangcai/shejian）
+	miheng: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["rekuangcai", "reshejian"],
+		skills: ["kuangcai", "shejian"],
 	},
 	// 卢植（原型：shenhua 包 yl_luzhi，仅名字沿用，原技能"明任/贞良"与卡面不同，视为全新技能）
 	yl_luzhi: {
@@ -1498,41 +1497,41 @@ xugong: {
 		hp: 3,
 		skills: ["ruzong", "daoren"],
 	},
-	// 刘焉（原型：sp 包 liuyan，技能名"图射/立牧"与本地一致，沿用其id/技能id xinfu_tushe/xinfu_limu）
+	// 刘焉（原型：sp 包 liuyan，技能名"图射/立牧"与本地一致，沿用其id/技能id tushe/limu）
 	liuyan: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["xinfu_tushe", "xinfu_limu"],
+		skills: ["tushe", "limu"],
 	},
-	// 荀谌（原型：huicui 包 re_xunchen，技能名"锋略/暗涌"与本地一致，沿用其id/技能id refenglve/anyong）
-	re_xunchen: {
+	// 荀谌（原型：huicui 包 xunchen，技能名"锋略/暗涌"与本地一致，沿用其id/技能id fenglve/anyong）
+	xunchen: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["refenglve", "anyong"],
+		skills: ["fenglve", "anyong"],
 	},
-	// 徐荣（原型：xianding 包 xurong，技能"凶镶"与原技能"凶镬"(xinfu_xionghuo)机制一致，沿用其id；
+	// 徐荣（原型：xianding 包 xurong，技能"凶镶"与原技能"凶镬"(xionghuo)机制一致，沿用其id；
 	// 未沿用原第二技能"杀绝"，因本卡面仅展示一个技能）
 	xurong: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["xinfu_xionghuo"],
+		skills: ["xionghuo"],
 	},
-	// 黄祖（原型：xianding 包 dc_huangzu，仅名字沿用，原技能"精攻/骁眷"与卡面不同，视为全新技能）
-	dc_huangzu: {
+	// 黄祖（原型：xianding 包 huangzu，仅名字沿用，原技能"精攻/骁眷"与卡面不同，视为全新技能）
+	huangzu: {
 		sex: "male",
 		group: "qun",
-		hp: 3,
+		hp: 4,
 		skills: ["xishe"],
 	},
-	// 吕玲绮（原型：huicui 包 lvlingqi，技能名"帼武/妆戎/神威"与本地一致，沿用其id/技能id guowu/zhuangrong/llqshenwei）
+	// 吕玲绮（原型：huicui 包 lvlingqi，技能名"帼武/妆戎/神威"与本地一致，沿用其id/技能id guowu/zhuangrong/shenwei2）
 	lvlingqi: {
 		sex: "female",
 		group: "qun",
 		hp: 3,
-		skills: ["guowu", "zhuangrong", "llqshenwei"],
+		skills: ["guowu", "zhuangrong", "shenwei2"],
 	},
 
 
@@ -1542,15 +1541,15 @@ xugong: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["lz_yinge", "lz_shiren", "lz_juyi"],
+		skills: ["yinge", "shiren", "juyi2"],
 	},
 	// QUN0xx 稳镇风云 司马亮 —— 未找到同名官方角色，视为全新角色（卡面"稳镇风云"标题与
 	// QUN054皇甫嵩相同，疑为占位复用文本，与皇甫嵩并非同一角色，技能亦完全不同）
-	hb_simaliang: {
+	simaliang: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["sml_sheju", "sml_zuwang"],
+		skills: ["sheju", "zuwang"],
 	},
 	// QUN0xx 稳镇风云 王允 —— 对应SP包的 wangyun（同名同势力，体力沿用其4点；技能
 	// "赦论/伐异"与原技能"连计/谋逞"不同名，视为全新技能）
@@ -1558,14 +1557,14 @@ xugong: {
 		sex: "male",
 		group: "qun",
 		hp: 4,
-		skills: ["wy_shelun", "wy_fayi"],
+		skills: ["shelun", "fayi"],
 	},
 	// QUN0xx 稳镇风云 贾南风 —— 未找到同名官方角色，视为全新角色
-	hb_jiananfeng: {
+	jiananfeng: {
 		sex: "female",
 		group: "qun",
 		hp: 3,
-		skills: ["jnf_shanzheng", "jnf_xiongbao", "jnf_liedu"],
+		skills: ["shanzheng", "xiongbao", "liedu"],
 	},
 	// QUN101 轧庭焚礼 刘宏 —— 对应SP2包的 liuhong（同名同势力，体力沿用其4点；技能
 	// "朝争/甚宠"与原技能"鬻爵/图兴"不同名，视为全新技能；卡面未展示主公技，故不沿用isZhugong）
@@ -1573,7 +1572,7 @@ xugong: {
 		sex: "male",
 		group: "qun",
 		hp: 4,
-		skills: ["lh_chaozheng", "lh_shenchong"],
+		skills: ["chaozheng", "shenchong"],
 	},
 	// QUN102 从龙之仪 刘辩 —— 对应"先登"包的 liubian（同名同势力，体力沿用其3点；
 	// 技能名"诗怨/毒逝"与本地一致，沿用其id，但效果按卡面数值重新设计；卡面未展示主公技
@@ -1590,7 +1589,7 @@ xugong: {
 		sex: "male",
 		group: "qun",
 		hp: 4,
-		skills: ["dy_wuku", "dy_miewu"],
+		skills: ["wuku", "miewu"],
 	},
 	// QUN133 悲戚疏香 严夫人 —— 对应SP2包的 yanfuren（同名同势力，体力沿用其3点；
 	// 技能名"谗逆/匿伏"与本地一致，沿用其id，效果按卡面数值重新设计）

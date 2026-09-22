@@ -74,6 +74,55 @@ function createWindow() {
 	createMainWindow();
 }
 
+// 渲染进程真正卡死（比如死循环）后连页面自己的 JS 都跑不动了，没法自救，
+// 只能靠主进程这边检测：Chromium 会在渲染进程无响应超过一定时间后触发
+// unresponsive 事件；如果持续无响应超过 WATCHDOG_TIMEOUT_MS 还没恢复，就
+// 认为是真卡死了，强制刷新页面（同源，localStorage 里已经记录的对局数据不会丢）
+const WATCHDOG_TIMEOUT_MS = 15_000;
+function setupHangWatchdog(win: BrowserWindow) {
+	let unresponsiveTimer: ReturnType<typeof setTimeout> | null = null;
+
+	win.webContents.on("unresponsive", () => {
+		console.warn("[gz3-watchdog] 渲染进程无响应，等待恢复...");
+		if (unresponsiveTimer) {
+			clearTimeout(unresponsiveTimer);
+		}
+		unresponsiveTimer = setTimeout(() => {
+			if (win.isDestroyed()) {
+				return;
+			}
+			console.warn(`[gz3-watchdog] 持续无响应超过 ${WATCHDOG_TIMEOUT_MS}ms，强制刷新窗口`);
+			win.webContents.forcefullyCrashRenderer();
+		}, WATCHDOG_TIMEOUT_MS);
+	});
+
+	win.webContents.on("responsive", () => {
+		if (unresponsiveTimer) {
+			console.warn("[gz3-watchdog] 渲染进程已恢复响应");
+			clearTimeout(unresponsiveTimer);
+			unresponsiveTimer = null;
+		}
+	});
+
+	// forcefullyCrashRenderer 会让渲染进程真正崩溃退出，再触发 render-process-gone，
+	// 这里统一在 gone 事件里做真正的重载，避免 reload() 在渲染进程仍卡死时同样无效
+	win.webContents.on("render-process-gone", (event, details) => {
+		if (win.isDestroyed()) {
+			return;
+		}
+		console.warn("[gz3-watchdog] 渲染进程已退出，原因：" + details.reason + "，正在重新加载");
+		if (unresponsiveTimer) {
+			clearTimeout(unresponsiveTimer);
+			unresponsiveTimer = null;
+		}
+		if (import.meta.env.DEV) {
+			win.loadURL(`http://localhost:8080`);
+		} else {
+			win.loadURL(`http://localhost:8089/index.html`);
+		}
+	});
+}
+
 function createMainWindow() {
 	let win = new BrowserWindow({
 		width: 1000,
@@ -99,6 +148,7 @@ function createMainWindow() {
 		win.loadURL(`http://localhost:8089/index.html`);
 	}
 	remote.enable(win.webContents);
+	setupHangWatchdog(win);
 	const menuTemplate: Electron.MenuItemConstructorOptions[] = [
 		{
 			label: "操作",

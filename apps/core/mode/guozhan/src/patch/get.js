@@ -178,6 +178,98 @@ export class GetGuozhan extends Get {
 	}
 
 	/**
+	 * 势力判断专用的"有效身份"猜测：已明置的直接用真实identity；未明置的按“会不会被挤野”
+	 * 二元猜一个（会挤野就当野心家，不会就当主将势力）。fid/tid 在 realAttitude/rawAttitude
+	 * 里各自都要用，抽成共享方法避免两处实现漂移。
+	 *
+	 * @param {Player} player
+	 * @returns {string}
+	 */
+	_gzIdentity(player) {
+		if (player.isUnseen()) {
+			if (!player.wontYe()) {
+				return "ye";
+			}
+			return player.getGuozhanGroup(0);
+		}
+		return player.identity;
+	}
+
+	/**
+	 * from 未明置时，这名玩家最终揭示出来还可能是哪些势力（用 game.getIdentityList 剔除
+	 * 已经满员/被禁用的势力）。找不到就退化成四大常规势力，保证一定有候选，不会返回空数组
+	 * 导致后面的概率计算除零。
+	 *
+	 * @param {Player} player
+	 * @returns {string[]}
+	 */
+	_gzCandidateGroups(player) {
+		if (typeof game.getIdentityList == "function") {
+			var list = game.getIdentityList(player);
+			if (list) {
+				var keys = Object.keys(list).filter(function (key) {
+					return key != "unknown" && key != "ye";
+				});
+				if (keys.length) {
+					return keys;
+				}
+			}
+		}
+		return ["wei", "shu", "wu", "qun"];
+	}
+
+	/**
+	 * 每名玩家固定分配一个“打法人格”，只在 from 还未明置（势力信号还没建立起来）时才会
+	 * 影响态度评分——对应三将/群雄割据刚开局所有人都暗置、纯粹靠个人博弈行事的阶段。
+	 * 人格一旦分配就存进 storage，整局不变。
+	 *
+	 * @param {Player} player
+	 * @returns {string}
+	 */
+	_gzPersonality(player) {
+		if (!player.storage.gzPersonality) {
+			var pool = ["bully", "passive", "safe", "balanced"];
+			player.storage.gzPersonality = pool[Math.floor(Math.random() * pool.length)];
+		}
+		return player.storage.gzPersonality;
+	}
+
+	/**
+	 * 按 from 的人格，在原始态度分上叠加一个小幅修正：恃强凌弱者更想打弱的、放过强的；
+	 * 谨慎者更想打没有反击能力/离得远的、放过威胁大的；被动者整体上不那么在乎谁是谁。
+	 * 只做小幅加减/缩放，不会反转原有正负号所代表的敌友大方向。
+	 *
+	 * @param {Player} from
+	 * @param {Player} to
+	 * @param {number} att
+	 * @returns {number}
+	 */
+	_gzPersonalityAdjust(from, to, att) {
+		switch (this._gzPersonality(from)) {
+			case "bully":
+				if (to.hp < from.hp) {
+					return att - 0.5;
+				}
+				if (to.hp > from.hp) {
+					return att + 0.3;
+				}
+				return att;
+			case "passive":
+				return att * 0.5;
+			case "safe": {
+				var threat = to.countCards("he") + (to.hasSkillTag("save", true) ? 1 : 0);
+				var dist = get.distance(from, to);
+				if (threat <= 1 || dist > 2) {
+					return att - 0.3;
+				}
+				return att + 0.2;
+			}
+			default:
+				return att;
+		}
+	}
+
+	/**
 	 * > ?.??
 	 *
 	 * @param {Player} from
@@ -187,29 +279,51 @@ export class GetGuozhan extends Get {
 	 * @returns
 	 */
 	realAttitude(from, to, difficulty, toidentity) {
-		var getIdentity = function (player) {
-			if (player.isUnseen()) {
-				if (!player.wontYe()) {
-					return "ye";
-				}
-				return player.getGuozhanGroup(0);
-			}
-			return player.identity;
-		};
-		var fid = getIdentity(from);
-		if (fid == toidentity && toidentity != "ye") {
-			return 4 + difficulty;
-		}
-		if (from.identity == "unknown" && fid == toidentity) {
-			if (from.wontYe()) {
+		var fid = this._gzIdentity(from);
+		if (from.identity != "unknown") {
+			// from 已经明置，身份是确定的，维持原来的强判断
+			if (fid == toidentity && toidentity != "ye") {
 				return 4 + difficulty;
 			}
+			return this._gzRealAttitudeCore(from, to, difficulty, toidentity, fid);
 		}
-		var groups = [];
-		var map = {},
-			sides = [],
-			pmap = _status.connectMode ? lib.playerOL : game.playerMap,
-			player;
+		// from 未明置：不再是“猜一个身份就当真/当假”的二元判断，而是按“这个势力目前
+		// 轮到我的概率”在“当队友”和下面常规聚类结果之间做连续插值。
+		var core = this._gzRealAttitudeCore(from, to, difficulty, toidentity, fid);
+		if (toidentity != "ye" && toidentity != "unknown") {
+			var candidates = this._gzCandidateGroups(from);
+			if (candidates.includes(toidentity)) {
+				var chance = 1 / Math.max(1, candidates.length);
+				if (fid == toidentity && from.wontYe()) {
+					chance = Math.max(chance, 0.6);
+				}
+				var allyScore = 4 + difficulty;
+				return core + (allyScore - core) * chance;
+			}
+		}
+		return core;
+	}
+
+	/**
+	 * realAttitude 的原有聚类打分主体，抽出来复用（未明置的 from 也要走这套逻辑作为
+	 * “插值的另一端”）。在原有逻辑基础上叠加三处修正：
+	 * ①势力体量按血量加权，不是单纯数人头，避免“3个残血 vs 2个满血”被错判成更大势力；
+	 * ②对野心家不再额外加成“显得像最大势力”，改成对最终结果打折——打死野心家不能巩固
+	 *   任何势力局势，性价比本来就低；
+	 * ③自己所处势力是全场最弱/唯一势力时，整体收敛敌意（观望），除非对方明显是当前最大
+	 *   势力——这时反而额外增加敌意（拉偏架，防止一方独大）。
+	 *
+	 * @param {Player} from
+	 * @param {Player} to
+	 * @param {number} difficulty
+	 * @param {string} toidentity
+	 * @param {string} fid
+	 * @returns {number}
+	 */
+	_gzRealAttitudeCore(from, to, difficulty, toidentity, fid) {
+		var pmap = _status.connectMode ? lib.playerOL : game.playerMap,
+			map = {},
+			sides = [];
 		for (var i of game.players) {
 			if (i.identity == "unknown") {
 				continue;
@@ -219,59 +333,94 @@ export class GetGuozhan extends Get {
 				if (i.isFriendOf(pmap[j])) {
 					added = true;
 					map[j].push(i);
-					if (i == this) {
-						player = j;
-					}
 					break;
 				}
 			}
 			if (!added) {
 				map[i.playerid] = [i];
 				sides.push(i.playerid);
-				if (i == this) {
-					player = i.playerid;
-				}
 			}
 		}
+		var strengthOf = function (players) {
+			return players.reduce(function (sum, p) {
+				return sum + Math.max(0.5, p.hp);
+			}, 0);
+		};
+		var groupSizes = [],
+			groupStrengths = [];
 		for (var i in map) {
-			var num = map[i].length;
-			groups.push(num);
+			groupSizes.push(map[i].length);
+			groupStrengths.push(strengthOf(map[i]));
 		}
-		var max = Math.max.apply(this, groups);
-		if (max <= 1) {
+		var maxSize = groupSizes.length ? Math.max.apply(this, groupSizes) : 0;
+		if (maxSize <= 1) {
 			return -3;
 		}
+		var max = groupStrengths.length ? Math.max.apply(this, groupStrengths) : 0;
 		var from_p;
 		if (from.identity == "unknown" && from.wontYe()) {
 			from_p = get.population(fid);
 		} else {
-			from_p = game.countPlayer(function (current) {
-				return current.isFriendOf(from);
-			}, true);
+			from_p = strengthOf(
+				game.players.filter(function (current) {
+					return current.identity != "unknown" && current.isFriendOf(from);
+				})
+			);
 		}
-		var to_p = game.countPlayer(function (current) {
-			return current.isFriendOf(to);
-		}, true);
-		if (to.identity == "ye") {
-			to_p += 1.5;
+		var to_p = strengthOf(
+			game.players.filter(function (current) {
+				return current.identity != "unknown" && current.isFriendOf(to);
+			})
+		);
+
+		var result;
+		if (to_p >= max) {
+			result = -5;
+		} else if (from_p >= max) {
+			result = -2 - to_p;
+		} else if (max >= game.players.length / 2) {
+			result = to_p <= from_p ? 0.5 : 0;
+		} else if (to_p < max - 1) {
+			result = 0;
+		} else {
+			result = -0.5;
 		}
 
-		if (to_p >= max) {
-			return -5;
+		if (to.identity == "ye") {
+			result *= 0.6;
 		}
-		if (from_p >= max) {
-			return -2 - to_p;
-		}
-		if (max >= game.players.length / 2) {
-			if (to_p <= from_p) {
-				return 0.5;
+
+		if (from.identity != "unknown") {
+			var fromKey = null;
+			for (var j of sides) {
+				if (pmap[j] == from || from.isFriendOf(pmap[j])) {
+					fromKey = j;
+					break;
+				}
 			}
-			return 0;
+			if (fromKey != null && groupSizes.length >= 3) {
+				var fromGroupStrength = strengthOf(map[fromKey]);
+				var minStrength = Math.min.apply(this, groupStrengths);
+				if (fromGroupStrength <= minStrength + 0.01) {
+					if (to_p >= max * 0.8) {
+						result -= 0.5;
+					} else {
+						result *= 0.5;
+					}
+				}
+			}
 		}
-		if (to_p < max - 1) {
-			return 0;
+
+		if (to.hasSkillTag && to.hasSkillTag("maixie", true)) {
+			var aliveRatio = game.players.length / Math.max(1, game.players.length + game.dead.length);
+			if (_status._aozhan || aliveRatio <= 0.6) {
+				result -= 1;
+			} else if (aliveRatio > 0.8) {
+				result += 0.5;
+			}
 		}
-		return -0.5;
+
+		return result;
 	}
 
 	/**
@@ -282,17 +431,16 @@ export class GetGuozhan extends Get {
 	 * @returns
 	 */
 	rawAttitude(from, to) {
-		var getIdentity = function (player) {
-			if (player.isUnseen()) {
-				if (!player.wontYe()) {
-					return "ye";
-				}
-				return player.getGuozhanGroup(0);
-			}
-			return player.identity;
-		};
-		var fid = getIdentity(from),
-			tid = getIdentity(to);
+		var result = this._gzRawAttitudeInner(from, to);
+		if (from.identity == "unknown" && to.identity != "unknown" && from != to) {
+			result = this._gzPersonalityAdjust(from, to, result);
+		}
+		return result;
+	}
+
+	_gzRawAttitudeInner(from, to) {
+		var fid = this._gzIdentity(from),
+			tid = this._gzIdentity(to);
 		if (to.identity == "unknown" && game.players.length == 2) {
 			return -5;
 		}
@@ -313,6 +461,14 @@ export class GetGuozhan extends Get {
 			if (from.wontYe()) {
 				return 4 + difficulty;
 			}
+		}
+		// gz3: 双方都暗置，但各自的真实势力（fid/tid，不是猜测）本来就相同时，不能只把
+		// 它当成"猜出来的队友"按 realAttitude 里的概率插值处理——那套插值后面还会被
+		// to.ai.shown（对方看起来像不像已知身份）进一步按 Math.random() 打散，导致
+		// 明明是真队友，AI 还是会去打，等打完才明置发现打了自己人。这里跟上面"对方已
+		// 明置"的分支对齐，真身份确定相同且双方都不会被挤成野心家时，直接判定为队友。
+		if (from.identity == "unknown" && to.identity == "unknown" && fid == tid && tid != "ye" && from.wontYe() && to.wontYe()) {
+			return 4 + difficulty;
 		}
 		var att = get.realAttitude(from, to, difficulty, tid);
 		if (from.storage.zhibi && from.storage.zhibi.includes(to)) {

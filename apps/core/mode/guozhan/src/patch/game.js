@@ -1,5 +1,6 @@
 import { lib, game, Game, ui, get, ai, _status } from "noname";
 import { showYexingsContent, chooseCharacterContent, chooseCharacterOLContent } from "./content.js";
+import { recordGuozhanResult } from "./battleLog.js";
 
 export class GameGuozhan extends Game {
 	/**
@@ -179,7 +180,8 @@ export class GameGuozhan extends Game {
 			ye: "野",
 			unknown: "猜",
 		};
-		const maxPlayer = (_status.separatism ? Math.max(get.population() / 2 - 1, 1) : get.population() / 2);
+		// const maxPlayer = (_status.separatism ? Math.max(get.population() / 2 - 1, 1) : get.population() / 2);
+		const maxPlayer = get.population() / 2;
 		for ( let group of ["wei", "shu", "wu", "qun", "jin"]) {
 			if (group == _status.bannedGroup?.slice(6) || get.population(group) >= maxPlayer && !game.hasPlayer(current => {
 				return get.is.jun(current) && current.identity == group;
@@ -366,6 +368,10 @@ export class GameGuozhan extends Game {
 		}
 		// @ts-expect-error 祖宗之法就是这么写的
 		var winner = (_status.connectMode ? lib.playerOL : game.playerMap)[game.winner_id];
+		// gz3: 快速自动测试模式下用于批量刷 AI 对局，记录每局武将出场与胜负，供后续统计强度用
+		if (lib.config.test_game) {
+			recordGuozhanResult(winner);
+		}
 		game.over(winner && winner.isFriendOf(me) ? true : false);
 		// @ts-expect-error 祖宗之法就是这么写的
 		game.showIdentity();
@@ -391,6 +397,21 @@ export class GameGuozhan extends Game {
 		next.setContent(chooseCharacterContent);
 
 		return next;
+
+		// gz3: 双势力/选择势力角色确定真实势力时，优先加入当前人数最多（且未满）的
+		// 势力而不是纯随机选——避免明明有势力还有空位，AI却随机落单到"独苗"势力。
+		// 人数相同时仍随机挑选。
+		/**
+		 * @param {string[]} groups
+		 * @returns {string}
+		 */
+		function pickGroup(groups) {
+			if (!groups.length) {
+				return groups.randomGet();
+			}
+			const maxPop = Math.max(...groups.map(group => get.population(group)));
+			return groups.filter(group => get.population(group) == maxPop).randomGet();
+		}
 
 		/**
 		 * @param {Player} player
@@ -452,19 +473,20 @@ export class GameGuozhan extends Game {
 							// @ts-expect-error 祖宗之法就是这么写的
 							if (selectGroup.includes(lib.character[vicex][1])) {
 								// @ts-expect-error 祖宗之法就是这么写的
-								player.trueIdentity = get.is.double(mainx, true).randomGet();
+								player.trueIdentity = pickGroup(get.is.double(mainx, true));
 							} else if (!get.is.double(vicex, true)) {
 								player.trueIdentity = lib.character[vicex][1];
 							}
 							// @ts-expect-error 祖宗之法就是这么写的
 							else if (get.is.double(mainx, true).removeArray(get.is.double(vicex, true)).length == 0 || get.is.double(vicex, true).removeArray(get.is.double(mainx, true)).length == 0) {
 								// @ts-expect-error 祖宗之法就是这么写的
-								player.trueIdentity = get.is
-									// @ts-expect-error 祖宗之法就是这么写的
-									.double(vicex, true)
-									// @ts-expect-error 祖宗之法就是这么写的
-									.filter(group => get.is.double(mainx, true).includes(group))
-									.randomGet();
+								player.trueIdentity = pickGroup(
+									get.is
+										// @ts-expect-error 祖宗之法就是这么写的
+										.double(vicex, true)
+										// @ts-expect-error 祖宗之法就是这么写的
+										.filter(group => get.is.double(mainx, true).includes(group))
+								);
 							}
 							// @ts-expect-error 祖宗之法就是这么写的
 							else {
@@ -472,7 +494,7 @@ export class GameGuozhan extends Game {
 							}
 							// @ts-expect-error 祖宗之法就是这么写的
 						} else if (selectGroup.includes(lib.character[mainx][1]) && get.is.double(vicex, true)) {
-							player.trueIdentity = get.is.double(vicex, true).randomGet();
+							player.trueIdentity = pickGroup(get.is.double(vicex, true));
 						}
 						if (back) {
 							list.remove(player.name1);

@@ -19008,7 +19008,8 @@ export default {
 				}
 				const num = player.identity == group ? 0 : 1;
 				// @ts-expect-error 类型就是这么写的
-				return get.totalPopulation(group) + num > (_status.separatism ? Math.max(get.population() / 2 - 1, 1) : get.population() / 2);
+				// return get.totalPopulation(group) + num > (_status.separatism ? Math.max(get.population() / 2 - 1, 1) : get.population() / 2);
+				return get.totalPopulation(group) + num > get.population() / 2;
 			});
 			if (willBeYe?.length) {
 				groups.removeArray(willBeYe);

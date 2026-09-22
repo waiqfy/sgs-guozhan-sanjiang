@@ -12,6 +12,21 @@ const delay = ms =>
 		}, ms);
 	});
 
+// gz3: 双势力/选择势力角色确定真实势力时，优先加入当前人数最多（且未满）的势力，
+// 而不是纯随机选——避免明明有势力还有空位，AI却随机落单到"独苗"势力。人数相同
+// 时仍随机挑选。
+/**
+ * @param {string[]} groups
+ * @returns {string}
+ */
+function pickPreferredGroup(groups) {
+	if (!groups.length) {
+		return groups.randomGet();
+	}
+	const maxPop = Math.max(...groups.map(group => get.population(group)));
+	return groups.filter(group => get.population(group) == maxPop).randomGet();
+}
+
 /**
  * @param {GameEvent} event
  * @param {GameEvent} _trigger
@@ -122,8 +137,9 @@ export const chooseCharacterContent = async (event, _trigger, _player) => {
 						.chooseControl(get.is.double(name1, true));
 
 					next.set("prompt", "请选择主将代表的势力");
+					// gz3: 优先加入当前人数最多（且未满）的势力，而不是纯随机选
 					// @ts-expect-error 祖宗之法就是这么写的
-					next.set("ai", () => _status.event.controls.randomGet());
+					next.set("ai", () => pickPreferredGroup(_status.event.controls));
 
 					result2 = await next.forResult();
 				} else if (!get.is.double(name2, true)) {
@@ -137,8 +153,9 @@ export const chooseCharacterContent = async (event, _trigger, _player) => {
 						.chooseControl(get.is.double(name2, true).filter(group => get.is.double(name1, true).includes(group)));
 
 					next.set("prompt", "请选择你代表的势力");
+					// gz3: 优先加入当前人数最多（且未满）的势力，而不是纯随机选
 					// @ts-expect-error 祖宗之法就是这么写的
-					next.set("ai", () => _status.event.controls.randomGet());
+					next.set("ai", () => pickPreferredGroup(_status.event.controls));
 
 					result2 = await next.forResult();
 				} else {
@@ -155,8 +172,9 @@ export const chooseCharacterContent = async (event, _trigger, _player) => {
 					.chooseControl(get.is.double(name2, true));
 
 				next.set("prompt", "请选择副将代表的势力");
+				// gz3: 优先加入当前人数最多（且未满）的势力，而不是纯随机选
 				// @ts-expect-error 祖宗之法就是这么写的
-				next.set("ai", () => _status.event.controls.randomGet());
+				next.set("ai", () => pickPreferredGroup(_status.event.controls));
 
 				result2 = await next.forResult();
 			}
@@ -597,7 +615,7 @@ export const chooseThirdCharacter = async playerFirst => {
 		}
 		const result = await player
 			.chooseButton(true, ["选择一名武将放入公共武将池", [candidates, "character"]])
-			.set("ai", button => get.guozhanRank(button.link))
+			.set("ai", button => -get.guozhanRank(button.link))
 			.forResult();
 		const picked = result.links[0];
 		pool.remove(picked);

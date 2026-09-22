@@ -5861,7 +5861,7 @@ else if (entry[1] !== void 0) stringifying[key] = JSON.stringify(entry[1]);*/
 						if (typeinfo) {
 							uiintro.add('<div class="text center">' + typeinfo + "</div>");
 						}
-						if (lib.card[name].unique && lib.card[name].type == "equip") {
+						if (lib.card[name] && lib.card[name].unique && lib.card[name].type == "equip") {
 							if (lib.cardPile.guozhan && lib.cardPack.guozhan.includes(name)) {
 								uiintro.add('<div class="text center">专属装备</div>').style.marginTop = "-5px";
 							} else {

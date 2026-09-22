@@ -3,6 +3,20 @@ import ErrorStackParser from "error-stack-parser";
 import StackTraceGPS from "stacktrace-gps";
 import { ErrorManager } from "@/util/sandbox.js";
 
+/**
+ * 将错误日志文本自动保存为文件，避免用户只能靠截图保存原生 alert 弹窗里的报错内容。
+ * game.writeFile 由统一文件系统适配器安装（Electron/浏览器/移动端均可用），失败时静默忽略。
+ */
+function saveErrorLog(game, content: string) {
+	if (typeof game.writeFile != "function") return;
+	const fileName = `error_${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
+	try {
+		game.writeFile(content, "log/error", fileName, () => {});
+	} catch (e) {
+		// 保存失败不影响原有的报错展示流程
+	}
+}
+
 function getStatusInfo({ lib, get, _status }) {
 	if (!_status?.event) return "";
 
@@ -140,7 +154,9 @@ export function setOnError({ lib, game, get, _status }) {
 		log.push("-------------");
 		const errorReporter = ErrorManager.getErrorReporter(err);
 		if (errorReporter) {
-			game.print(errorReporter.report(log.join("\n") + "\n代码出现错误"));
+			const reported = errorReporter.report(log.join("\n") + "\n代码出现错误");
+			saveErrorLog(game, reported);
+			game.print(reported);
 		} else {
 			if (typeof frame.lineNumber == "number" && (typeof game.readFile == "function" || location.origin != "file://")) {
 				/**
@@ -226,8 +242,10 @@ export function setOnError({ lib, game, get, _status }) {
 					})
 				);
 			}
-			alert(log.join("\n"));
-			game.print(log.join("\n"));
+			const content = log.join("\n");
+			saveErrorLog(game, content);
+			alert(content);
+			game.print(content);
 		}
 	};
 }
