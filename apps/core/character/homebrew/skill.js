@@ -322,6 +322,8 @@ export default {
 // ========== liuqi 刘琦 ==========
 	// 问计：出牌阶段开始时，你可以令一名其他角色交给你一张牌，若其与你：势力相同或未确定势力，你本回合使用此牌无距离、次数限制且不能被响应；势力不同，你交给其一张除此牌外的牌。 参考gzwenji
 	wenji: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
 		direct: true,
@@ -464,6 +466,8 @@ export default {
 
 	// 屯江：结束阶段，若你于出牌阶段内使用过牌且未指定过其他角色为目标，你可以摸X张牌（X为全场势力数）。 参考gztunjiang
 	tunjiang: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		trigger: { player: "phaseJieshuBegin" },
 		frequent: true,
@@ -662,6 +666,8 @@ export default {
 // ========== xiahouba 夏侯霸 ==========
 	// 豹烈：锁定技，出牌阶段开始时，所有攻击范围内包含你的其他势力的角色依次选择一项：1.弃置一张牌并对你使用一张【杀】；2.令你弃置其一张牌；你对体力值不小于你的其他角色使用【杀】无距离与次数限制。 参考gzbaolie
 	baolie: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		mod: {
 			targetInRange(card, player, target) {
@@ -2782,6 +2788,8 @@ export default {
 
 	// 再起：弃牌阶段结束时，你可以令至多X名与你势力相同的角色各选择一项：1.摸一张牌；2.令你回复1点体力（X为本回合置入弃牌堆的红色牌数）。 参考rezaiqi
 	zaiqixx: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		direct: true,
 		filter(event, player) {
@@ -2941,6 +2949,8 @@ export default {
 // ========== ganfuren 甘夫人 ==========
 	// 神智：准备阶段，你可以选择一名角色，弃置其一个区域中的最后一张牌或你的所有手牌，然后其回复1点体力。 参考shenzhi(sp)
 	shenzhi: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		trigger: { player: "phaseZhunbeiBegin" },
 		filter(event, player) {
@@ -3116,6 +3126,8 @@ export default {
 // ========== jiangwanfeiyi 蒋琬&费祎 ==========
 	// 生息：弃牌阶段结束时，若你未于此回合内造成过伤害，你可以摸两张牌。 参考shengxi(sp)
 	shengxi: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		trigger: { player: "phaseDiscardEnd" },
 		frequent: true,
@@ -3213,6 +3225,8 @@ export default {
 // ========== madai 马岱 ==========
 	// 潜袭：准备阶段，你可以摸一张牌，然后弃置一张牌，然后选择一名距离为1的角色，本回合其不能使用或打出与你弃置牌颜色相同的手牌，你使用牌无视其该颜色的防具。若其本回合没有失去过牌且受到伤害，出牌阶段结束时，你摸两张牌。 参考qianxi(yijiang)
 	qianxi: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		trigger: { player: "phaseZhunbeiBegin" },
 		preHidden: true,
@@ -3849,6 +3863,8 @@ export default {
 // ========== fazheng 法正 ==========
 	// 眩惑：其他角色的出牌阶段开始时，你可以交给其一张牌，然后其交给你两张牌。若其与你势力相同，其选择并获得以下技能之一直到回合结束：“武圣”、“咆哮”、“龙胆”、“铁骑”、“烈弓”、“狂骨”；不同，本轮不能再发动此技能。 参考gzxuanhuo(guozhan)
 	xuanhuo: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
 		filter(event, player) {
@@ -4237,6 +4253,8 @@ export default {
 // ========== jianyong 简雍 ==========
 	// 巧说：出牌阶段，你可以与一名角色拼点，若你：赢，本回合你使用下一张基本牌或普通锦囊牌可以多（无距离限制）或少选择一个目标；没赢，本回合不能对自己以外的目标使用牌。 参考qiaoshui(yijiang)
 	qiaoshui: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		audioname2: {
 			re_jianyong: "reqiaoshui",
@@ -4475,6 +4493,8 @@ export default {
 // ========== koufeng 寇封 ==========
 	// 怀兵：准备阶段，你可以选择两名角色，获得这两名角色各一张手牌，然后你展示手牌，令其中体力值较少的角色下个摸牌阶段摸牌数、出牌阶段【杀】的使用次数、弃牌阶段手牌上限改为其中红色牌的数量。 参考sxrmhuaibing
 	huaibing: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		trigger: {
 			player: "phaseZhunbeiBegin",
@@ -6103,6 +6123,8 @@ export default {
 // ========== chendao 陈到 ==========
 	// 往烈：出牌阶段开始时，你可以选择一张手牌，你于此阶段内：使用此牌无距离限制且不能被响应；使用此牌结算结束后不能再对其他角色使用牌。 参考potwanglie
 	wanglie: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
 		filter(event, player) {
@@ -6204,6 +6226,8 @@ export default {
 // ========== zhugezhan 诸葛瞻 ==========
 	// 罪论：结束阶段，你可以观看牌堆顶三张牌，你每满足以下一项便获得其中的一张，然后将其余牌以任意顺序置于牌堆顶：1.你于此回合内造成过伤害；2.你于此回合内未弃置过牌；3.手牌数为全场最少。若均不满足，你与一名其他角色各失去1点体力。 参考xinfu_zuilun
 	zuilun: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		trigger: {
 			player: "phaseJieshuBegin",
@@ -6405,6 +6429,8 @@ export default {
 // ========== meifang 糜芳 ==========
 	// 火厄：锁定技，结束阶段，你视为对至多四名其他角色使用一张【火攻】，若能造成伤害，须造成伤害并取消剩余目标（否则当前目标观看你的手牌）。最后你分配因此展示的牌，点数之和小于13则失去1点体力。 参考sxrmhuoe
 	huoe: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		forced: true,
 		trigger: {
@@ -6529,6 +6555,8 @@ export default {
 // ========== dengzhi 邓芝 ==========
 	// 简亮：准备阶段，若你的手牌数不为全场最多，你可以与你势力相同的所有角色各摸一张牌。 参考gzjianliang
 	jianliang: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: 2,
 		trigger: { player: "phaseZhunbeiBegin" },
 		frequent: true,
@@ -6931,6 +6959,8 @@ export default {
 
 	// 追还：回合结束时，你可以选择至多两名角色，其中一名角色下一次受到伤害后，其对来源造成1点伤害；另一名角色下一次受到伤害后，伤害来源弃置两张手牌。 参考gzzhuihuan
 	zhuihuan: {
+		skillAnimation: true,
+		animationColor: "soil",
 		audio: "zhuihuan",
 		trigger: { player: "phaseJieshuBegin" },
 		async cost(event, trigger, player) {
@@ -7449,6 +7479,8 @@ export default {
 // ========== haozhao 郝昭 ==========
 	// 镇骨：结束阶段，你可以选择一名其他角色，你的回合结束时和该角色的下个回合结束时，其将手牌摸至或弃至与你手牌数相同（最多摸至五张）。 参考drlt_zhengu(shenhua)
 	drlt_zhengu: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: 2,
 		trigger: { player: "phaseJieshuBegin" },
 		filter(event, player) {
@@ -7528,6 +7560,8 @@ export default {
 // ========== simazhao 司马昭 ==========
 	// 昭然：出牌阶段开始时，你可以令你的手牌对所有角色可见直到此阶段结束。若如此做，当你于本阶段失去任意花色的最后一张手牌时（每种花色限一次），你摸一张牌或弃置一名其他角色的一张牌。 参考zhaoran(yingbian)
 	zhaoran: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
 		preHidden: true,
@@ -7784,6 +7818,8 @@ export default {
 
 	// 泰然：锁定技，回合结束时，你回复体力至上限且手牌摸至体力上限；出牌阶段开始时，你失去上回合以此法回复的体力，弃置以此法获得的手牌。 参考tairan(yingbian)
 	tairan: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: 2,
 		trigger: { player: "phaseJieshuBegin" },
 		forced: true,
@@ -8100,6 +8136,8 @@ export default {
 
 	// 洛神：准备阶段，你可以进行判定，若结果为黑色，你可以重复此流程，然后你获得其中所有的判定牌。 参考luoshen(standard)
 	luoshen: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: 2,
 		trigger: { player: "phaseZhunbeiBegin" },
 		frequent: true,
@@ -8331,6 +8369,8 @@ export default {
 	// "phaseZhunbei"（用于在每回合开始时记录判定区里的延时锦囊，供奖励结算时排除
 	// 因乐不思蜀/兵粮寸断导致的跳过）。
 	qiaobian1: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: "qiaobian",
 		sourceSkill: "qiaobian",
 		trigger: {
@@ -8457,6 +8497,8 @@ export default {
 // ========== caoren 曹仁 ==========
 	// 据守：结束阶段，你可以摸X张牌（X为存活角色亮明势力数），然后你可以使用一张装备牌。若X大于2，则你将武将牌叠置。 参考gz_jushou
 	jushou: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: "xinjushou",
 		trigger: {
 			player: "phaseJieshuBegin",
@@ -9171,6 +9213,8 @@ export default {
 // ========== lidian 李典 ==========
 	// 恂恂：摸牌阶段开始时，你可以观看牌堆顶的四张牌，将其中两张牌以任意顺序置于牌堆顶，其余以任意顺序置于牌堆底。 参考xunxun(refresh)
 	xunxun: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: 2,
 		trigger: { player: "phaseDrawBegin1" },
 		preHidden: true,
@@ -9534,6 +9578,8 @@ export default {
 // ========== cuimao 崔琰&毛玠 ==========
 	// 征辟：出牌阶段每项限一次：1.选择一名未确定势力的角色，直到回合结束或其明置武将牌，你对其使用牌无距离和次数限制；2.选择一名有明置武将牌的角色，交给其一张牌，然后其交给你一张除此牌以外的非基本牌或两张基本牌。 参考gz_zhengbi(旧版卡面)，2026年重印卡面文本改动较大，按新文本重写
 	zhengbi: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: "zhengbi",
 		enable: "phaseUse",
 		group: ["zhengbi_reset"],
@@ -9739,6 +9785,8 @@ export default {
 // ========== yujin 于禁 ==========
 	// 节钺：准备阶段，你可以交给不为魏势力的一名角色一张手牌，然后令其执行一次“军令”。若其执行，你摸一张牌；若其不执行，你本回合的摸牌阶段多摸三张牌。 参考gz_jieyue
 	jieyue: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: ["jieyue", 2],
 		trigger: {
 			player: "phaseZhunbeiBegin",
@@ -10001,6 +10049,8 @@ export default {
 
 	// 秘计：结束阶段，你可以摸X张牌（X为你已损失的体力值），然后可以将至多等量的牌交给其他角色。 参考miji(yijiang)
 	miji: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: 2,
 		audioname: ["re_wangyi"],
 		trigger: {
@@ -10907,6 +10957,8 @@ export default {
 // ========== chengyu 程昱 ==========
 	// 设伏：出牌阶段结束时，你可以将一张手牌扣置于武将牌上；当一名角色使用牌时，你可以移去你武将牌上的一张同名牌令之无效。 参考shefu(sp)
 	shefu: {
+		skillAnimation: true,
+		animationColor: "water",
 		trigger: { player: "phaseJieshuBegin" },
 		direct: true,
 		audio: 2,
@@ -11762,6 +11814,8 @@ export default {
 // ========== luzhi 鲁芝 ==========
 	// 清忠：出牌阶段开始时，你可以摸两张牌，然后本阶段结束时，若你手牌不为场上唯一最少，你与一名手牌数最少的角色交换手牌。 参考qingzhong(sp)
 	qingzhong: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
 		check(event, player) {
@@ -11920,6 +11974,8 @@ export default {
 // ========== wenyang 文鸯 ==========
 	// 覆阵：准备阶段，你可以视为对一个确定势力的所有其他角色使用一张【决斗】，结算后所有角色本回合只能再使用共计X张手牌（X为结算流程中共计打出【杀】的数量）。 参考gz_duanqiu(guozhan，同角色技能"断虬"，audio字段本身指向jsrgfuzhen，确认为同一设计)
 	fuzhen: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: "jsrgfuzhen",
 		trigger: {
 			player: "phaseZhunbeiBegin",
@@ -12943,6 +12999,8 @@ export default {
 
 	// 忿肆：锁定技，准备阶段，你对体力值不小于你的一名角色造成1点伤害，然后若该角色不为你，则其视为对你使用一张【杀】。 参考fensi(xianding)
 	fensi: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: 2,
 		trigger: { player: "phaseZhunbeiBegin" },
 		forced: true,
@@ -13979,6 +14037,8 @@ export default {
 
 	// 排异：弃牌阶段结束时，若你此阶段未弃置过牌，你可以将任意张“权”交给一名角色，然后若其手牌数大于你，你对其造成1点伤害。 参考gz_ol_paiyi
 	paiyi: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: "paiyi",
 		trigger: {
 			player: "phaseDiscardEnd",
@@ -14133,6 +14193,8 @@ export default {
 
 	// 进趋：结束阶段，你可以摸两张牌，然后将手牌弃至X张（X为你于此回合内发动过“奇制”的次数）。 参考jinqu(sp)
 	jinqu: {
+		skillAnimation: true,
+		animationColor: "water",
 		audio: 2,
 		trigger: { player: "phaseJieshuBegin" },
 		check(event, player) {
@@ -14264,6 +14326,8 @@ export default {
 
 	// 奋迅：出牌阶段开始时，你可以选择一名其他角色，本回合你计算与其的距离视为1，然后直到回合结束时，若你未对其造成过伤害，你弃置一张牌。 参考fenxun(sp)
 	fenxun: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
 		filterTarget(card, player, target) {
@@ -14317,6 +14381,8 @@ export default {
 // ========== lvfan 吕范 ==========
 	// 调度：同势力角色使用装备牌时，若其装备区没有该类别装备，可以摸一张牌。准备阶段，你可以将与一名同势力角色装备区里的一张牌移动至另一名同势力角色的装备区。 参考gz_diaodu_best
 	diaodu: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: "diaodu",
 		trigger: {
 			global: "useCard",
@@ -14462,6 +14528,8 @@ export default {
 // ========== panjun 潘濬 ==========
 	// 聪察：准备阶段，你可以选择一名未确定势力的角色，直到你的下个回合开始，当其首次确定势力后，若其与你：势力相同，你与其各摸两张牌；势力不同，其失去1点体力；摸牌阶段，若所有角色均已确定势力，你可以多摸两张牌。 参考gzcongcha
 	congcha: {
+		skillAnimation: true,
+		animationColor: "wood",
 		aiShowTag: "support",
 		audio: 2,
 		trigger: { player: "phaseZhunbeiBegin" },
@@ -14865,6 +14933,8 @@ export default {
 // ========== lvmeng 吕蒙 ==========
 	// 克己：锁定技，弃牌阶段开始时，若你未于出牌阶段内使用过颜色不同的牌，则你于本回合内的手牌上限+4。 参考gz_keji
 	keji: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: "keji",
 		forced: true,
 		trigger: {
@@ -15077,6 +15147,8 @@ export default {
 // ========== zhouyu 周瑜 ==========
 	// 英姿：锁定技，摸牌阶段，你多摸一张牌；你的手牌上限等于你的体力上限。 参考yingzi
 	yingzi: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: "reyingzi_sunce",
 		locked: true,
 		trigger: { player: "phaseDrawBegin2" },
@@ -15457,6 +15529,8 @@ export default {
 // ========== sunjian 孙坚 ==========
 	// 英魂：准备阶段，你可以选择一名其他角色并选择一项：1.令其摸X张牌，然后弃置一张牌；2.令其摸一张牌，然后弃置X张牌。（X为你已损失的体力值） 参考gzyinghun
 	yinghun: {
+		skillAnimation: true,
+		animationColor: "wood",
 		aiShowTag: "defense",
 		aiShowCost: true,
 		audio: "yinghun",
@@ -15640,6 +15714,8 @@ export default {
 
 	// 鹰扬：准备阶段，你可以与一名其他角色拼点。赢的角色视为对没赢的角色使用一张【决斗】。若你因此【决斗】受到伤害，你失去此技能并获得"魂殇"。 参考skill_old.js
 	scyingyang: {
+		skillAnimation: true,
+		animationColor: "wood",
 		aiShowTag: "support",
 		audio: 2,
 		trigger: { player: "phaseZhunbeiBegin" },
@@ -15994,6 +16070,8 @@ export default {
 // ========== lusu 鲁肃 ==========
 	// 好施：摸牌阶段，你可以多摸两张牌，然后若你的手牌数大于5，你将半数手牌（向下取整）交给手牌最少的一名其他角色。 参考haoshi(shenhua)
 	haoshi: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: 2,
 		trigger: { player: "phaseDrawBegin2" },
 		filter(event, player) {
@@ -17007,6 +17085,8 @@ export default {
 
 	// 奋命：结束阶段，若你处于连环状态，你可以弃置所有处于连环状态的其他角色各一张牌，然后对其中一名因此没有手牌的角色造成1点伤害。 参考fake_fenming(guozhan)
 	fenming: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: "fenming",
 		trigger: { player: "phaseJieshuBegin" },
 		filter(event, player) {
@@ -17146,6 +17226,8 @@ export default {
 // ========== sunyi 孙翊 ==========
 	// 躁厉：锁定技，准备阶段，你弃置你手牌/装备区的所有牌，并摸等量的牌。然后，你可以将一张牌当【决斗】使用，若如此做，你失去1点体力、并摸已损失体力数量的牌。 参考stdzaoli(sixiang)
 	zaolix: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: "zaoli",
 		locked: true,
 		trigger: {
@@ -18064,6 +18146,8 @@ export default {
 
 	// 兴学：结束阶段，你可以令至多X名角色（X为你的体力上限）依次摸一张牌，并将一张牌置于牌堆顶或将此牌交给另一名此技能的目标。 参考mobilexingxue
 	xingxue: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: 2,
 		trigger: { player: "phaseJieshuBegin" },
 		filter(event, player) {
@@ -18190,6 +18274,8 @@ export default {
 // ========== sundeng 孙登 ==========
 	// 匡弼：出牌阶段限一次，你可以将至多三张牌置于武将牌上，称为"弼"。你的回合外，与你势力相同的角色可以如手牌般使用或打出"弼"；每当一张"弼"因此离开你的武将牌后，你摸一张牌。你的下个回合开始时，移去所有"弼"。 参考skill_old.js
 	kuangbi: {
+		skillAnimation: true,
+		animationColor: "wood",
 		aiShowTag: "support",
 		audio: 2,
 		enable: "phaseUse",
@@ -18242,6 +18328,8 @@ export default {
 // ========== zumao 祖茂 ==========
 	// 引兵：结束阶段，你可以将任意名攻击范围内包含你的角色各一张手牌置于你的武将牌上；当你受到【杀】或【决斗】造成的伤害后，来源可以获得一张“引兵”牌。 参考yinbing(sp)
 	yinbing: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: 2,
 		trigger: { player: "phaseJieshuBegin" },
 		filter(event, player) {
@@ -18304,6 +18392,8 @@ export default {
 
 	// 绝地：锁定技，准备阶段，你选择一项：1.移去所有“引兵”牌，然后你摸牌至体力上限；2.令一名体力值小于等于你的其他角色获得所有“引兵”牌，然后其回复1点体力并摸等量的牌。 参考juedi(sp)
 	juedi: {
+		skillAnimation: true,
+		animationColor: "wood",
 		trigger: { player: "phaseZhunbeiBegin" },
 		filter(event, player) {
 			return player.getExpansions("yinbing").length > 0;
@@ -18696,6 +18786,8 @@ export default {
 // ========== sunluyu 孙鲁育 ==========
 	// 穆穆：准备阶段，你可以弃置一张牌，移动场上的一张装备牌（可以替换原装备）。 参考stdmumu(sixiang)
 	mumu: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: "mumu",
 		trigger: { player: "phaseZhunbeiBegin" },
 		filter(event, player) {
@@ -18895,6 +18987,8 @@ export default {
 // ========== sunhao 孙皓 ==========
 	// 残蚀：摸牌阶段，你可以多摸X张牌（X为已受伤的角色数），然后当你本回合使用【杀】或普通锦囊牌时，你弃置一张牌。 参考canshi(sp)
 	canshi: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: 2,
 		trigger: { player: "phaseDrawBegin1" },
 		check(event, player) {
@@ -19009,6 +19103,8 @@ export default {
 // ========== kanze 阚泽 ==========
 	// 下书：出牌阶段开始时，你可以将所有手牌交给一名其他角色，然后该角色亮出任意数量的手牌，你选择一项：1.获得其亮出的手牌；2.获得其未亮出的手牌。 参考xiashu(sp)
 	xiashu: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
 		direct: true,
@@ -19331,6 +19427,8 @@ export default {
 
 	// 诱敌：结束阶段，你可以令一名其他角色弃置你的一张手牌，若此牌不为：【杀】，你获得其一张牌；黑色牌，你摸一张牌。 参考xinfu_youdi
 	youdi: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: 2,
 		trigger: {
 			player: "phaseJieshuBegin",
@@ -19384,6 +19482,8 @@ export default {
 // ========== sunru 孙茹 ==========
 	// 影箭：准备阶段，你可以视为使用一张无距离限制的冰【杀】。 参考yingjian(mobile)
 	yingjian: {
+		skillAnimation: true,
+		animationColor: "wood",
 		trigger: { player: "phaseZhunbeiBegin" },
 		direct: true,
 		audio: "qingyi",
@@ -19614,6 +19714,8 @@ export default {
 
 	// 诫训：结束阶段，你可以令一名角色弃置一张手牌，然后若此牌的花色为：♦，其摸两张牌；♥，回复1点体力。 参考jiexun(yijiang)（原技能机制不同，此处按描述重写）
 	jiexun: {
+		skillAnimation: true,
+		animationColor: "wood",
 		audio: 2,
 		trigger: { player: "phaseJieshuBegin" },
 		filter(event, player) {
@@ -19711,6 +19813,8 @@ export default {
 
 	// 遗礼：摸牌阶段，你可以少摸一张牌或流失一点体力，获得2枚“阴阳鱼”标记，然后你可以令任意名其他角色各获得你的1枚“阴阳鱼”标记。 参考skill_old.js
 	yili: {
+		skillAnimation: true,
+		animationColor: "wood",
 		aiShowTag: "support",
 		audio: 2,
 		trigger: { player: "phaseDrawBegin1" },
@@ -20542,6 +20646,8 @@ export default {
 	// 邀宴：准备阶段，你可以令所有角色依次选择是否于本回合结束时参与议事，若此议事结果为：红色，你获得任意未参与议事的角色各一张手牌；黑色，你可以对一名参与议事的角色造成2点伤害。 参考jsrgyaoyan
 	// jsrg原版逐人征询是否参会、回合结束才裁决的流程与卡面差异较大，改用引擎自带的player.chooseToDebate议事原语，在准备阶段直接选定参与者并即时裁决。
 	yaoyan: {
+		skillAnimation: true,
+		animationColor: "wood",
 		aiShowTag: "support",
 		audio: 2,
 		trigger: { player: "phaseZhunbeiBegin" },
@@ -20687,6 +20793,8 @@ export default {
 // ========== chengong 陈宫 ==========
 	// 引叛：出牌阶段限一次，你可以选择一名角色，令所有与其势力不同的角色依次选择是否对其使用一张无距离次数限制的【杀】，结算完成后，该角色于其下个回合使用【杀】的次数+X，若其进入过濒死状态，其回复1点体力（X为其以损失的体力值）。 未找到，需另写（卡面注释标明为全新技能，_trans_merge.md/_merged_skill_all.md均无对应代码，按描述原创实现）
 	yinpan: {
+		skillAnimation: true,
+		animationColor: "qun",
 		aiShowTag: "defense",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
@@ -21169,6 +21277,8 @@ export default {
 
 	// 闭月：结束阶段，你摸X张牌（X为本回合受到伤害的角色数+1，且至多为4）。 参考biyue(standard，改写)
 	biyue: {
+		skillAnimation: true,
+		animationColor: "qun",
 		audio: 2,
 		trigger: { player: "phaseJieshuBegin" },
 		frequent: true,
@@ -21427,6 +21537,8 @@ export default {
 
 	// 横征：摸牌阶段开始时，若你没有手牌、体力值为1或全场唯一最少，你可以放弃摸牌，改为从每名其他角色的区域内获得一张牌。 参考hengzheng(sp)
 	hengzheng: {
+		skillAnimation: true,
+		animationColor: "qun",
 		audio: 2,
 		trigger: { player: "phaseDrawBegin1" },
 		preHidden: true,
@@ -22452,6 +22564,8 @@ export default {
 // ========== jiling 吉玲 ==========
 	// 双刃：出牌阶段开始时，你可以与一名角色拼点。若你：赢，你视为对其或与其势力相同的一名角色使用一张不计入次数的【杀】；没赢，你本回合不能再使用【杀】。锁定技，你使用【杀】对目标角色造成伤害后，可弃置一张手牌并对该角色距离1的另一名角色造成1点伤害。 参考shuangren(sp，改写)
 	shuangren: {
+		skillAnimation: true,
+		animationColor: "qun",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
 		direct: true,
@@ -23080,6 +23194,8 @@ export default {
 // ========== yuanshu 袁术 ==========
 	// 伪帝：出牌阶段开始时，你可以令与你势力相同的其他角色各交给你任意张牌。 参考skill_old.js
 	weidi: {
+		skillAnimation: true,
+		animationColor: "qun",
 		aiShowTag: "support",
 		aiShowCost: true,
 		audio: 2,
@@ -23107,6 +23223,8 @@ export default {
 	// 庸肆：锁定技，若场上没有【玉玺】，视为你装备着【玉玺】；其他势力角色装备【玉玺】时，你失去1点体力或弃两张牌。 参考gzyongsi
 	// 说明：gzyongsi前半段"视为装备玉玺"与卡面完全一致，但后半段为"成为知己知彼目标时展示手牌"，与卡面"其他势力装备玉玺时你失去体力或弃牌"不符，已重写后半段效果。
 	yongsi: {
+		skillAnimation: true,
+		animationColor: "qun",
 		audio: "yongsi1",
 		init(player, skill) {
 			player.addExtraEquip(skill, "yuxi", true, player => lib.card.yuxi && !game.hasPlayer(current => current.getEquip("yuxi")));
@@ -23543,6 +23661,8 @@ export default {
 	// 诏兵：弃牌阶段开始时，你可以弃置任意张手牌，然后令至多等量其他角色选择一项：1.展示并交给你一张【杀】；2.失去1点体力。 参考jsrgzhaobing
 	// 说明：源码为结束阶段强制弃置所有手牌，与卡面(弃牌阶段开始时、可弃置任意张)不符，已改为弃牌阶段开始时可选择弃置数量。
 	zhaobing: {
+		skillAnimation: true,
+		animationColor: "qun",
 		audio: 2,
 		trigger: { player: "phaseDiscardBegin" },
 		filter(event, player) {
@@ -23847,6 +23967,8 @@ export default {
 // ========== liubiao 刘表 ==========
 	// 宴殺：准备阶段，你可以视为使用一张以任意名角色为目标的【五谷丰登】，结算后所有非目标角色依次可以将一张装备牌当【杀】对其中一名目标角色使用（无距离限制）。 参考jsrgyansha(jsrg)
 	yansha: {
+		skillAnimation: true,
+		animationColor: "qun",
 		aiShowTag: "offense",
 		audio: 2,
 		trigger: { player: "phaseZhunbeiBegin" },
@@ -23911,6 +24033,8 @@ export default {
 
 	// 自守：准备阶段，你可以额外摸X张牌，然后令你本回合的手牌上限+X（X为场上势力数）。若如此做，你于本回合出牌阶段使用牌时，只能指定自己为目标。 参考gzzishou(yijiang/gz)
 	zishou: {
+		skillAnimation: true,
+		animationColor: "qun",
 		aiShowTag: "draw",
 		audio: 2,
 		trigger: { player: "phaseZhunbeiBegin" },
@@ -24347,6 +24471,8 @@ export default {
 // ========== zhanglu 张鲁 ==========
 	// 義舍：每名同势力角色出牌阶段限一次，若你没有“米”，其可以摸两张牌，然后将等量张牌置于你的武将牌上，称为“米”。当你移去最后一张“米”后，你回复1点体力。 参考yishe(sp)
 	yishe: {
+		skillAnimation: true,
+		animationColor: "qun",
 		aiShowTag: "draw",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
@@ -24538,6 +24664,8 @@ export default {
 // ========== yanbaihu 严白虎 ==========
 	// 雉盜：锁定技，出牌阶段开始时，你选择一名其他角色，然后直到此回合结束，你与其的距离视为1且你不能使用牌指定除你与其外的角色为目标；当你于出牌阶段内首次对其造成伤害后，你获得其区域内的一张牌。 参考本项目guozhan模式自带的gzzhidao(mode/guozhan/src/skill/character/rest.js)，直接照抄到这里，避免分散在多个文件里
 	gzzhidao: {
+		skillAnimation: true,
+		animationColor: "qun",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
 		forced: true,
@@ -25776,6 +25904,8 @@ export default {
 	},
 	// 妆戎：出牌阶段限一次，你可以弃置一张锦囊牌，若如此做你视为拥有标准版“无双”直到此阶段结束。 参考zhuangrong(huicui)
 	zhuangrong: {
+		skillAnimation: true,
+		animationColor: "qun",
 		aiShowTag: "support",
 		aiShowCost: true,
 		audio: "zhuangrong",
@@ -26145,6 +26275,8 @@ export default {
 	// 朝争：出牌阶段开始时，你可以与所有其他角色议事，若结果为红色，所有意见为红色的角色回复1点体力；若结果为黑色，所有意见为红色的其他角色各失去1点体力。若所有结果均一致，所有与你势力相同的角色摸一张牌，本回合你视为大势力。
 	// 与卡面文字核对一致；onlyOL包olchaozheng(闪刘宏)也是议事机制，但具体红黑结算数值和这张卡不同，本地已经在用真正的player.chooseToDebate()实现卡面这套数值，不是另起炉灶，无需按官方数值改。
 	chaozheng: {
+		skillAnimation: true,
+		animationColor: "qun",
 		aiShowTag: "offense",
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
