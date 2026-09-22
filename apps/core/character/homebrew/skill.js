@@ -6729,20 +6729,34 @@ export default {
 	chengshang: {
 		audio: "chengshang",
 		trigger: { player: "useCardAfter" },
+		group: ["chengshang_reset"],
 		filter(event, player) {
 			if (player.hasHistory("sourceDamage", evt => evt.card === event.card)) {
 				return false;
 			}
-			return event.targets?.some(i => i.isIn() && !i.isFriendOf(player));
+			const used = player.storage.chengshang_used || [];
+			return event.targets?.some(i => i.isIn() && diffGroup(player, i) && !used.includes(i));
 		},
-		usable: 1,
 		async content(event, trigger, player) {
-			var cards = get.cards().filter(card => get.position(card) == "d" && get.suit(card, false) == get.suit(trigger.card, false));
+			const used = player.storage.chengshang_used || [];
+			const target = trigger.targets.find(i => i.isIn() && diffGroup(player, i) && !used.includes(i));
+			player.storage.chengshang_used = used.concat(target);
+			const cards = Array.from(ui.discardPile.childNodes).filter(card => get.suit(card, false) == get.suit(trigger.card, false));
 			if (!cards.length) {
 				return;
 			}
-			var card = cards[0];
-			await player.gain(card, "gain2");
+			await player.gain(cards[0], "gain2");
+		},
+		subSkill: {
+			reset: {
+				charlotte: true,
+				trigger: { global: "roundStart" },
+				forced: true,
+				popup: false,
+				content() {
+					delete player.storage.chengshang_used;
+				},
+			},
 		},
 		ai: {
 			effect: {
