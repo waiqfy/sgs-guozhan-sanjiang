@@ -5967,8 +5967,16 @@ export default {
 				const num = Math.ceil(player.hp / 2);
 				return {
 					audio: "zj_yizan",
-					// 参考官方zj_yizan：backup这里就是filterCard:true，没有"至少一张基本牌"这道额外校验。
-					filterCard: true,
+					// 选中的num张牌里必须至少有一张基本牌：非基本牌只有在已选中过基本牌、或者剩余可选数量还够留一张基本牌时才能选
+					filterCard(card) {
+						if (get.type(card) === "basic") {
+							return true;
+						}
+						if (ui.selected.cards.some(c => get.type(c) === "basic")) {
+							return true;
+						}
+						return num - ui.selected.cards.length - 1 > 0;
+					},
 					selectCard: [num, num],
 					check(card) {
 						return 6 - get.value(card);
