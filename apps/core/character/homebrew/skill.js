@@ -5968,7 +5968,7 @@ export default {
 				return {
 					audio: "zj_yizan",
 					filterCard: true,
-					selectCard: num,
+					selectCard: [num, num],
 					check(card) {
 						return 6 - get.value(card);
 					},
@@ -9761,7 +9761,7 @@ export default {
 				charlotte: true,
 				forced: true,
 				popup: false,
-				trigger: { player: "phaseDiscardAfter" },
+				trigger: { player: "phaseAfter" },
 				filter(event, player) {
 					return player.storage.fengying_pending_turn;
 				},
@@ -11772,6 +11772,7 @@ export default {
 		filterCard() {
 			return false;
 		},
+		selectCard: -1,
 		viewAsFilter(player) {
 			return !player.storage.caishi_used;
 		},
