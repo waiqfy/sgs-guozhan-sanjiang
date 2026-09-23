@@ -9760,6 +9760,13 @@ export default {
 			player.awakenSkill("fengying", undefined);
 			player.storage.fengying = true;
 			player.addSkill("fengying_grant");
+			// 照抄真正挟天子卡牌的用法(apps/core/card/guozhan.js:657)：发动后立即结束本回合的
+			// 出牌阶段(skipped=true)，让本回合尽快走完弃牌/结束阶段，phaseDiscardAfter那步
+			// 才能尽快触发，不用等玩家把出牌阶段剩下的操作走完。
+			const useEvt = event.getParent("phaseUse");
+			if (useEvt && useEvt.name === "phaseUse") {
+				useEvt.skipped = true;
+			}
 
 			const list = game.filterPlayer(current => current.isFriendOf(player) && current.countCards("h") < current.maxHp);
 			list.sort(lib.sort.seat);
@@ -10369,7 +10376,9 @@ export default {
 				await player.gain(links, "gain2");
 				const sum = links.reduce((s, c) => s + get.number(c), 0);
 				if (sum === 13) {
-					await player.recoverTo(player.maxHp);
+					// "复原武将牌"指的是武将牌叠置(turnOver)状态复原，不是回复体力；
+					// 之前误用recoverTo(maxHp)直接回满体力，跟"复原"完全是两回事。
+					await player.turnOver(false);
 				}
 			}
 		},
