@@ -615,6 +615,8 @@ export const chooseThirdCharacter = async playerFirst => {
 		}
 		const result = await player
 			.chooseButton(true, ["选择一名武将放入公共武将池", [candidates, "character"]])
+			// gz3: guozhanRank 数值越大武将越强（如小乔高、关羽低），chooseButton 的
+			// ai 取分数最大的选项，这里取负，让数值最小（最弱）的武将被贡献出去。
 			.set("ai", button => -get.guozhanRank(button.link))
 			.forResult();
 		const picked = result.links[0];
@@ -654,6 +656,8 @@ export const chooseThirdCharacter = async playerFirst => {
 		}
 		const result = await player
 			.chooseButton(true, ["从公共武将池中选择你的第三个武将", [publicPool.slice(0), "character"]])
+			// gz3: 这里是给自己选第三个武将，要挑强的——guozhanRank 数值越大越强，
+			// 不取负，分数最大就对应数值最大（最强）的武将。
 			.set("ai", button => get.guozhanRank(button.link))
 			.forResult();
 		const picked = result.links[0];
