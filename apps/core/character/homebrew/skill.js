@@ -8841,7 +8841,7 @@ export default {
 			}
 
 			const result = await player
-				.chooseCard("he", true, "使用一张装备牌")
+				.chooseCard("he", false, "使用一张装备牌")
 				.set("ai", card => {
 					if (get.type(card) == "equip") {
 						return 5 - get.value(card);
