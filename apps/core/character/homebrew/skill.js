@@ -7952,7 +7952,7 @@ export default {
 			if (trigger.player == player) {
 				event.result = await player.chooseBool(get.prompt2("xiongshu")).forResult();
 			} else {
-				event.result = await player.chooseToDiscard("he", true).set("prompt2", get.prompt2("xiongshu")).forResult();
+				event.result = await player.chooseToDiscard("he").set("prompt2", get.prompt2("xiongshu")).forResult();
 			}
 		},
 		async content(event, trigger, player) {
