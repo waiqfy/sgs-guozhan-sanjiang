@@ -23074,7 +23074,7 @@ export default {
 			return true;
 		},
 		async content(event, trigger, player) {
-			const result = await player.chooseToDiscard("h", true).forResult();
+			const result = await player.chooseToDiscard("h", false).forResult();
 			if (result.bool) {
 				const target = await player
 					.chooseTarget((card, player, target) => target != trigger.player && get.distance(trigger.player, target) == 1)
@@ -24102,7 +24102,7 @@ export default {
 		async content(event, trigger, player) {
 			const num = player.countCards("h");
 			const { bool, cards } = await player
-				.chooseToDiscard("h", [1, num], true)
+				.chooseToDiscard("h", [1, num], false)
 				.set("prompt", "诏兵：弃置任意张手牌")
 				.set("ai", card => 6 - get.value(card))
 				.forResult();
@@ -25826,7 +25826,7 @@ export default {
 		async content(event, trigger, player) {
 			const target = trigger.player;
 			const result = await player
-				.chooseToDiscard("h", player.countCards("h"), true)
+				.chooseToDiscard("h", player.countCards("h"), false)
 				.set("prompt2", "舌剑：是否弃置所有手牌（至少一张）？")
 				.forResult();
 			if (!result?.bool || !result.cards?.length || !target?.isIn()) {
