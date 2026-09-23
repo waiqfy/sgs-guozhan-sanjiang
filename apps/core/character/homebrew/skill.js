@@ -10033,7 +10033,7 @@ export default {
 		},
 		trigger: { target: "useCardToTargeted" },
 		async content(event, trigger, player) {
-			await player.damage(1, trigger.player);
+			await player.damage(1, player);
 			trigger.getParent().excluded.add(player);
 			if (trigger.player.countCards("he")) {
 				await player.discardPlayerCard({
@@ -10065,7 +10065,7 @@ export default {
 			return player.hp < player.maxHp;
 		},
 		async content(event, trigger, player) {
-			const num = player.getDamagedHp();
+			const num = Math.min(4, player.getDamagedHp());
 			await player.draw(num);
 			if (_status.connectMode) {
 				game.broadcastAll(() => {
