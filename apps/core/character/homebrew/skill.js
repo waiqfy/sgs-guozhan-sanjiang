@@ -3907,11 +3907,31 @@ export default {
 			result: {
 				player(player, target) {
 					// AI自己知道自己的真实势力(player.group恒为真实势力，即使自己还暗置)，
-					// 不需要像sameGroup那样要求双方identity都已确定，否则自己暗置时永远评分成"不同势力"，形同虚设。
-					if (player.identity == "ye" || target.identity == "ye") {
-						return sameGroup(target, player) ? 1 : 0.3;
+					// 不需要像sameGroup那样要求双方identity都已确定——包括对方还暗置、亮出后才成为队友的情况。
+					const isAlly = target => (player.identity == "ye" || target.identity == "ye" ? sameGroup(target, player) : target.group == player.group);
+					if (isAlly(target)) {
+						return 1;
 					}
-					return target.group == player.group ? 1 : 0.3;
+					// 对敌人发动本轮就不能再对任何人发动了(见filter里的xuanhuo_locked)，
+					// 为避免提前把机会浪费在敌人身上，优先留着等队友；只有确定本轮不会再遇到队友、
+					// 或对方手上有桃值得抢下来时，才对敌人发动。
+					if (player.storage.xuanhuo_locked) {
+						return 0;
+					}
+					let hasFutureAlly = false;
+					for (let p = target.getNext(); p != player; p = p.getNext()) {
+						if (p.isIn() && isAlly(p)) {
+							hasFutureAlly = true;
+							break;
+						}
+					}
+					if (!hasFutureAlly) {
+						return 1;
+					}
+					if (target.countCards("h", card => get.name(card) == "tao")) {
+						return 1;
+					}
+					return 0;
 				},
 			},
 			threaten: 1,
@@ -24954,10 +24974,10 @@ export default {
 						return evt.skill == "guanhuo" && evt.event.getParent("phaseUse") === trigger.getParent("phaseUse");
 					}).length;
 					if (count == 1) {
-						player.addTempSkill("guanhuo_ex", { player: "phaseUseAfter" });
+						player.addTempSkill("guanhuo_ex", "phaseUseAfter");
 						player.addMark("guanhuo_ex", 1, false);
 					} else {
-						player.tempBanSkill("guanhuo", { player: "phaseUseAfter" });
+						await player.removeSkills("guanhuo");
 					}
 				},
 			},
