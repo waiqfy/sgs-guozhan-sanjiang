@@ -11,7 +11,7 @@ export const aozhan = {
 export const guozhan = {
 	8: [
 		"gz_xurong", "gz_xunyou", "gz_lidian", "gz_caopi", "gz_shamoke", "gz_lifeng", "gz_wangping", "gz_xiaoqiao", "gz_zhoutai", "gz_lvfan", "gz_beimihu", "gz_mateng", "gz_jiaxu", "gz_huaxin", "gz_duyu", "gz_zhonghui", "gz_xuyou", "gz_simazhao",
-		"guanyu", "lvbu",
+		"lvbu",
 	],
 	7: [
 		"gz_wangyi", "gz_zhanghe", "gz_jianggan", "gz_simayi", "gz_weiyan", "gz_huangyueying", "gz_zhugeliang", "gz_lingtong", "gz_sunshangxiang", "gz_sunce", "gz_yuanshao", "gz_yuanshu", "gz_hetaihou", "gz_simashi", "gz_panjun", "gz_zhuran", "gz_jiachong", "gz_yanghu",
@@ -39,5 +39,6 @@ export const guozhan = {
 	],
 	1: [
 		"gz_zangba", "gz_bianfuren", "gz_xuzhu", "gz_menghuo", "gz_ganfuren", "gz_guanyu", "gz_lukang", "gz_jiangqing", "gz_chendong", "gz_zoushi", "gz_panfeng", "gz_tianfeng", "gz_yanyan",
+		"guanyu",
 	],
 };
