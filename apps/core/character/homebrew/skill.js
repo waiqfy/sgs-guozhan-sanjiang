@@ -11771,7 +11771,6 @@ export default {
 		animationColor: "water",
 		limited: true,
 		enable: "chooseToUse",
-		group: ["caishi_change"],
 		filter(event, player) {
 			return event.type === "wuxie";
 		},
@@ -11786,23 +11785,16 @@ export default {
 		async precontent(event) {
 			event.result.skill = "caishi";
 		},
-		onuse(result, player) {
+		// 换将不走"caishi_change监听useCardAfter再靠event.skill识别"这套间接链路(之前多次修都没修好)，
+		// 直接抄jianglve(王平)那种就地changeCharacter的写法，onuse是useResult()按result.skill直接查表
+		// 调用的，只要这里确实是caishi自己的result对象，就一定会跑到，不需要额外的事件识别。
+		async onuse(result, player) {
 			player.storage.caishi_used = true;
 			player.awakenSkill?.("caishi");
-		},
-	},
-
-	caishi_change: {
-		charlotte: true,
-		trigger: { player: "useCardAfter" },
-		filter(event, player) {
-			return event.skill == "caishi";
-		},
-		silent: true,
-		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt("caishi"), "是否变更此武将牌（主将）？").forResult();
-		},
-		async content(event, trigger, player) {
+			const change = await player.chooseBool(get.prompt("caishi"), "是否变更此武将牌（主将）？").forResult();
+			if (!change.bool) {
+				return;
+			}
 			if (!_status.characterlist) {
 				game.initCharacterList();
 			}
