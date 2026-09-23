@@ -1031,4 +1031,49 @@ export class PlayerGuozhan extends lib.element.Player {
 			this.ai.shown = -0.5;
 		}
 	}
+
+	/**
+	 * gz3: 官方原版trySkillAnimate查不到main/vice时统一兜底成"main"（见
+	 * checkShow()对name3一无所知，任何第三将动态获得、不在lib.character[name3][3]
+	 * 静态数组里的技能——比如换将换来的新技能——都会查不到槽位，一路兜底成"main"，
+	 * 导致第三将发动技能特效时头像却显示成了主将。
+	 * 这里在官方原版基础上加一层兜底：查不到main/vice时，只要玩家确实有第三将，就
+	 * 优先兜底成"third"（而不是"main"），其余逻辑跟官方原版完全一致。
+	 * @param {string} name
+	 * @param {string} popname
+	 * @param {'main' | 'vice' | 'third' | boolean} [checkShow]
+	 */
+	trySkillAnimate(name, popname, checkShow) {
+		game.callHook("checkSkillAnimate", [this, name, popname]);
+		if (!game.online && lib.config.skill_animation_type != "off" && lib.skill[name] && lib.skill[name].skillAnimation) {
+			if (lib.config.skill_animation_type == "default") {
+				checkShow = checkShow || (lib.character[this.name3] ? "third" : "main");
+			} else {
+				checkShow = false;
+			}
+			if (lib.skill[name].textAnimation) {
+				checkShow = false;
+			}
+			this.$skill(lib.skill[name].animationStr || lib.translate[name], lib.skill[name].skillAnimation, lib.skill[name].animationColor, checkShow);
+			return;
+		}
+		var player = this;
+		game.broadcast(
+			function (player, name, popname) {
+				player.trySkillAnimate(name, popname);
+			},
+			player,
+			name,
+			popname
+		);
+		if (lib.animate.skill[name]) {
+			lib.animate.skill[name].apply(this, arguments);
+		} else {
+			if (popname != name) {
+				this.popup(popname, "water", false);
+			} else {
+				this.popup(get.skillTranslation(name, this), "water", false);
+			}
+		}
+	}
 }
