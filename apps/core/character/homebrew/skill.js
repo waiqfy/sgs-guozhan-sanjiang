@@ -5525,7 +5525,7 @@ export default {
 		logTarget: "player",
 		async cost(event, trigger, player) {
 			event.result = await trigger.player
-				.chooseCard("h", true)
+				.chooseCard("h", false)
 				.set("filterCard", card => get.type(card) == "basic")
 				.set("prompt2", `协穆：是否展示并交给${get.translation(player)}一张基本牌，然后本回合内计算与其他角色的距离-1？`)
 				.forResult();
