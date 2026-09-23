@@ -13934,7 +13934,7 @@ export default {
 		async content(event, trigger, player) {
 			const current = _status.currentPhase;
 			if (current.isIn() && current.canUse({ name: "jiu", isCard: true }, current)) {
-				await current.useCard({ name: "jiu", isCard: true });
+				await current.useCard({ name: "jiu", isCard: true }, current);
 			}
 		},
 		group: "shijiu_recast",
@@ -18882,8 +18882,8 @@ export default {
 				.forResult();
 		},
 		async content(event, trigger, player) {
-			if (player.canMoveCard(null, true)) {
-				await player.moveCard().set("nojudge", true);
+			if (player.canMoveCard(null, true, null, null, null, "canReplace")) {
+				await player.moveCard({ nojudge: true, canReplace: true });
 			}
 		},
 	},
@@ -25810,7 +25810,7 @@ export default {
 		},
 		ai: {
 			threaten: 1.4,
-			order: 1,
+			order: 9,
 			result: {
 				target(player, target) {
 					return -get.attitude(player, target);
