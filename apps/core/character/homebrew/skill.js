@@ -21068,9 +21068,16 @@ export default {
 				})
 				.forResult();
 			if (choice.control == "弃牌摸牌") {
+				const cardResult = await player
+					.chooseCard("he", true, "除疠：选择一张牌弃置")
+					.set("ai", card => (get.suit(card) == "spade" ? 8 : 5) - get.value(card))
+					.forResult();
+				if (!cardResult.bool || !cardResult.cards?.length) {
+					return;
+				}
 				const targets = await player
 					.chooseTarget([1, 3], "除疠：选择至多三名势力各不相同或未确定势力的其他角色", (card, player, target) => {
-						if (player == target) {
+						if (player == target || target.countCards("he") <= 0) {
 							return false;
 						}
 						for (let i = 0; i < ui.selected.targets.length; i++) {
@@ -21086,14 +21093,14 @@ export default {
 					return;
 				}
 				const drawList = [];
-				const selfResult = await player.chooseToDiscard("he", true).forResult();
-				if (selfResult.bool && selfResult.cards?.length && selfResult.cards.some(card => get.suit(card) == "spade")) {
+				if (get.suit(cardResult.cards[0]) == "spade") {
 					drawList.push(player);
 				}
+				await player.discard(cardResult.cards);
 				for (const target of targets.targets) {
 					if (target.countCards("he") > 0) {
 						const result = await player.discardPlayerCard(target, "he", true).forResult();
-						if (result.bool && result.cards?.length && result.cards.some(card => get.suit(card) == "spade")) {
+						if (result.bool && result.cards?.length && get.suit(result.cards[0]) == "spade") {
 							drawList.push(target);
 						}
 					}
