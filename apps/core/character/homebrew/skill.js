@@ -6066,6 +6066,9 @@ export default {
 
 // ========== zhaotongguang 赵统赵广 ==========
 	// 翊赞：你可以将X张牌（其中至少一张牌是基本牌）当任意基本牌使用或打出。（X为你体力值的一半，向上取整） 参考zj_yizan
+	// X用Math.max(1, ...)兜底：玩家进入濒死时hp可能是0甚至负数，Math.ceil(0/2)算出来是0，
+	// selectCard变成[0,0]，此时不用选任何牌就能视为打出一张基本牌（等于白嫖无懈可击/桃/杀），
+	// 必须保证X至少是1
 	yizan: {
 		audio: "yizan_respond_shan",
 		enable: ["chooseToUse", "chooseToRespond"],
@@ -6073,11 +6076,11 @@ export default {
 			if (get.type(name) !== "basic") {
 				return false;
 			}
-			const num = Math.ceil(player.hp / 2);
+			const num = Math.max(1, Math.ceil(player.hp / 2));
 			return player.countCards("esh") >= num;
 		},
 		filter(event, player) {
-			const num = Math.ceil(player.hp / 2);
+			const num = Math.max(1, Math.ceil(player.hp / 2));
 			if (player.countCards("hes") < num) {
 				return false;
 			}
@@ -6111,7 +6114,7 @@ export default {
 			},
 			check(button) {
 				const player = _status.event.player;
-				const num = Math.ceil(player.hp / 2);
+				const num = Math.max(1, Math.ceil(player.hp / 2));
 				const card = { name: button.link[2], nature: button.link[3] };
 				if (_status.event.getParent().type !== "phase" || game.hasPlayer(current => player.canUse(card, current) && get.effect(current, card, player, player) > 0)) {
 					switch (button.link[2]) {
@@ -6136,7 +6139,7 @@ export default {
 				return 0;
 			},
 			backup(links, player) {
-				const num = Math.ceil(player.hp / 2);
+				const num = Math.max(1, Math.ceil(player.hp / 2));
 				return {
 					audio: "zj_yizan",
 					// 选中的num张牌里必须至少有一张基本牌：非基本牌只有在已选中过基本牌、或者剩余可选数量还够留一张基本牌时才能选
@@ -6162,7 +6165,7 @@ export default {
 				};
 			},
 			prompt(links, player) {
-				const num = Math.ceil(player.hp / 2);
+				const num = Math.max(1, Math.ceil(player.hp / 2));
 				return `将${get.cnNumber(num)}张牌（其中至少一张是基本牌）当做${get.translation(links[0][3] || "")}${get.translation(links[0][2])}使用或打出`;
 			},
 		},
@@ -6170,7 +6173,7 @@ export default {
 			order() {
 				const player = _status.event.player;
 				const event = _status.event;
-				const num = Math.ceil(player.hp / 2);
+				const num = Math.max(1, Math.ceil(player.hp / 2));
 				if (event.filterCard({ name: "jiu" }, player, event) && get.effect(player, { name: "jiu" }) > 0 && player.countCards("hes") > num) {
 					return 3.3;
 				}
@@ -6180,7 +6183,7 @@ export default {
 				if (tag === "fireAttack") {
 					return true;
 				}
-				const num = Math.ceil(player.hp / 2);
+				const num = Math.max(1, Math.ceil(player.hp / 2));
 				if (player.countCards("hes") < num) {
 					return false;
 				}
