@@ -5967,17 +5967,8 @@ export default {
 				const num = Math.ceil(player.hp / 2);
 				return {
 					audio: "zj_yizan",
-					filterCard(card, player) {
-						if (get.type(card) === "basic") {
-							return true;
-						}
-						const selected = ui.selected.cards;
-						if (selected.some(c => get.type(c) === "basic")) {
-							return true;
-						}
-						// 还没选过基本牌时，不能让非基本牌占满最后一个名额，否则凑不出"至少一张基本牌"
-						return selected.length < num - 1;
-					},
+					// 参考官方zj_yizan：backup这里就是filterCard:true，没有"至少一张基本牌"这道额外校验。
+					filterCard: true,
 					selectCard: [num, num],
 					check(card) {
 						return 6 - get.value(card);
@@ -11803,7 +11794,10 @@ export default {
 				return;
 			}
 			const newName = pool.randomGet();
-			const newPairs = player.name2 ? [newName, player.name2] : [newName];
+			// 才识可能挂在主将也可能挂在副将，参照xiongyi(韩当)/jianglve(王平)的判断方式，
+			// 不能无条件只换name1——如果才识实际是副将技能，之前永远在换一个跟这个技能毫无关系的主将。
+			const isVice = !get.character(player.name1, 3).includes("caishi") && get.character(player.name2, 3).includes("caishi");
+			const newPairs = player.name2 ? (isVice ? [player.name1, newName] : [newName, player.name2]) : [newName];
 			await player.changeCharacter(newPairs);
 		},
 	},
