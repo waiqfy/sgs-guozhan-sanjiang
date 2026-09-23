@@ -11781,16 +11781,15 @@ export default {
 			return !player.storage.caishi_used;
 		},
 		viewAs: { name: "wuxie" },
-		async precontent(event) {
+		// 效果顺序是"先变将，然后打出这张无懈可击"，不是"打出无懈可击之后再变将"，
+		// 所以变将放进precontent——它在这张viewAs牌真正的无懈可击效果resolve之前执行，
+		// 而不是等onuse(卡牌使用完毕后)才做。之前onuse方案的时序是反的。
+		async precontent(event, trigger, player) {
 			event.result.skill = "caishi";
-		},
-		// 换将不走"caishi_change监听useCardAfter再靠event.skill识别"这套间接链路(之前多次修都没修好)，
-		// 直接抄jianglve(王平)那种就地changeCharacter的写法，onuse是useResult()按result.skill直接查表
-		// 调用的，只要这里确实是caishi自己的result对象，就一定会跑到，不需要额外的事件识别。
-		async onuse(result, player) {
 			player.storage.caishi_used = true;
 			player.awakenSkill?.("caishi");
-			const change = await player.chooseBool(get.prompt("caishi"), "是否变更此武将牌（主将）？").forResult();
+			// 才识可能挂在主将也可能挂在副将，提示语不能写死"主将"
+			const change = await player.chooseBool(get.prompt("caishi"), "是否变更此武将牌？").forResult();
 			if (!change.bool) {
 				return;
 			}
@@ -11802,8 +11801,8 @@ export default {
 				return;
 			}
 			const newName = pool.randomGet();
-			// 才识可能挂在主将也可能挂在副将，参照xiongyi(韩当)/jianglve(王平)的判断方式，
-			// 不能无条件只换name1——如果才识实际是副将技能，之前永远在换一个跟这个技能毫无关系的主将。
+			// 参照xiongyi(韩当)/jianglve(王平)的判断方式，不能无条件只换name1——
+			// 如果才识实际是副将技能，之前永远在换一个跟这个技能毫无关系的主将。
 			const isVice = !get.character(player.name1, 3).includes("caishi") && get.character(player.name2, 3).includes("caishi");
 			const newPairs = player.name2 ? (isVice ? [player.name1, newName] : [newName, player.name2]) : [newName];
 			await player.changeCharacter(newPairs);
