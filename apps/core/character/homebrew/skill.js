@@ -16255,7 +16255,7 @@ export default {
 			threaten: 4.5,
 			pretao: true,
 			nokeep: true,
-			order: 1,
+			order: 6,
 			expose: 0.2,
 			result: {
 				target(player, target) {
@@ -19494,7 +19494,7 @@ export default {
 			},
 		},
 		ai: {
-			order: 1,
+			order: 4,
 			result: {
 				player: 1,
 			},
@@ -19710,7 +19710,7 @@ export default {
 		},
 		ai: {
 			threaten: 1.1,
-			order: 1,
+			order: 6,
 			result: {
 				target: -1.5,
 			},
@@ -21819,7 +21819,7 @@ export default {
 		},
 		ai: {
 			threaten: 1.8,
-			order: 1,
+			order: () => 1 + 10 * Math.random(),
 			result: {
 				player(player) {
 					const players = game.filterPlayer();
@@ -22498,7 +22498,7 @@ export default {
 		},
 		ai: {
 			threaten: 1,
-			order: 1,
+			order: 8,
 			result: {
 				player: 1,
 			},
