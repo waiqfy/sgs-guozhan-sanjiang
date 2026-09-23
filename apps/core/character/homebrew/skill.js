@@ -3889,7 +3889,7 @@ export default {
 			}
 			await target.chooseToGive(player, "he", 2, true);
 			if (sameGroup(target, player)) {
-				const list = ["wusheng", "paoxiao", "longdan", "zhuiming", "liegong", "kuanggu"];
+				const list = ["wusheng", "paoxiao", "longdan", "gz_tieji", "liegong", "kuanggu"];
 				const result = await target
 					.chooseControl(list)
 					.set("prompt", "眩惑：选择获得一项技能直到回合结束")
@@ -21679,6 +21679,27 @@ export default {
 			result: { player: 1 },
 		},
 	},
+	// 崩坏：锁定技，结束阶段，若你不是体力值最小的角色，你选择一项：1.失去1点体力，2.减1点体力上限。（获得自"暴凌"/"举义"）
+	benghuai: {
+		audio: 2,
+		trigger: { player: "phaseJieshuBegin" },
+		forced: true,
+		filter(event, player) {
+			return game.hasPlayer(current => current != player && current.hp < player.hp);
+		},
+		async content(event, trigger, player) {
+			const choice = await player
+				.chooseControl("失去1点体力", "体力上限-1")
+				.set("prompt", "崩坏：请选择一项")
+				.set("ai", () => (player.hp > 1 ? "失去1点体力" : "体力上限-1"))
+				.forResult();
+			if (choice.control == "失去1点体力") {
+				await player.loseHp();
+			} else {
+				await player.loseMaxHp();
+			}
+		},
+	},
 
 // ========== jiaxu 贾诩 ==========
 	// 完杀：锁定技，你的回合内，除与你势力相同的角色外，不处于濒死状态的角色不能使用【桃】。 参考wansha(shenhua，改写)
@@ -22380,14 +22401,40 @@ export default {
 			} else if (!main) {
 				control = "副将";
 			} else {
-				const result = await trigger.source
+				const result = await player
 					.chooseControl("主将", "副将")
-					.set("prompt", "断肠：请选择移除一张武将牌上的技能")
+					.set("prompt", "断肠：令" + get.translation(trigger.source) + "失去一张武将牌的所有技能")
+					.set("forceDie", true)
 					.set("ai", () => "主将")
 					.forResult();
 				control = result.control;
 			}
-			trigger.source.hideCharacter(control == "主将" ? 0 : 1);
+			let skills;
+			if (control == "主将") {
+				trigger.source.showCharacter(0);
+				skills = lib.character[trigger.source.name][3];
+				game.log(trigger.source, "失去了主将技能");
+			} else {
+				trigger.source.showCharacter(1);
+				skills = lib.character[trigger.source.name2][3];
+				game.log(trigger.source, "失去了副将技能");
+			}
+			const list = [];
+			for (let i = 0; i < skills.length; i++) {
+				list.add(skills[i]);
+				const info = lib.skill[skills[i]];
+				if (info.charlotte) {
+					list.splice(i--);
+					continue;
+				}
+				if (typeof info.derivation == "string") {
+					list.add(info.derivation);
+				} else if (Array.isArray(info.derivation)) {
+					list.addArray(info.derivation);
+				}
+			}
+			trigger.source.removeSkill(list);
+			trigger.source.syncSkills();
 		},
 	},
 
