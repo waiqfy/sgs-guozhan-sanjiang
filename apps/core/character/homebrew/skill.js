@@ -1919,7 +1919,7 @@ export default {
 		frequent: true,
 		preHidden: true,
 		filter(event) {
-			return get.type(event.card) == "trick" && event.card.isCard;
+			return get.type(event.card) == "trick" && !event.card.viewAs;
 		},
 		async content(event, trigger, player) {
 			const { cards } = await player.draw("nodelay").forResult();
@@ -4823,7 +4823,7 @@ export default {
 				prompt: "是否执行【强识】的效果摸一张牌？",
 				sourceSkill: "qiangzhi",
 				filter(event, player) {
-					return get.type(event.card, "trick") == player.storage.qiangzhi_draw;
+					return !event.card.viewAs && get.type(event.card, "trick") == player.storage.qiangzhi_draw;
 				},
 				async content(event, trigger, player) {
 					player.draw("nodelay");
@@ -7958,19 +7958,27 @@ export default {
 			if (!game.hasPlayer(current => current != player)) {
 				return;
 			}
+			const useEvent = trigger.getParent();
 			if (trigger.player == player) {
 				await player.draw();
-			}
-			const result = await player.chooseTarget("凶竖：选择一名角色代替成为此牌的伤害来源", (card, plyr, target) => target != player).forResult();
-			const target = result && result.targets && result.targets[0];
-			if (!target) {
-				return;
-			}
-			const useEvent = trigger.getParent();
-			if (useEvent) {
-				useEvent.customArgs = useEvent.customArgs || {};
-				useEvent.customArgs.default = useEvent.customArgs.default || {};
-				useEvent.customArgs.default.customSource = target;
+				const result = await player.chooseTarget("凶竖：选择一名其他角色代替你成为此牌的伤害来源", (card, plyr, target) => target != player).forResult();
+				const target = result && result.targets && result.targets[0];
+				if (!target) {
+					return;
+				}
+				if (useEvent) {
+					useEvent.customArgs = useEvent.customArgs || {};
+					useEvent.customArgs.default = useEvent.customArgs.default || {};
+					useEvent.customArgs.default.customSource = target;
+				}
+			} else {
+				// 卡面："若你不为此牌的使用者，你可以弃一张牌，然后代替使用者成为此牌的伤害来源"——
+				// 是你自己顶替，不是再挑一个人顶替。
+				if (useEvent) {
+					useEvent.customArgs = useEvent.customArgs || {};
+					useEvent.customArgs.default = useEvent.customArgs.default || {};
+					useEvent.customArgs.default.customSource = player;
+				}
 			}
 		},
 		ai: {
