@@ -15084,7 +15084,7 @@ export default {
 			await player.showCards([card]);
 			const choice = await player.chooseBool("是否将此牌置于牌堆顶？（否则弃置）").forResult();
 			if (choice && choice.bool) {
-				target.loseTo(card, ui.cardPile, "insert");
+				await target.lose(card, ui.cardPile, "insert");
 			} else {
 				await target.discard(card);
 			}
