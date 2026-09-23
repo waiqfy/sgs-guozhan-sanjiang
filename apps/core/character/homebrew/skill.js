@@ -15025,36 +15025,61 @@ export default {
 	// 涉猎：摸牌阶段可改为亮出牌堆顶五张牌，获得其中每种不同花色的牌各一张，其余置入弃牌堆。（获得自"夺荆"） 参考gz_shelie(guozhan)。translate.js里一直有这两条技能的文本，但代码从未真正写过，导致夺荆之后addSkill("shelie"/"gongxin")形同虚设，这次补上
 	shelie: {
 		aiShowTag: "support",
-		audio: 2,
+		audio: "shelie",
 		trigger: { player: "phaseDrawBegin1" },
 		filter(event, player) {
 			return !event.numFixed;
 		},
-		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt("shelie")).forResult();
-		},
 		async content(event, trigger, player) {
-			trigger.cancel();
+			trigger.changeToZero();
 			const cards = get.cards(5);
-			game.log(player, "亮出了", cards);
-			const suits = [];
-			const gain = [];
-			const rest = [];
+			await game.cardsGotoOrdering(cards);
+			const videoId = lib.status.videoId++;
+			game.broadcastAll(
+				function (player, id, cards) {
+					let str;
+					if (player == game.me && !_status.auto) {
+						str = "涉猎：获取花色各不相同的牌";
+					} else {
+						str = "涉猎";
+					}
+					const dialog = ui.create.dialog(str, cards);
+					dialog.videoId = id;
+				},
+				player,
+				videoId,
+				cards
+			);
+			let time = get.utc();
+			game.addVideo("showCards", player, ["涉猎", get.cardsInfo(cards)]);
+			game.addVideo("delay", null, 2);
+			const list = [];
 			for (const card of cards) {
-				const suit = get.suit(card);
-				if (!suits.includes(suit)) {
-					suits.push(suit);
-					gain.push(card);
-				} else {
-					rest.push(card);
+				list.add(get.suit(card, false));
+			}
+			const next = player.chooseButton(list.length, true);
+			next.set("dialog", event.videoId);
+			next.set("filterButton", function (button) {
+				for (let i = 0; i < ui.selected.buttons.length; i++) {
+					if (get.suit(ui.selected.buttons[i].link) == get.suit(button.link)) {
+						return false;
+					}
 				}
+				return true;
+			});
+			next.set("ai", function (button) {
+				return get.value(button.link, _status.event.player);
+			});
+			const result = await next.forResult();
+			if (!result.bool || !result.links?.length) {
+				return;
 			}
-			if (gain.length) {
-				await player.gain(gain, "gain2");
+			time = 1000 - (get.utc() - time);
+			if (time > 0) {
+				await game.delay(0, time);
 			}
-			if (rest.length) {
-				await game.cardsDiscard(rest);
-			}
+			game.broadcastAll("closeDialog", videoId);
+			await player.gain(result.links, "log", "gain2");
 		},
 		ai: {
 			threaten: 1.2,
