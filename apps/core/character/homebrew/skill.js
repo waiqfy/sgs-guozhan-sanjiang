@@ -5657,7 +5657,10 @@ export default {
 				.forResult();
 		},
 		async content(event, trigger, player) {
-			await player.changeVice();
+			// 原来无条件changeVice()，只要巨贾在副将上才是对的——巨贾也可能挂在
+			// 主将或第三将(3将/sanjiang模式)上，这种情况下应该变更的是jugu实际所在
+			// 的那张武将牌，而不是恒定变更副将
+			await pickAndChangeCharacter(player, "jugu", "巨贾：请选择要变更为的武将");
 		},
 	},
 
