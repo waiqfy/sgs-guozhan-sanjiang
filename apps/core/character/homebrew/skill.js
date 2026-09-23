@@ -3906,7 +3906,12 @@ export default {
 			order: 8,
 			result: {
 				player(player, target) {
-					return sameGroup(target, player) ? 1 : 0.3;
+					// AI自己知道自己的真实势力(player.group恒为真实势力，即使自己还暗置)，
+					// 不需要像sameGroup那样要求双方identity都已确定，否则自己暗置时永远评分成"不同势力"，形同虚设。
+					if (player.identity == "ye" || target.identity == "ye") {
+						return sameGroup(target, player) ? 1 : 0.3;
+					}
+					return target.group == player.group ? 1 : 0.3;
 				},
 			},
 			threaten: 1,
@@ -24949,10 +24954,10 @@ export default {
 						return evt.skill == "guanhuo" && evt.event.getParent("phaseUse") === trigger.getParent("phaseUse");
 					}).length;
 					if (count == 1) {
-						player.addTempSkill("guanhuo_ex", "phaseUseAfter");
+						player.addTempSkill("guanhuo_ex", { player: "phaseUseAfter" });
 						player.addMark("guanhuo_ex", 1, false);
 					} else {
-						await player.removeSkills("guanhuo");
+						player.tempBanSkill("guanhuo", { player: "phaseUseAfter" });
 					}
 				},
 			},
