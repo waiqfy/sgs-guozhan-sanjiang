@@ -5967,7 +5967,17 @@ export default {
 				const num = Math.ceil(player.hp / 2);
 				return {
 					audio: "zj_yizan",
-					filterCard: true,
+					filterCard(card, player) {
+						if (get.type(card) === "basic") {
+							return true;
+						}
+						const selected = ui.selected.cards;
+						if (selected.some(c => get.type(c) === "basic")) {
+							return true;
+						}
+						// 还没选过基本牌时，不能让非基本牌占满最后一个名额，否则凑不出"至少一张基本牌"
+						return selected.length < num - 1;
+					},
 					selectCard: [num, num],
 					check(card) {
 						return 6 - get.value(card);
@@ -9746,45 +9756,32 @@ export default {
 		limited: true,
 		skillAnimation: "epic",
 		animationColor: "gray",
-		content(event, trigger, player) {
+		async content(event, trigger, player) {
 			player.awakenSkill("fengying", undefined);
 			player.storage.fengying = true;
-			player.storage.fengying_pending_turn = true;
+			player.addSkill("fengying_grant");
+
+			const list = game.filterPlayer(current => current.isFriendOf(player) && current.countCards("h") < current.maxHp);
+			list.sort(lib.sort.seat);
+			player.line(list, "thunder");
+			await game.asyncDraw(list, current => current.maxHp - current.countCards("h"));
 		},
-		group: ["fengying_grant", "fengying_draw"],
+		group: ["fengying_grant"],
 		subSkill: {
-			// 参照真正的挟天子(apps/core/card/guozhan.js:2132)：额外回合是在phaseDiscardAfter
-			// (本回合已经快结束时)用不带参数的insertPhase()追加的，而不是在phaseUse发动的当下、
-			// 本回合弃牌/结束阶段都还没跑完时就insertPhase(null, true)硬插到队列最前面——
-			// 那样得到的额外回合实际上从未真正跑起来过。
+			// 直接照抄真正的挟天子技能本体(apps/core/card/guozhan.js:2132的xietianzi)，
+			// 只去掉里面"是否弃一张手牌"的成本判断，其余(触发时机phaseDiscardAfter、
+			// 不带参数的insertPhase()、发动后自行removeSkill)原样保留。
+			// 用addSkill+自行removeSkill而不是addTempSkill的自动过期，
+			// 避免重蹈duojing_after那次"过期条件和触发条件本身撞车"的覆辙。
 			grant: {
 				charlotte: true,
 				forced: true,
 				popup: false,
-				trigger: { player: "phaseAfter" },
-				filter(event, player) {
-					return player.storage.fengying_pending_turn;
-				},
+				nopop: true,
+				trigger: { player: "phaseDiscardAfter" },
 				content(event, trigger, player) {
-					delete player.storage.fengying_pending_turn;
+					player.removeSkill("fengying_grant");
 					player.insertPhase();
-					player.storage.fengying_pending_draw = true;
-				},
-			},
-			draw: {
-				charlotte: true,
-				forced: true,
-				popup: false,
-				trigger: { player: "phaseZhunbeiBegin" },
-				filter(event, player) {
-					return player.storage.fengying_pending_draw;
-				},
-				async content(event, trigger, player) {
-					delete player.storage.fengying_pending_draw;
-					const list = game.filterPlayer(current => current.isFriendOf(player) && current.countCards("h") < current.maxHp);
-					list.sort(lib.sort.seat);
-					player.line(list, "thunder");
-					await game.asyncDraw(list, current => current.maxHp - current.countCards("h"));
 				},
 			},
 		},
