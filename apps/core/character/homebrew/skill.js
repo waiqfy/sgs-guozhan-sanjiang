@@ -15067,31 +15067,52 @@ export default {
 		enable: "phaseUse",
 		usable: 1,
 		filterTarget(card, player, target) {
-			return target != player && target.countCards("h") > 0;
+			return target != player && target.countCards("h");
 		},
 		async content(event, trigger, player) {
-			const target = event.target;
-			await player.viewHandcards(target);
-			const hearts = target.getCards("h", card => get.suit(card, target) == "heart");
-			if (!hearts.length) {
-				return;
-			}
-			const result = await player.chooseButton([get.prompt2("gongxin"), [hearts, "vcard"]], true).forResult();
-			if (!result || !result.bool || !result.links || !result.links.length) {
-				return;
-			}
-			const card = result.links[0];
-			await player.showCards([card]);
-			const choice = await player.chooseBool("是否将此牌置于牌堆顶？（否则弃置）").forResult();
-			if (choice && choice.bool) {
-				await target.lose(card, ui.cardPile, "insert");
-			} else {
-				await target.discard(card);
+			const target = event.target,
+				cards = target.getCards("h"),
+				next = player.chooseToMove_new("攻心");
+			next.set("list", [
+				[get.translation(target) + "的手牌", cards],
+				[["弃置"], ["置于牌堆顶"]],
+			]);
+			next.set("filterOk", moved => {
+				return moved[1].slice().concat(moved[2]).filter(card => get.suit(card) == "heart").length == 1;
+			});
+			next.set("filterMove", (from, to, moved) => {
+				if (moved[0].includes(from.link) && moved[1].length + moved[2].length >= 1 && [1, 2].includes(to)) {
+					return false;
+				}
+				return get.suit(from) == "heart";
+			});
+			next.set("processAI", list => {
+				let card = list[0][1]
+					.slice()
+					.filter(card => get.suit(card) == "heart")
+					.sort((a, b) => get.value(b) - get.value(a))[0];
+				if (!card) {
+					return false;
+				}
+				return [list[0][1].slice().remove(card), [card], []];
+			});
+			const result = await next.forResult();
+			if (result.bool) {
+				if (result.moved[1].length) {
+					await target.discard(result.moved[1]);
+				} else {
+					await player.showCards(result.moved[2], get.translation(player) + "对" + get.translation(target) + "发动了【攻心】");
+					await target.lose(result.moved[2], ui.cardPile, "visible", "insert");
+				}
 			}
 		},
 		ai: {
-			order: 3,
-			result: { player: 1 },
+			threaten: 1.5,
+			result: {
+				target(player, target) {
+					return -target.countCards("h");
+				},
+			},
 		},
 	},
 
