@@ -9773,13 +9773,13 @@ export default {
 			player.line(list, "thunder");
 			await game.asyncDraw(list, current => current.maxHp - current.countCards("h"));
 		},
-		group: ["fengying_grant"],
+		// 注意：fengying_grant不能写进group——group声明的子技能只要玩家拥有fengying就永远挂着，
+		// 会导致每个回合的phaseDiscardAfter都无条件insertPhase()，跟"限定技发动过之后才生效"完全不符。
+		// 只在content里按需player.addSkill()挂上，子技能自己content里再removeSkill()卸掉。
 		subSkill: {
 			// 直接照抄真正的挟天子技能本体(apps/core/card/guozhan.js:2132的xietianzi)，
 			// 只去掉里面"是否弃一张手牌"的成本判断，其余(触发时机phaseDiscardAfter、
 			// 不带参数的insertPhase()、发动后自行removeSkill)原样保留。
-			// 用addSkill+自行removeSkill而不是addTempSkill的自动过期，
-			// 避免重蹈duojing_after那次"过期条件和触发条件本身撞车"的覆辙。
 			grant: {
 				charlotte: true,
 				forced: true,
@@ -11783,6 +11783,9 @@ export default {
 			return !player.storage.caishi_used;
 		},
 		viewAs: { name: "wuxie" },
+		async precontent(event) {
+			event.result.skill = "caishi";
+		},
 		onuse(result, player) {
 			player.storage.caishi_used = true;
 			player.awakenSkill?.("caishi");
