@@ -34,6 +34,83 @@ function isCharacterShown(player, skill) {
 	return false;
 }
 
+// 所有"变更此武将牌"类技能的通用逻辑：从当前不在场的武将里随机亮出2个供玩家选择
+// （而不是直接随机抽1个焗给玩家），适用于caishi(才识)/xiongyi(雄异)/jianglve(将略)/
+// xishe_change(袭射)。
+// slotOrSkillId传技能id时，自动判断该技能实际挂在主将(0)/副将(1)/第三将(2，3将/sanjiang
+// 模式专属)中的哪一个槽位；传数字时直接指定槽位（用于xishe_change这类不属于任何角色、
+// 而是固定改副将的临时技能，无法通过技能id反查槽位）。
+// 第三将槽位不走player.changeCharacter——引擎的changeCharacter/reinit2从设计上就只处理
+// name1/name2这一对，完全不认识name3（见content.ts的changeCharacter实现），所以第三将槽位
+// 换将照抄xushuTransThird()换第三将时的写法：直接removeSkill旧技能、置换name3、更新
+// avatar3g/name3这两个UI节点、再addSkill新技能。
+async function pickAndChangeCharacter(player, slotOrSkillId, prompt) {
+	if (!_status.characterlist) {
+		game.initCharacterList();
+	}
+	const pool = _status.characterlist.filter(name => lib.character[name]);
+	if (!pool.length) {
+		return false;
+	}
+	const shuffled = pool.slice();
+	shuffled.randomSort();
+	const candidates = shuffled.slice(0, Math.min(2, shuffled.length));
+	let chosen = candidates[0];
+	if (candidates.length > 1) {
+		const result = await player
+			.chooseButton([prompt || "请选择要变更为的武将", [candidates, "character"]])
+			.set("filterButton", button => candidates.includes(button.link))
+			.set("ai", button => get.guozhanRank(button.link))
+			.forResult();
+		chosen = (result?.bool && result.links?.[0]) || candidates[0];
+	}
+	if (!chosen) {
+		return false;
+	}
+	let slot;
+	if (typeof slotOrSkillId === "number") {
+		slot = slotOrSkillId;
+	} else {
+		const names = [player.name1, player.name2, player.name3].filter(Boolean);
+		slot = names.findIndex(name => get.character(name, 3).includes(slotOrSkillId));
+		if (slot < 0) {
+			slot = 0;
+		}
+	}
+	if (slot === 2) {
+		const oldName = player.name3;
+		if (oldName && lib.character[oldName]) {
+			for (const oldSkill of get.character(oldName, 3)) {
+				if (player.hasSkill(oldSkill, null, null, false)) {
+					player.removeSkill(oldSkill);
+				}
+			}
+		}
+		_status.characterlist.remove(chosen);
+		if (oldName) {
+			_status.characterlist.add(oldName);
+		}
+		player.name3 = chosen;
+		if (player.node.avatar3g) {
+			player.node.avatar3g.setBackground(chosen, "character");
+			player.node.avatar3g.show();
+			player.node.name3.innerHTML = get.slimName(chosen);
+			player.node.name3.show();
+		}
+		for (const newSkill of get.character(chosen, 3)) {
+			if (lib.skill[newSkill]) {
+				player.addSkill(newSkill);
+			}
+		}
+		game.log(player, "将第三个武将从", `#b${get.translation(oldName)}`, "变更为了", `#b${get.translation(chosen)}`);
+	} else {
+		const names2 = [player.name1, player.name2].filter(Boolean);
+		names2[slot] = chosen;
+		await player.changeCharacter(names2);
+	}
+	return true;
+}
+
 // 徐庶"举荐"专用：交换两名角色"第三个武将"（name3，国战三将/sanjiang模式专属槽位）。
 function hasLianhengTag(card, owner) {
 	if (!card) {
@@ -3831,12 +3908,28 @@ export default {
 				player.chooseBool("将略：是否变更此将？").set("ai", () => true);
 			}
 			"step 9";
-			if (event.canChange && result && result.bool) {
-				const pool = _status.characterlist;
-				const newChar = pool.randomRemove();
+			event.doChange = !!(event.canChange && result && result.bool);
+			if (event.doChange) {
+				// 换将不再是直接随机抽1个焗给玩家，而是亮出2个候选让玩家自己选一个
+				const pool = _status.characterlist.filter(name => lib.character[name]);
+				const shuffled = pool.slice();
+				shuffled.randomSort();
+				event.candidates = shuffled.slice(0, Math.min(2, shuffled.length));
+				if (!event.candidates.length) {
+					event.doChange = false;
+				} else if (event.candidates.length > 1) {
+					player
+						.chooseButton(["将略：请选择要变更为的武将", [event.candidates, "character"]])
+						.set("filterButton", button => event.candidates.includes(button.link))
+						.set("ai", button => get.guozhanRank(button.link));
+				} else {
+					event._result = { bool: true, links: event.candidates.slice() };
+				}
+			}
+			"step 10";
+			if (event.doChange && result && result.bool && result.links && result.links.length) {
+				const newChar = result.links[0];
 				const isVice = !get.character(player.name1, 3).includes("jianglve") && get.character(player.name2, 3).includes("jianglve");
-				const oldChar = isVice ? player.name2 : player.name1;
-				pool.add(oldChar);
 				const newPairs = player.name2 ? (isVice ? [player.name1, newChar] : [newChar, player.name2]) : [newChar];
 				player.changeCharacter(newPairs);
 			}
@@ -11788,24 +11881,14 @@ export default {
 			event.result.skill = "caishi";
 			player.storage.caishi_used = true;
 			player.awakenSkill?.("caishi");
-			// 才识可能挂在主将也可能挂在副将，提示语不能写死"主将"
+			// 才识可能挂在主将、副将，也可能挂在第三将(3将/sanjiang模式)，提示语不能写死"主将"
 			const change = await player.chooseBool(get.prompt("caishi"), "是否变更此武将牌？").forResult();
 			if (!change.bool) {
 				return;
 			}
-			if (!_status.characterlist) {
-				game.initCharacterList();
-			}
-			const pool = _status.characterlist.filter(name => lib.character[name] && name != player.name1 && name != player.name2);
-			if (!pool.length) {
-				return;
-			}
-			const newName = pool.randomGet();
-			// 参照xiongyi(韩当)/jianglve(王平)的判断方式，不能无条件只换name1——
-			// 如果才识实际是副将技能，之前永远在换一个跟这个技能毫无关系的主将。
-			const isVice = !get.character(player.name1, 3).includes("caishi") && get.character(player.name2, 3).includes("caishi");
-			const newPairs = player.name2 ? (isVice ? [player.name1, newName] : [newName, player.name2]) : [newName];
-			await player.changeCharacter(newPairs);
+			// pickAndChangeCharacter会自己判断才识具体挂在哪个槽位（含第三将），
+			// 并且是亮出2个候选让玩家选，而不是直接随机抽1个焗给玩家
+			await pickAndChangeCharacter(player, "caishi", "才识：请选择要变更为的武将");
 		},
 	},
 
@@ -22554,16 +22637,13 @@ export default {
 			player.awakenSkill(event.name);
 			await game.asyncDraw(event.targets, 3);
 			if (!player.isMajor()) {
-				const pool = _status.characterlist;
-				if (pool && pool.length) {
+				if (!_status.characterlist) {
+					game.initCharacterList();
+				}
+				if (_status.characterlist.length) {
 					const result = await player.chooseBool("雄异：是否变更此将？").set("ai", () => true).forResult();
 					if (result.bool) {
-						const newChar = pool.randomRemove();
-						const isVice = !get.character(player.name1, 3).includes("xiongyi") && get.character(player.name2, 3).includes("xiongyi");
-						const oldChar = isVice ? player.name2 : player.name1;
-						pool.add(oldChar);
-						const newPairs = player.name2 ? (isVice ? [player.name1, newChar] : [newChar, player.name2]) : [newChar];
-						await player.changeCharacter(newPairs);
+						await pickAndChangeCharacter(player, "xiongyi", "雄异：请选择要变更为的武将");
 					}
 				}
 			}
@@ -26019,15 +26099,9 @@ export default {
 			event.result = await player.chooseBool(get.prompt("xishe_change"), "是否变更一次副将（变更后的副将处于暗置状态）？").forResult();
 		},
 		async content(event, trigger, player) {
-			if (!_status.characterlist) {
-				game.initCharacterList();
-			}
-			const pool = _status.characterlist.filter(name => lib.character[name] && name != player.name1 && name != player.name2);
-			if (!pool.length) {
-				return;
-			}
-			const newName = pool.randomGet();
-			await player.changeCharacter([player.name1, newName]);
+			// xishe_change是附加的临时技能，不属于任何角色，无法通过技能id反查槽位，
+			// 所以固定传1(副将)——这个技能本来就是"变更一次副将"，不是通用换将
+			await pickAndChangeCharacter(player, 1, "袭射：请选择要变更为的副将");
 		},
 	},
 
