@@ -21433,6 +21433,12 @@ export default {
 			}
 			return 6 - get.value(card);
 		},
+		ai: {
+			// 稍微压低优先级，避免在还没考虑清楚本回合其他技能/用牌前，就抢先把手牌拆成万箭齐发浪费掉。
+			order(item, player) {
+				return get.order({ name: "wanjian" }, player) - 0.1;
+			},
+		},
 		group: ["luanji_count", "luanji_reset", "luanji_respond"],
 		subSkill: {
 			reset: {
