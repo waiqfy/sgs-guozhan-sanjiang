@@ -9746,15 +9746,47 @@ export default {
 		limited: true,
 		skillAnimation: "epic",
 		animationColor: "gray",
-		async content(event, trigger, player) {
+		content(event, trigger, player) {
 			player.awakenSkill("fengying", undefined);
 			player.storage.fengying = true;
-			player.insertPhase(null, true);
-
-			const list = game.filterPlayer(current => current.isFriendOf(player) && current.countCards("h") < current.maxHp);
-			list.sort(lib.sort.seat);
-			player.line(list, "thunder");
-			await game.asyncDraw(list, current => current.maxHp - current.countCards("h"));
+			player.storage.fengying_pending_turn = true;
+		},
+		group: ["fengying_grant", "fengying_draw"],
+		subSkill: {
+			// 参照真正的挟天子(apps/core/card/guozhan.js:2132)：额外回合是在phaseDiscardAfter
+			// (本回合已经快结束时)用不带参数的insertPhase()追加的，而不是在phaseUse发动的当下、
+			// 本回合弃牌/结束阶段都还没跑完时就insertPhase(null, true)硬插到队列最前面——
+			// 那样得到的额外回合实际上从未真正跑起来过。
+			grant: {
+				charlotte: true,
+				forced: true,
+				popup: false,
+				trigger: { player: "phaseDiscardAfter" },
+				filter(event, player) {
+					return player.storage.fengying_pending_turn;
+				},
+				content(event, trigger, player) {
+					delete player.storage.fengying_pending_turn;
+					player.insertPhase();
+					player.storage.fengying_pending_draw = true;
+				},
+			},
+			draw: {
+				charlotte: true,
+				forced: true,
+				popup: false,
+				trigger: { player: "phaseZhunbeiBegin" },
+				filter(event, player) {
+					return player.storage.fengying_pending_draw;
+				},
+				async content(event, trigger, player) {
+					delete player.storage.fengying_pending_draw;
+					const list = game.filterPlayer(current => current.isFriendOf(player) && current.countCards("h") < current.maxHp);
+					list.sort(lib.sort.seat);
+					player.line(list, "thunder");
+					await game.asyncDraw(list, current => current.maxHp - current.countCards("h"));
+				},
+			},
 		},
 		ai: {
 			order: 0.1,
