@@ -199,7 +199,22 @@ export default {
 		audio: 2,
 		trigger: { player: "drawAfter" },
 		filter(event, player) {
-			return !!event.getParent("shenxian") && player.countCards("h") > 0;
+			// 甚贤(shenxian)自己的filter要求_status.currentPhase != player（只在别人回合触发），
+			// 所以真正由甚贤摸的牌绝不可能发生在玩家自己回合开始时；这里加一道保险，
+			// 避免event.getParent("shenxian")在别的场合（比如玩家自己回合的正常摸牌）误判为真。
+			if (_status.currentPhase == player) {
+				return false;
+			}
+			let evt = event,
+				found = false;
+			for (let i = 0; i < 6 && evt; i++) {
+				evt = evt.getParent?.();
+				if (evt && evt.skill === "shenxian") {
+					found = true;
+					break;
+				}
+			}
+			return found && player.countCards("h") > 0;
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseToDiscard("he").set("prompt", get.prompt2("qiangwu")).forResult();
