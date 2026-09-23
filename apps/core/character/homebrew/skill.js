@@ -25237,7 +25237,12 @@ export default {
 			return game.hasPlayer(current => current != player);
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("yirang")).forResult();
+			event.result = await player
+				.chooseBool(get.prompt2("yirang"))
+				// 揖讓会把手牌全部展示交出去，还搭上"招祸"，只有自己体力上限已经很低（≤2）
+				// 快撑不住的时候换血才划算，体力上限还高时AI不应该主动发动
+				.set("ai", () => player.maxHp <= 2)
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			player.awakenSkill(event.name);
