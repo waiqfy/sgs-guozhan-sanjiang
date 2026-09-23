@@ -15,15 +15,15 @@ export const guozhan = {
 	],
 	7: [
 		"gz_wangyi", "gz_zhanghe", "gz_jianggan", "gz_simayi", "gz_weiyan", "gz_huangyueying", "gz_zhugeliang", "gz_lingtong", "gz_sunshangxiang", "gz_sunce", "gz_yuanshao", "gz_yuanshu", "gz_hetaihou", "gz_simashi", "gz_panjun", "gz_zhuran", "gz_jiachong", "gz_yanghu",
-		"zhugeliang", "zhouyu", "jiaxu", "zhangjiao", "wenyang", "lvlingqi", "simaliang",
+		"zhugeliang", "zhouyu", "jiaxu", "zhangjiao", "wenyang", "lvlingqi", "simaliang", "zuoci", "duyu",
 	],
 	6: [
 		"gz_caoang", "gz_wangji", "gz_zhenji", "gz_guojia", "gz_yujin", "gz_jiangwei", "gz_zhangfei", "gz_zhouyu", "gz_daqiao", "gz_dingfeng", "gz_yuji", "gz_caiwenji", "gz_diaochan", "gz_zuoci", "gz_dongzhao", "gz_liuba", "gz_zhouyi", "gz_xunchen", "gz_zhugejin", "gz_yangxiu", "gz_tianyu", "gz_yangwan",
-		"zhangbao", "xiahouba", "liubei", "zhangfei", "zhaoyun", "machao", "wangping", "fazheng", "zhenji", "xiahouyuan", "caoren", "caopi", "dengai", "cuimao", "zhangchunhua", "guohuai", "caozhen", "zhugedan", "caomao", "simayi", "guojia", "sunquan", "ganning", "lvmeng", "huanggai", "taishici", "zhoutai", "zhuran", "sunhao", "lvdai", "zhouyi", "yuanshao", "dongzhuo", "zuoci", "liru", "quyi", "xushao", "jiananfeng", "liuhong",
+		"zhangbao", "xiahouba", "liubei", "zhangfei", "zhaoyun", "machao", "wangping", "fazheng", "zhenji", "xiahouyuan", "caoren", "caopi", "dengai", "cuimao", "zhangchunhua", "guohuai", "caozhen", "zhugedan", "caomao", "simayi", "guojia", "sunquan", "ganning", "lvmeng", "huanggai", "taishici", "zhoutai", "zhuran", "sunhao", "lvdai", "zhouyi", "yuanshao", "dongzhuo", "liru", "quyi", "xushao", "jiananfeng", "liuhong",
 	],
 	5: [
 		"gz_bulianshi", "gz_zhangliao", "gz_caocao", "gz_xuhuang", "gz_liushan", "gz_pangtong", "gz_zhaoyun", "gz_lusu", "gz_sunquan", "gz_ganning", "gz_zhangxiu", "gz_liqueguosi", "gz_huatuo", "gz_xushu", "gz_huangzu", "gz_miheng", "gz_zumao",
-		"liuqi", "huangyueying", "huangzhong", "pangtong", "shamoke", "masu", "guanxing", "liaohua", "koufeng", "wuyi", "liuchen", "guanyinping", "simazhao", "simashi", "zhanghe", "dianwei", "xunyu", "niujin", "hanhaoshihuan", "xizhicai", "wanglang", "guanqiujian", "yanghu", "caoshuang", "huaxin", "caocao", "zhangliao", "xuzhu", "zhonghui", "dingfeng", "luxun", "sunjian", "sunce", "jiangqing", "xusheng", "lingtong", "chendong", "sunxiu", "zhugeke", "kanze", "xugong", "fengxi", "sunchen", "chengong", "shixie", "huatuo", "yanliangwenchou", "yuji", "caiwenji", "mateng", "jiling", "zoushi", "yuanshu", "hansui", "gaoshun", "yanbaihu", "taoqian", "miheng", "xunchen", "huangzu", "liuzhang", "wangyun", "duyu", "panzhangmazhong", "handang",
+		"liuqi", "huangyueying", "huangzhong", "pangtong", "shamoke", "masu", "guanxing", "liaohua", "koufeng", "wuyi", "liuchen", "guanyinping", "simazhao", "simashi", "zhanghe", "dianwei", "xunyu", "niujin", "hanhaoshihuan", "xizhicai", "wanglang", "guanqiujian", "yanghu", "caoshuang", "huaxin", "caocao", "zhangliao", "xuzhu", "zhonghui", "dingfeng", "luxun", "sunjian", "sunce", "jiangqing", "xusheng", "lingtong", "chendong", "sunxiu", "zhugeke", "kanze", "xugong", "fengxi", "sunchen", "chengong", "shixie", "huatuo", "yanliangwenchou", "yuji", "caiwenji", "mateng", "jiling", "zoushi", "yuanshu", "hansui", "gaoshun", "yanbaihu", "taoqian", "miheng", "xunchen", "huangzu", "liuzhang", "wangyun", "panzhangmazhong", "handang",
 	],
 	4: [
 		"gz_caozhen", "gz_dianwei", "gz_dengai", "gz_xunyu", "gz_madai", "gz_liubei", "gz_mifuren", "gz_wuguotai", "gz_luxun", "gz_taishici", "gz_zhangjiao", "gz_pangde", "gz_liuqi", "gz_zhangchunhua", "gz_zongyu", "gz_shixie", "gz_yanbaihu", "gz_wujing", "gz_zhugeke", "gz_sunchen", "gz_liaohua",
