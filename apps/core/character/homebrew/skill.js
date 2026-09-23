@@ -7940,6 +7940,11 @@ export default {
 		usable: 1,
 		trigger: { global: "useCardToTargeted" },
 		filter(event, player) {
+			// AOE牌(万箭齐发/南蛮等)一次使用会对每个目标各触发一次useCardToTargeted，
+			// 加isFirstTarget保证这类牌只在第一个目标结算时问一次，不会连续弹好几次。
+			if (!event.isFirstTarget) {
+				return false;
+			}
 			if (event.card.name != "sha" && !(get.type(event.card) == "trick" && get.tag(event.card, "damage"))) {
 				return false;
 			}
@@ -9699,7 +9704,9 @@ export default {
 				charlotte: true,
 				mod: {
 					targetInRange(card, player, target) {
-						if (target === player.storage.zhengbi_target && target.isUnseen()) {
+						// 用identity=="unknown"而不是isUnseen()：一旦目标本回合内明置导致势力确定，
+						// 哪怕武将牌暗置状态本身没变化，这条"对未定势力无限制"的效果也应立即失效。
+						if (target === player.storage.zhengbi_target && target.identity == "unknown") {
 							return true;
 						}
 					},
@@ -9708,7 +9715,7 @@ export default {
 					// "对特定目标不受今天已用次数限制"要用cardUsableTarget这个mod（第三个参数才是
 					// 具体的目标Player），原来这里写错了mod名导致这条"无次数限制"从来没真正生效过。
 					cardUsableTarget(card, player, target) {
-						if (target === player.storage.zhengbi_target && target.isUnseen()) {
+						if (target === player.storage.zhengbi_target && target.identity == "unknown") {
 							return true;
 						}
 					},
