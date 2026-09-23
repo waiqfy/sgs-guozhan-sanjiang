@@ -6489,7 +6489,8 @@ export default {
 						const { huogong } = get.event();
 						return target != player && player.canUse(huogong, target);
 					},
-					[1, 4]
+					[1, 4],
+					true
 				)
 				.set("huogong", card)
 				.set("ai", target => {
@@ -15903,7 +15904,7 @@ export default {
 			if (useOpt1) {
 				player.addTempSkill("tianxiang_mark1", "phaseAfter");
 				if (source.isIn() && target.isIn()) {
-					await source.damage(target, 1);
+					await target.damage(1, source);
 					if (target.isIn()) {
 						const num = Math.min(5, target.getDamagedHp());
 						if (num > 0) {
