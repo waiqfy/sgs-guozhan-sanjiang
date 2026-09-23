@@ -3936,24 +3936,78 @@ export default {
 				player.chooseBool("将略：是否变更此将？").set("ai", () => true);
 			}
 			"step 9";
+			// 注意：这个content()是旧式"step N"写法，会被StepCompiler拆开重新编译，
+			// 不能引用pickCharacterCandidates/applyCharacterChange这些模块作用域里的
+			// 普通函数（拆开后找不到，会报"is not defined"），只能把逻辑原样内联在这里。
 			event.doChange = !!(event.canChange && result && result.bool);
 			if (event.doChange) {
 				// 换将不再是直接随机抽1个焗给玩家，而是亮出2个候选让玩家自己选一个
-				event.candidates = pickCharacterCandidates();
+				if (!_status.characterlist) {
+					game.initCharacterList();
+				}
+				var pool = _status.characterlist.filter(function (name) {
+					return lib.character[name];
+				});
+				pool.randomSort();
+				event.candidates = pool.slice(0, Math.min(2, pool.length));
 				if (!event.candidates.length) {
 					event.doChange = false;
 				} else if (event.candidates.length > 1) {
 					player
 						.chooseButton(["将略：请选择要变更为的武将", [event.candidates, "character"]])
-						.set("filterButton", button => event.candidates.includes(button.link))
-						.set("ai", button => get.guozhanRank(button.link));
+						.set("filterButton", function (button) {
+							return event.candidates.includes(button.link);
+						})
+						.set("ai", function (button) {
+							return get.guozhanRank(button.link);
+						});
 				} else {
 					event._result = { bool: true, links: event.candidates.slice() };
 				}
 			}
 			"step 10";
 			if (event.doChange && result && result.bool && result.links && result.links.length) {
-				applyCharacterChange(player, "jianglve", result.links[0]);
+				var newChar = result.links[0];
+				var names3 = [player.name1, player.name2, player.name3].filter(Boolean);
+				var slot = names3.findIndex(function (name) {
+					return get.character(name, 3).includes("jianglve");
+				});
+				if (slot < 0) {
+					slot = 0;
+				}
+				if (slot === 2) {
+					var oldName3 = player.name3;
+					if (oldName3 && lib.character[oldName3]) {
+						get.character(oldName3, 3).forEach(function (oldSkill) {
+							if (player.hasSkill(oldSkill, null, null, false)) {
+								player.removeSkill(oldSkill);
+							}
+						});
+					}
+					if (_status.characterlist) {
+						_status.characterlist.remove(newChar);
+						if (oldName3) {
+							_status.characterlist.add(oldName3);
+						}
+					}
+					player.name3 = newChar;
+					if (player.node.avatar3g) {
+						player.node.avatar3g.setBackground(newChar, "character");
+						player.node.avatar3g.show();
+						player.node.name3.innerHTML = get.slimName(newChar);
+						player.node.name3.show();
+					}
+					get.character(newChar, 3).forEach(function (newSkill) {
+						if (lib.skill[newSkill]) {
+							player.addSkill(newSkill);
+						}
+					});
+					game.log(player, "将第三个武将从", "#b" + get.translation(oldName3), "变更为了", "#b" + get.translation(newChar));
+				} else {
+					var newPairs2 = [player.name1, player.name2].filter(Boolean);
+					newPairs2[slot] = newChar;
+					player.changeCharacter(newPairs2);
+				}
 			}
 		},
 		marktext: "略",
@@ -7027,22 +7081,76 @@ export default {
 			"step 2";
 			// 归隐可能挂在主将、副将，也可能挂在第三将(3将/sanjiang模式)，不能只判断name1/name2；
 			// "变更此武将"是换成一张新武将牌，不是removeCharacter变小兵——原来这里错误地
-			// 调用了removeCharacter，跟文本描述的"变更"对不上
-			event.candidates = pickCharacterCandidates();
+			// 调用了removeCharacter，跟文本描述的"变更"对不上。
+			// 注意：这个content()是旧式"step N"写法，会被StepCompiler拆开重新编译，不能引用
+			// pickCharacterCandidates/applyCharacterChange这些模块作用域里的普通函数
+			// （拆开后找不到，会报"is not defined"），只能把逻辑原样内联在这里。
+			if (!_status.characterlist) {
+				game.initCharacterList();
+			}
+			var pool2 = _status.characterlist.filter(function (name) {
+				return lib.character[name];
+			});
+			pool2.randomSort();
+			event.candidates = pool2.slice(0, Math.min(2, pool2.length));
 			event.doChange = !!event.candidates.length;
 			if (event.doChange) {
 				if (event.candidates.length > 1) {
 					player
 						.chooseButton(["归隐：请选择要变更为的武将", [event.candidates, "character"]])
-						.set("filterButton", button => event.candidates.includes(button.link))
-						.set("ai", button => get.guozhanRank(button.link));
+						.set("filterButton", function (button) {
+							return event.candidates.includes(button.link);
+						})
+						.set("ai", function (button) {
+							return get.guozhanRank(button.link);
+						});
 				} else {
 					event._result = { bool: true, links: event.candidates.slice() };
 				}
 			}
 			"step 3";
 			if (event.doChange && result && result.bool && result.links && result.links.length) {
-				applyCharacterChange(player, "guiyin", result.links[0]);
+				var newChar2 = result.links[0];
+				var names4 = [player.name1, player.name2, player.name3].filter(Boolean);
+				var slot2 = names4.findIndex(function (name) {
+					return get.character(name, 3).includes("guiyin");
+				});
+				if (slot2 < 0) {
+					slot2 = 0;
+				}
+				if (slot2 === 2) {
+					var oldName4 = player.name3;
+					if (oldName4 && lib.character[oldName4]) {
+						get.character(oldName4, 3).forEach(function (oldSkill) {
+							if (player.hasSkill(oldSkill, null, null, false)) {
+								player.removeSkill(oldSkill);
+							}
+						});
+					}
+					if (_status.characterlist) {
+						_status.characterlist.remove(newChar2);
+						if (oldName4) {
+							_status.characterlist.add(oldName4);
+						}
+					}
+					player.name3 = newChar2;
+					if (player.node.avatar3g) {
+						player.node.avatar3g.setBackground(newChar2, "character");
+						player.node.avatar3g.show();
+						player.node.name3.innerHTML = get.slimName(newChar2);
+						player.node.name3.show();
+					}
+					get.character(newChar2, 3).forEach(function (newSkill) {
+						if (lib.skill[newSkill]) {
+							player.addSkill(newSkill);
+						}
+					});
+					game.log(player, "将第三个武将从", "#b" + get.translation(oldName4), "变更为了", "#b" + get.translation(newChar2));
+				} else {
+					var newPairs3 = [player.name1, player.name2].filter(Boolean);
+					newPairs3[slot2] = newChar2;
+					player.changeCharacter(newPairs3);
+				}
 			}
 		},
 		ai: {
