@@ -44,29 +44,27 @@ function isCharacterShown(player, skill) {
 // name1/name2这一对，完全不认识name3（见content.ts的changeCharacter实现），所以第三将槽位
 // 换将照抄xushuTransThird()换第三将时的写法：直接removeSkill旧技能、置换name3、更新
 // avatar3g/name3这两个UI节点、再addSkill新技能。
-async function pickAndChangeCharacter(player, slotOrSkillId, prompt) {
+function pickCharacterCandidates() {
 	if (!_status.characterlist) {
 		game.initCharacterList();
 	}
 	const pool = _status.characterlist.filter(name => lib.character[name]);
-	if (!pool.length) {
-		return false;
-	}
 	const shuffled = pool.slice();
 	shuffled.randomSort();
-	const candidates = shuffled.slice(0, Math.min(2, shuffled.length));
-	let chosen = candidates[0];
-	if (candidates.length > 1) {
-		const result = await player
-			.chooseButton([prompt || "请选择要变更为的武将", [candidates, "character"]])
-			.set("filterButton", button => candidates.includes(button.link))
-			.set("ai", button => get.guozhanRank(button.link))
-			.forResult();
-		chosen = (result?.bool && result.links?.[0]) || candidates[0];
-	}
-	if (!chosen) {
-		return false;
-	}
+	return shuffled.slice(0, Math.min(2, shuffled.length));
+}
+
+// 实际执行"把skillId所在的那张武将牌换成chosen"——独立拆出来（不是async），
+// 这样async content的技能可以await它，非async(旧的"step N"写法，比如guiyin/jianglve)
+// 的技能也能直接调用而不需要处理Promise。
+// slotOrSkillId传技能id时，自动判断该技能实际挂在主将(0)/副将(1)/第三将(2，3将/sanjiang
+// 模式专属)中的哪一个槽位；传数字时直接指定槽位（用于xishe_change这类不属于任何角色、
+// 而是固定改副将的临时技能，无法通过技能id反查槽位）。
+// 第三将槽位不走player.changeCharacter——引擎的changeCharacter/reinit2从设计上就只处理
+// name1/name2这一对，完全不认识name3（见content.ts的changeCharacter实现），所以第三将槽位
+// 换将照抄xushuTransThird()换第三将时的写法：直接removeSkill旧技能、置换name3、更新
+// avatar3g/name3这两个UI节点、再addSkill新技能。
+function applyCharacterChange(player, slotOrSkillId, chosen) {
 	let slot;
 	if (typeof slotOrSkillId === "number") {
 		slot = slotOrSkillId;
@@ -86,9 +84,11 @@ async function pickAndChangeCharacter(player, slotOrSkillId, prompt) {
 				}
 			}
 		}
-		_status.characterlist.remove(chosen);
-		if (oldName) {
-			_status.characterlist.add(oldName);
+		if (_status.characterlist) {
+			_status.characterlist.remove(chosen);
+			if (oldName) {
+				_status.characterlist.add(oldName);
+			}
 		}
 		player.name3 = chosen;
 		if (player.node.avatar3g) {
@@ -103,10 +103,38 @@ async function pickAndChangeCharacter(player, slotOrSkillId, prompt) {
 			}
 		}
 		game.log(player, "将第三个武将从", `#b${get.translation(oldName)}`, "变更为了", `#b${get.translation(chosen)}`);
-	} else {
-		const names2 = [player.name1, player.name2].filter(Boolean);
-		names2[slot] = chosen;
-		await player.changeCharacter(names2);
+		return null;
+	}
+	const names2 = [player.name1, player.name2].filter(Boolean);
+	names2[slot] = chosen;
+	return player.changeCharacter(names2);
+}
+
+// 所有"变更此武将牌"类技能的通用逻辑（async版本）：从当前不在场的武将里随机亮出2个供
+// 玩家选择（而不是直接随机抽1个焗给玩家），适用于caishi(才识)/xiongyi(雄异)/jugu2(巨贾)/
+// xishe_change(袭射)这几个async content写的技能。旧式"step N"写法的技能（jianglve/guiyin）
+// 没法直接await这个函数，改成自己在content里插入chooseButton步骤、拿到chosen后调用上面的
+// applyCharacterChange。
+async function pickAndChangeCharacter(player, slotOrSkillId, prompt) {
+	const candidates = pickCharacterCandidates();
+	if (!candidates.length) {
+		return false;
+	}
+	let chosen = candidates[0];
+	if (candidates.length > 1) {
+		const result = await player
+			.chooseButton([prompt || "请选择要变更为的武将", [candidates, "character"]])
+			.set("filterButton", button => candidates.includes(button.link))
+			.set("ai", button => get.guozhanRank(button.link))
+			.forResult();
+		chosen = (result?.bool && result.links?.[0]) || candidates[0];
+	}
+	if (!chosen) {
+		return false;
+	}
+	const changeEvent = applyCharacterChange(player, slotOrSkillId, chosen);
+	if (changeEvent) {
+		await changeEvent;
 	}
 	return true;
 }
@@ -3911,10 +3939,7 @@ export default {
 			event.doChange = !!(event.canChange && result && result.bool);
 			if (event.doChange) {
 				// 换将不再是直接随机抽1个焗给玩家，而是亮出2个候选让玩家自己选一个
-				const pool = _status.characterlist.filter(name => lib.character[name]);
-				const shuffled = pool.slice();
-				shuffled.randomSort();
-				event.candidates = shuffled.slice(0, Math.min(2, shuffled.length));
+				event.candidates = pickCharacterCandidates();
 				if (!event.candidates.length) {
 					event.doChange = false;
 				} else if (event.candidates.length > 1) {
@@ -3928,10 +3953,7 @@ export default {
 			}
 			"step 10";
 			if (event.doChange && result && result.bool && result.links && result.links.length) {
-				const newChar = result.links[0];
-				const isVice = !get.character(player.name1, 3).includes("jianglve") && get.character(player.name2, 3).includes("jianglve");
-				const newPairs = player.name2 ? (isVice ? [player.name1, newChar] : [newChar, player.name2]) : [newChar];
-				player.changeCharacter(newPairs);
+				applyCharacterChange(player, "jianglve", result.links[0]);
 			}
 		},
 		marktext: "略",
@@ -7003,11 +7025,24 @@ export default {
 				event.redo();
 			}
 			"step 2";
-			if (lib.character[player.name1][3].includes("guiyin")) {
-				player.removeCharacter(0);
+			// 归隐可能挂在主将、副将，也可能挂在第三将(3将/sanjiang模式)，不能只判断name1/name2；
+			// "变更此武将"是换成一张新武将牌，不是removeCharacter变小兵——原来这里错误地
+			// 调用了removeCharacter，跟文本描述的"变更"对不上
+			event.candidates = pickCharacterCandidates();
+			event.doChange = !!event.candidates.length;
+			if (event.doChange) {
+				if (event.candidates.length > 1) {
+					player
+						.chooseButton(["归隐：请选择要变更为的武将", [event.candidates, "character"]])
+						.set("filterButton", button => event.candidates.includes(button.link))
+						.set("ai", button => get.guozhanRank(button.link));
+				} else {
+					event._result = { bool: true, links: event.candidates.slice() };
+				}
 			}
-			if (lib.character[player.name2][3].includes("guiyin")) {
-				player.removeCharacter(1);
+			"step 3";
+			if (event.doChange && result && result.bool && result.links && result.links.length) {
+				applyCharacterChange(player, "guiyin", result.links[0]);
 			}
 		},
 		ai: {
