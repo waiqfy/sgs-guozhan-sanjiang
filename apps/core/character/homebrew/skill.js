@@ -1145,7 +1145,7 @@ export default {
 					if (target.hasSkillTag("nogain") || !target.countCards("h")) {
 						return 0;
 					}
-					return 1;
+					return -get.attitude(player, target);
 				},
 			},
 		},
@@ -14993,7 +14993,7 @@ export default {
 		async content(event, trigger, player) {
 			trigger.cancel();
 			player.storage.duojing_target = trigger.player;
-			player.addTempSkill("duojing_after");
+			player.addTempSkill("duojing_after", { global: [] });
 		},
 		ai: {
 			order: 9,
