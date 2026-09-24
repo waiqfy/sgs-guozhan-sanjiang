@@ -11671,9 +11671,9 @@ export default {
 		audio: 6,
 		sourceSkill: "xianfu",
 		trigger: { global: "phaseZhunbeiBegin" },
-		// 文本是"一名与你势力相同的角色的准备阶段"，没写"其他"，自己的准备阶段也该算
 		filter(event, player) {
 			return (
+				event.player !== player &&
 				event.player.isFriendOf(player) &&
 				player.countMark("xianqu_mark") > 0 &&
 				!(player.storage.xianfu_targets || []).includes(event.player)
@@ -16504,9 +16504,8 @@ export default {
 			const result = await player
 				.chooseCardTarget({
 					selectCard: Math.floor(player.countCards("h") / 2),
-					// 文本是"一名其他角色"，收牌的人不能是鲁肃自己
 					filterTarget(card, player, target) {
-						return target != player && target.isMinHandcard();
+						return target.isMinHandcard();
 					},
 					prompt: "将一半的手牌交给场上手牌数最少的一名角色",
 					forced: true,
