@@ -21464,7 +21464,15 @@ export default {
 						}
 						return true;
 					})
-					.set("ai", target => get.attitude(get.player(), target))
+					.set("ai", target => {
+						const attitude = get.attitude(get.player(), target);
+						// 队友被弃置的牌不一定是黑桃，摸不到牌纯粹让队友掉一张牌，不划算；
+						// 敌人则无所谓有没有黑桃，弃牌本身就是干扰，正常按好感度选
+						if (attitude > 0 && !target.getCards("e", card => get.suit(card) == "spade").length) {
+							return -1;
+						}
+						return attitude;
+					})
 					.forResult();
 				if (!targets.bool || !targets.targets || !targets.targets.length) {
 					return;
