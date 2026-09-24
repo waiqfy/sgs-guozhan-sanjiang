@@ -4910,6 +4910,15 @@ export default {
 		filterTarget(card, player, target) {
 			return player.isFriendOf(target) && get.distance(player, target) <= 1;
 		},
+		// 官方参考本身也没写ai，纯靠引擎默认的兜底热情度评估这类phaseUse主动技，
+		// 大概率就是"从来不主动发动"的原因，加一个合理的默认值
+		ai: {
+			order: 6,
+			result: {
+				player: 1,
+				target: 1,
+			},
+		},
 		async content(event, trigger, player) {
 			const { target } = event,
 				name = `${event.name}_used`;
