@@ -16333,19 +16333,20 @@ export default {
 		aiShowTag: "support",
 		audio: 2,
 		// "compareAfter"这个事件名整个引擎里根本不存在，导致这个技能从来没有触发过；
-		// 拼点结束后真正的事件叫"chooseToCompareAfter"。同文件jyzongshi也是监听这个事件，
-		// 但用的是global+手动比对event.player/event.target，不是player/target角色写法——
-		// 这个事件不是常规按角色分发的trigger，role写法(trigger:{player:...,target:...})
-		// 匹配不上，照抄jyzongshi的写法才会真正触发
-		trigger: { global: "chooseToCompareAfter" },
+		// 拼点结束后真正的事件叫"chooseToCompareAfter"（同文件jyzongshi的写法：
+		// global:["chooseToCompareAfter","compareMultipleAfter"]，手动比对
+		// event.player/event.target，不是player/target角色写法）。
+		// 另外拼点牌结算后不一定严格落在"d"(纯弃牌堆)位置，jyzongshi用的是"od"这个更宽松的
+		// 过滤，之前用"d"筛出来是空数组，filter恒为false，一次都没触发过
+		trigger: { global: ["chooseToCompareAfter", "compareMultipleAfter"] },
 		filter(event, player) {
 			if (player != event.player && player != event.target) {
 				return false;
 			}
-			return [event.card1, event.card2].filterInD("d").some(card => player.hasUseTarget(card));
+			return [event.card1, event.card2].filterInD("od").some(card => player.hasUseTarget(card));
 		},
 		async content(event, trigger, player) {
-			const cards = [trigger.card1, trigger.card2].filterInD("d").filter(card => player.hasUseTarget(card));
+			const cards = [trigger.card1, trigger.card2].filterInD("od").filter(card => player.hasUseTarget(card));
 			if (!cards.length) {
 				return;
 			}
@@ -24556,8 +24557,10 @@ export default {
 		filter(event, player) {
 			return event.player != player && player.canCompare(event.player);
 		},
+		// 之前没写ai，默认偏保守，导致惴恐几乎不主动发动——赢了能白嫖对方一张牌用，
+		// 输了也只是让对方拿走一张自己本来就要弃置计入拼点成本的牌，怎么样都不亏，直接给true
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("zhuikong", trigger.player)).forResult();
+			event.result = await player.chooseBool(get.prompt2("zhuikong", trigger.player)).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			const target = trigger.player;
