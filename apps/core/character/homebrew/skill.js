@@ -26253,6 +26253,12 @@ export default {
 				}
 			}
 			if (killed) {
+				// 袭射发生在目标的准备阶段(target的回合里)，不是黄祖自己的回合，"此回合结束时"
+				// 指的是target当前这个回合结束，不是黄祖自己下一次回合结束——之前trigger写
+				// {player:"phaseAfter"}绑定的是黄祖自己的phaseAfter，要等到黄祖自己下一次
+				// 回合结束才会触发，跟"此回合结束"完全对不上，参照duojing_after同款写法，
+				// 记下具体是哪个回合(target)，改成监听global的phaseAfter再比对
+				player.storage.xishe_change_turn = target;
 				// 不能直接用"phaseAfter"当过期条件——xishe_change自己的trigger也是phaseAfter，
 				// 触发事件名撞过期条件会导致引擎在该触发的这一刻先把技能过期删掉，永远等不到执行
 				// (跟duojing_after是同一类bug)，改成不会自然满足的{global:[]}，靠content自己收尾
@@ -26263,15 +26269,16 @@ export default {
 	},
 	xishe_change: {
 		charlotte: true,
-		trigger: { player: "phaseAfter" },
+		trigger: { global: "phaseAfter" },
 		forced: true,
 		filter(event, player) {
-			return !!player.name2;
+			return event.player === player.storage.xishe_change_turn && !!player.name2;
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseBool(get.prompt("xishe_change"), "是否变更一次副将（变更后的副将处于暗置状态）？").forResult();
 			// expire改成了{global:[]}不会自然过期，不管选是否都要在这里手动收尾，
 			// 否则以后每个phaseAfter都会再问一次
+			delete player.storage.xishe_change_turn;
 			player.removeSkill("xishe_change");
 		},
 		async content(event, trigger, player) {
