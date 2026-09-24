@@ -4357,6 +4357,12 @@ export default {
 		filter(event, player) {
 			return event.card.name == "sha" && player.countCards("he") > 0 && event.player.isPhaseUsing();
 		},
+		// 龙吟本质是"帮使杀的人不计入次数/摸牌"，纯粹是资敌行为，cost内部的go虽然已经按
+		// 好感度gate了，但AI对是否发动这个技能本身还有一层独立的"是否发动"评估，没有这层
+		// check兜底的话敌方使用杀时AI仍可能选择发动，加一层顶层check直接堵死
+		check(event, player) {
+			return get.attitude(player, event.player) > 0;
+		},
 		async cost(event, trigger, player) {
 			let go = false;
 			if (get.attitude(player, trigger.player) > 0) {
@@ -14606,21 +14612,14 @@ export default {
 				audioname: ["heqi"],
 				trigger: { player: "useCardToPlayered" },
 				forced: true,
+				// 按要求不套官方那套"需要2张闪"的写法，改成真正让这张杀变成"刺杀"(nature: stab)——
+				// 引擎自带的刺杀属性本来就是"1张闪，之后还要弃1张手牌"，不是"2张闪"
 				filter(event, player) {
-					return event.card.name == "sha" && !event.getParent().directHit.includes(event.target) && get.distance(player, event.target) <= 1;
+					return event.card.name == "sha" && !event.getParent().directHit.includes(event.target) && get.distance(player, event.target) <= 1 && !game.hasNature(event.card, "stab");
 				},
 				logTarget: "target",
 				content(event, trigger, player) {
-					const id = trigger.target.playerid;
-					const map = trigger.getParent().customArgs;
-					if (!map[id]) {
-						map[id] = {};
-					}
-					if (typeof map[id].shanRequired == "number") {
-						map[id].shanRequired++;
-					} else {
-						map[id].shanRequired = 2;
-					}
+					game.setNature(trigger.card, "stab", true);
 				},
 				ai: {
 					directHit_ai: true,
@@ -16333,7 +16332,9 @@ export default {
 	hanzhan: {
 		aiShowTag: "support",
 		audio: 2,
-		trigger: { player: "compareAfter", target: "compareAfter" },
+		// "compareAfter"这个事件名整个引擎里根本不存在，导致这个技能从来没有触发过；
+		// 拼点结束后真正的事件叫"chooseToCompareAfter"(参考同文件jyzongshi的用法)
+		trigger: { player: "chooseToCompareAfter", target: "chooseToCompareAfter" },
 		filter(event, player) {
 			return [event.card1, event.card2].filterInD("d").some(card => player.hasUseTarget(card));
 		},
@@ -19211,7 +19212,9 @@ export default {
 			return event.player != player && event.player.inRange(player);
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("zhixi", trigger.player)).forResult();
+			// 令对方弃一张牌纯粹是纯收益、没有代价，AI没有理由拒绝，之前没写ai默认值
+			// 偏保守导致基本不发动
+			event.result = await player.chooseBool(get.prompt2("zhixi", trigger.player)).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			await trigger.player.chooseToDiscard(true);
@@ -20175,6 +20178,10 @@ export default {
 		ai: {
 			threaten: 0.7,
 		},
+		// 缺了group声明，huaiju_effect虽然作为subSkill注册进了lib.skill，但从没被自动挂到
+		// 任何玩家身上，免伤这部分从来没生效过——老版本(skill_old.js的nzry_huaiju)是有
+		// group: "nzry_huaiju_effect"的，这里漏掉了
+		group: "huaiju_effect",
 		subSkill: {
 			effect: {
 				charlotte: true,
@@ -23216,41 +23223,22 @@ export default {
 		audio: "kuangfu",
 		trigger: { global: "phaseUseBegin" },
 		usable: 1,
+		forced: true,
 		// 文本是"与你势力相同角色的出牌阶段"，没有写"其他角色"，潘凤自己也算在内，
 		// 不能排除event.player==player的情况
 		filter(event, player) {
 			return event.player.isFriendOf(player) && !player.storage.kuangfu_lock;
 		},
-		logTarget(event) {
-			return event.player;
-		},
-		check(event, player) {
-			return get.attitude(player, event.player) > 0;
-		},
-		// "其可以令你摸两张牌"——是当前回合的这名势力相同角色自己决定要不要发动，不是潘凤自己，
-		// 原来没写cost，靠引擎默认的"是否发动"兜底会问到技能持有者(潘凤)身上，问错了人
-		async cost(event, trigger, player) {
-			event.result = await trigger.player
-				.chooseBool(get.prompt2("kuangfu", player), "狂斧：是否令" + get.translation(player) + "摸两张牌，然后视为对其指定的一名角色使用一张【决斗】？")
-				.forResult();
-		},
+		// "出牌阶段限一次"不是"出牌阶段开始时"——原来在阶段一开始就问一次是否发动，
+		// 现在改成给这名势力相同角色的整个出牌阶段授予一个可以随时主动发动的按钮
+		// (kuangfu_active)，而不是只能在阶段刚开始那一刻决定
 		async content(event, trigger, player) {
-			const ally = trigger.player;
-			await player.draw(2);
-			const result = await ally
-				.chooseTarget("狂斧：指定一名角色，令" + get.translation(player) + "视为对其使用一张【决斗】", (card, playerx, target) => player.canUse({ name: "juedou" }, target))
-				.set("ai", target => get.effect(target, { name: "juedou" }, player, player))
-				.forResult();
-			if (result.bool && result.targets && result.targets.length) {
-				const target = result.targets[0];
-				const before = player.hp;
-				await player.useCard({ name: "juedou", isCard: true }, target, false);
-				if (player.hp < before) {
-					await player.chooseToDiscard("he", 2, true);
-					player.storage.kuangfu_lock = true;
-				}
-			}
+			trigger.player.storage.kuangfu_from = player;
+			trigger.player.addTempSkill("kuangfu_active", "phaseUseAfter");
 		},
+		// 原来reset只声明在subSkill里、没写group，从来没被自动挂到潘凤自己身上过，
+		// kuangfu_lock一旦置true就永远清不掉了——顺手补上group
+		group: "kuangfu_reset",
 		subSkill: {
 			reset: {
 				trigger: { player: "phaseAfter" },
@@ -23267,6 +23255,36 @@ export default {
 		},
 		ai: {
 			threaten: 1.1,
+		},
+	},
+	kuangfu_active: {
+		charlotte: true,
+		audio: "kuangfu",
+		enable: "phaseUse",
+		usable: 1,
+		filter(event, player) {
+			return player.storage.kuangfu_from && player.storage.kuangfu_from.isIn();
+		},
+		check(event, player) {
+			return get.attitude(player, player.storage.kuangfu_from) > 0;
+		},
+		async content(event, trigger, player) {
+			const source = player.storage.kuangfu_from;
+			delete player.storage.kuangfu_from;
+			await source.draw(2);
+			const result = await player
+				.chooseTarget("狂斧：指定一名角色，令" + get.translation(source) + "视为对其使用一张【决斗】", (card, playerx, target) => source.canUse({ name: "juedou" }, target))
+				.set("ai", target => get.effect(target, { name: "juedou" }, source, source))
+				.forResult();
+			if (result.bool && result.targets && result.targets.length) {
+				const target = result.targets[0];
+				const before = source.hp;
+				await source.useCard({ name: "juedou", isCard: true }, target, false);
+				if (source.hp < before) {
+					await source.chooseToDiscard("he", 2, true);
+					source.storage.kuangfu_lock = true;
+				}
+			}
 		},
 	},
 
@@ -24542,13 +24560,13 @@ export default {
 			const opponentCard = result.bool ? result.card2 : result.card1;
 			const winnerOwnCard = result.bool ? result.card1 : result.card2;
 			const loser = result.bool ? target : player;
-			if (opponentCard && winner.isIn()) {
-				await winner.chooseToUse({
-					prompt: `惴恐：是否使用${get.translation(loser)}的拼点牌？`,
-					filterCard(card) {
-						return card === opponentCard;
-					},
-				});
+			// opponentCard这时已经不在winner的手牌/装备区里了（拼点牌结算后进了弃牌堆），
+			// 普通chooseToUse按位置筛选牌根本选不到这张牌，一直没生效；参考同文件hanzhan(酣战)
+			// 的写法：先$gain2临时视觉上"拿到"这张牌，再直接chooseUseTarget指定这张牌对象
+			if (opponentCard && winner.isIn() && winner.hasUseTarget(opponentCard)) {
+				winner.$gain2(opponentCard, false);
+				await game.delayx();
+				await winner.chooseUseTarget(true, opponentCard, false);
 			}
 			if (winnerOwnCard && loser.isIn()) {
 				loser.storage.zhuikong_forbid = get.type(winnerOwnCard);
@@ -24580,8 +24598,11 @@ export default {
 			return event.card.name == "sha";
 		},
 		async cost(event, trigger, player) {
+			// 被选中的人要在"交一张牌"和"变成这张杀的额外目标"里选一个，两个都是亏——
+			// AI应该选敌人来承受这个两难，不是选队友
 			event.result = await player
 				.chooseTarget(get.prompt2("qiuyuan"), (card, player, target) => target != player && target != trigger.player)
+				.set("ai", target => -get.attitude(player, target))
 				.forResult();
 		},
 		async content(event, trigger, player) {
