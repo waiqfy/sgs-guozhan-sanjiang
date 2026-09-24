@@ -3679,6 +3679,11 @@ export default {
 		skillAnimation: true,
 		animationColor: "orange",
 		derivation: "gzyongjue",
+		// 移除武将牌是很大的代价，AI不应该在满血时就随便发动——只有自己已经受伤(或者
+		// 濒死本来就要触发)时才值得考虑
+		check(event, player) {
+			return player.isDamaged() || player.isDying();
+		},
 		async content(event, _trigger, player) {
 			const result = await player.chooseTarget("请选择获得〖勇决〗的角色", () => true).forResult();
 			if (!result.bool || !result.targets?.length) {
@@ -20131,7 +20136,15 @@ export default {
 					return target.countCards("h") > 0;
 				})
 				.set("ai", function (target) {
-					return get.attitude(_status.event.player, target);
+					const player = _status.event.player;
+					const attitude = get.attitude(player, target);
+					// 弃牌是强制的(chooseToDiscard里forced:true)，如果目标手里根本没有红色牌，
+					// 队友只会白白弃掉一张有用的黑色牌、什么好处也拿不到——这种情况不该选这个目标
+					const hasRed = target.countCards("h", card => get.color(card, target) == "red") > 0;
+					if (attitude > 0 && !hasRed) {
+						return -1;
+					}
+					return attitude;
 				})
 				.forResult();
 		},
@@ -20670,9 +20683,10 @@ export default {
 		group: ["diaogui_draw", "diaogui_cancel"],
 		enable: ["chooseToUse"],
 		usable: 1,
-		filterCard() {
-			return false;
-		},
+		// 文本是"将一张牌当【调虎离山】使用"，是要真的选1张牌当成本，不是无中生有的免费转化——
+		// filterCard写死false、又没配selectCard:-1兜底，导致选牌步骤永远凑不出合法结果，
+		// 一直没有确认按钮，技能等于从来发动不了
+		filterCard: true,
 		viewAsFilter(player) {
 			return !player.storage.diaogui_used;
 		},
