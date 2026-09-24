@@ -23214,8 +23214,10 @@ export default {
 		audio: "kuangfu",
 		trigger: { global: "phaseUseBegin" },
 		usable: 1,
+		// 文本是"与你势力相同角色的出牌阶段"，没有写"其他角色"，潘凤自己也算在内，
+		// 不能排除event.player==player的情况
 		filter(event, player) {
-			return event.player != player && event.player.isFriendOf(player) && !player.storage.kuangfu_lock;
+			return event.player.isFriendOf(player) && !player.storage.kuangfu_lock;
 		},
 		logTarget(event) {
 			return event.player;
@@ -26373,18 +26375,21 @@ export default {
 		aiShowTag: "support",
 		aiShowCost: true,
 		audio: "zhuangrong",
-		trigger: { player: "phaseUseBegin" },
+		// "出牌阶段限一次"不是"出牌阶段开始时"，不应该只能在阶段刚开始那一刻发动，
+		// 而是整个出牌阶段内随时可以主动使用，改成跟jushou/chuwen同款的enable:"phaseUse"
+		enable: "phaseUse",
 		usable: 1,
 		filter(event, player) {
 			return player.countCards("he", card => get.type(card) == "trick") > 0;
 		},
-		async cost(event, trigger, player) {
-			event.result = await player
+		async content(event, trigger, player) {
+			const result = await player
 				.chooseToDiscard("he", card => get.type(card) == "trick", 1, false)
 				.set("prompt2", "妆戎：是否弃置一张锦囊牌，视为拥有标准版〖无双〗直到此阶段结束？")
 				.forResult();
-		},
-		async content(event, trigger, player) {
+			if (!result.bool) {
+				return;
+			}
 			player.addTempSkill("wushuang", "phaseUseAfter");
 		},
 		ai: { threaten: 1.4 },
