@@ -23223,6 +23223,13 @@ export default {
 		check(event, player) {
 			return get.attitude(player, event.player) > 0;
 		},
+		// "其可以令你摸两张牌"——是当前回合的这名势力相同角色自己决定要不要发动，不是潘凤自己，
+		// 原来没写cost，靠引擎默认的"是否发动"兜底会问到技能持有者(潘凤)身上，问错了人
+		async cost(event, trigger, player) {
+			event.result = await trigger.player
+				.chooseBool(get.prompt2("kuangfu", player), "狂斧：是否令" + get.translation(player) + "摸两张牌，然后视为对其指定的一名角色使用一张【决斗】？")
+				.forResult();
+		},
 		async content(event, trigger, player) {
 			const ally = trigger.player;
 			await player.draw(2);
@@ -25318,7 +25325,9 @@ export default {
 	// 招禍：锁定技，当其他角色进入濒死状态时，若你的体力上限大于1，你减1点体力上限，然后摸两张牌。 参考zhaohuo(mobile)
 	zhaohuo: {
 		audio: 2,
-		trigger: { global: "enterDying" },
+		// "enterDying"这个事件名在引擎里根本不存在(全局搜不到任何地方触发过这个名字)，
+		// 导致这个技能从来没有被触发过；进入濒死状态真正对应的事件叫"dying"
+		trigger: { global: "dying" },
 		forced: true,
 		filter(event, player) {
 			return event.player != player && player.maxHp > 1;
@@ -26264,30 +26273,27 @@ export default {
 
 // ========== lvlingqi 吕玲绮 ==========
 	// 帼武：出牌阶段开始时，你可以展示全部手牌，根据你展示的类别数，你获得对应效果：至少一类，从弃牌堆获得一张【杀】；至少两类，此阶段使用牌无距离限制；至少三类，此阶段使用【杀】可以多指定两名角色为目标（此效果每回合限一次）。 参考guowu(huicui)
+	// 之前额外加了个phaseZhunbeiBegin触发专门去重置guowu_multi_used，跟官方参考的单一
+	// trigger设计不一样，会造成"一回合触发两次"的观感（一次在准备阶段重置标记，一次在出牌
+	// 阶段真正展示）；官方参考本来就是单一trigger、靠一个"用过了"的临时技能自己在阶段结束后
+	// 过期来限制"每回合限一次"，改成完全照抄这个写法。
+	// 另外之前多指定目标是靠mod.selectTarget把[min,max]的max+2实现的，但"杀"默认的
+	// selectTarget range本身就不是数组(单目标默认是数字1)，Array.isArray(range)恒为false，
+	// 这个mod从来没真正生效过——改成照抄官方参考里"杀指定完目标后再追加问一次是否多指定"的
+	// 写法(useCard1触发，直接把目标塞进trigger.targets)，这才是真正会生效的机制。
 	guowu: {
 		skillAnimation: true,
 		animationColor: "qun",
 		aiShowTag: "support",
 		audio: "guowu",
-		trigger: { player: ["phaseUseBegin", "phaseZhunbeiBegin"] },
-		filter(event, player, name) {
-			if (name == "phaseZhunbeiBegin") {
-				return true;
-			}
+		trigger: { player: "phaseUseBegin" },
+		filter(event, player) {
 			return player.countCards("h") > 0;
 		},
-		async cost(event, trigger, player, name) {
-			if (name == "phaseZhunbeiBegin") {
-				event.result = { bool: true };
-				return;
-			}
+		async cost(event, trigger, player) {
 			event.result = await player.chooseBool(get.prompt("guowu"), "是否展示全部手牌？").forResult();
 		},
-		async content(event, trigger, player, name) {
-			if (name == "phaseZhunbeiBegin") {
-				player.storage.guowu_multi_used = false;
-				return;
-			}
+		async content(event, trigger, player) {
 			const hs = player.getCards("h");
 			if (hs.length) {
 				await player.showCards(hs, get.translation(player) + "发动了〖帼武〗");
@@ -26318,22 +26324,47 @@ export default {
 	},
 	guowu_buff2: {
 		charlotte: true,
-		mod: {
-			selectTarget(card, player, range) {
-				if (card.name == "sha" && Array.isArray(range) && !player.storage.guowu_multi_used) {
-					return [range[0], range[1] + 2];
-				}
-			},
-		},
+		audio: "guowu",
 		trigger: { player: "useCard1" },
-		forced: true,
-		popup: false,
+		direct: true,
 		filter(event, player) {
-			return event.card?.name == "sha" && event.targets?.length > 1;
+			if (player.hasSkill("guowu_used")) {
+				return false;
+			}
+			const info = get.info(event.card, false);
+			if (!info || info.allowMultiple == false) {
+				return false;
+			}
+			if (event.card.name != "sha" || !event.targets) {
+				return false;
+			}
+			return game.hasPlayer(current => !event.targets.includes(current) && lib.filter.targetEnabled2(event.card, player, current) && lib.filter.targetInRange(event.card, player, current));
 		},
-		content(event, trigger, player) {
-			player.storage.guowu_multi_used = true;
+		async content(event, trigger, player) {
+			const num = game.countPlayer(current => !trigger.targets.includes(current) && lib.filter.targetEnabled2(trigger.card, player, current) && lib.filter.targetInRange(trigger.card, player, current));
+			const result = await player
+				.chooseTarget("帼武：是否为" + get.translation(trigger.card) + "增加" + (num > 1 ? "至多两个" : "一个") + "目标？", [1, Math.min(2, num)], (card, player, target) => {
+					const trig = _status.event.getTrigger();
+					const c = trig.card;
+					return !trig.targets.includes(target) && lib.filter.targetEnabled2(c, player, target) && lib.filter.targetInRange(c, player, target);
+				})
+				.set("ai", target => {
+					const p = _status.event.player;
+					const c = _status.event.getTrigger().card;
+					return get.effect(target, c, p, p);
+				})
+				.forResult();
+			if (!result.bool || !result.targets?.length) {
+				return;
+			}
+			const targets = result.targets.sortBySeat();
+			player.logSkill("guowu_buff2", targets);
+			trigger.targets.addArray(targets);
+			player.addTempSkill("guowu_used", "phaseUseAfter");
 		},
+	},
+	guowu_used: {
+		charlotte: true,
 	},
 	// 妆戎：出牌阶段限一次，你可以弃置一张锦囊牌，若如此做你视为拥有标准版“无双”直到此阶段结束。 参考zhuangrong(huicui)
 	zhuangrong: {
@@ -26349,7 +26380,7 @@ export default {
 		},
 		async cost(event, trigger, player) {
 			event.result = await player
-				.chooseToDiscard("he", card => get.type(card) == "trick", 1, true)
+				.chooseToDiscard("he", card => get.type(card) == "trick", 1, false)
 				.set("prompt2", "妆戎：是否弃置一张锦囊牌，视为拥有标准版〖无双〗直到此阶段结束？")
 				.forResult();
 		},
