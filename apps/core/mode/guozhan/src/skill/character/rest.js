@@ -18715,6 +18715,82 @@ export default {
 			}
 		},
 	},
+	// gz3: 给"暗置阶段怎么判断陌生人"加一层行为记录——伤害/弃牌这类对我不利的牌记成
+	// 敌意，回血/摸牌这类对我有利的记成好感，攒在 storage.gzGoodwill 里（按对方
+	// playerid 存），get.js 的 _gzGoodwill 读出来叠加进 get.attitude 的最终结果，
+	// 且不参与 to.ai.shown 的随机打散（这是公开发生过的事，不该被"看起来像不像
+	// 已知身份"这种噪声抹掉）。
+	_gzGoodwillCard: {
+		trigger: { target: "useCardToTargeted" },
+		ruleSkill: true,
+		forced: true,
+		silent: true,
+		popup: false,
+		filter(event, player) {
+			return !!event.player && event.player != player && !!event.card;
+		},
+		async content(event, trigger, player) {
+			// gz3: 全局规则技，一旦这里抛错会打断整局的触发时机排布，所以务必兜底，
+			// 绝不能把错误抛出去连累别的技能。
+			try {
+				var delta = get.effect(player, trigger.card, trigger.player, player);
+				if (!delta) {
+					return;
+				}
+				delta = Math.max(-3, Math.min(3, delta)) * 0.3;
+				if (!player.storage.gzGoodwill) {
+					player.storage.gzGoodwill = {};
+				}
+				var id = trigger.player.playerid;
+				player.storage.gzGoodwill[id] = (player.storage.gzGoodwill[id] || 0) + delta;
+				if (delta < 0) {
+					if (!trigger.player.storage.gzHarmedThisTurn) {
+						trigger.player.storage.gzHarmedThisTurn = [];
+					}
+					if (!trigger.player.storage.gzHarmedThisTurn.includes(player.playerid)) {
+						trigger.player.storage.gzHarmedThisTurn.push(player.playerid);
+					}
+				}
+			} catch (e) {
+				console.log("gz3 _gzGoodwillCard failed", e);
+			}
+		},
+	},
+	// gz3: "这个人这回合手里明明还有能打我的牌，却没打我"——对怀疑对象的克制，也是一种
+	// 好感信号，同上不参与随机打散。跟 _gzGoodwillCard 里记的"这回合已经真的打过我"
+	// 互斥，不重复加分。
+	_gzGoodwillRestraint: {
+		trigger: { player: "phaseAfter" },
+		ruleSkill: true,
+		forced: true,
+		silent: true,
+		popup: false,
+		async content(event, trigger, player) {
+			try {
+				var harmed = player.storage.gzHarmedThisTurn || [];
+				var hand = player.getCards("h");
+				for (var i = 0; i < game.players.length; i++) {
+					var target = game.players[i];
+					if (target == player || !target.isIn() || harmed.includes(target.playerid)) {
+						continue;
+					}
+					var canHarm = hand.some(function (card) {
+						return player.canUse(card, target) && get.effect(target, card, player, target) < 0;
+					});
+					if (canHarm) {
+						if (!target.storage.gzGoodwill) {
+							target.storage.gzGoodwill = {};
+						}
+						var id = player.playerid;
+						target.storage.gzGoodwill[id] = (target.storage.gzGoodwill[id] || 0) + 0.3;
+					}
+				}
+			} catch (e) {
+				console.log("gz3 _gzGoodwillRestraint failed", e);
+			}
+			player.storage.gzHarmedThisTurn = [];
+		},
+	},
 	_mingzhi1: {
 		trigger: { player: "phaseBeginStart" },
 		//priority:19,

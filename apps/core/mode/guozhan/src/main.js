@@ -11,6 +11,13 @@ import { chooseThirdCharacter } from "./patch/content.js";
  * @type {ContentFuncByAll}
  */
 export const start = async (event, trigger, player) => {
+	// gz3: 好感度追踪（伤害/弃牌/摸牌/回血这类实际发生过的行为，攒成对每个人的好感，
+	// 供 get.attitude 判断陌生人时叠加）是每局都要生效的全局规则，不挂在任何角色
+	// 身上，所以要显式登记成全局技能，否则不会对任何玩家生效。见 patch/get.js 的
+	// _gzGoodwill、skill/character/rest.js 的 _gzGoodwillCard/_gzGoodwillRestraint。
+	game.addGlobalSkill("_gzGoodwillCard");
+	game.addGlobalSkill("_gzGoodwillRestraint");
+
 	// 首先检查是否在播放录像
 	const playback = localStorage.getItem(lib.configprefix + "playback");
 
