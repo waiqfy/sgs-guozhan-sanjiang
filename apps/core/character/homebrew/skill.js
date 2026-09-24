@@ -11671,9 +11671,9 @@ export default {
 		audio: 6,
 		sourceSkill: "xianfu",
 		trigger: { global: "phaseZhunbeiBegin" },
+		// 文本是"一名与你势力相同的角色的准备阶段"，没写"其他"，自己的准备阶段也该算
 		filter(event, player) {
 			return (
-				event.player !== player &&
 				event.player.isFriendOf(player) &&
 				player.countMark("xianqu_mark") > 0 &&
 				!(player.storage.xianfu_targets || []).includes(event.player)
@@ -14170,8 +14170,10 @@ export default {
 		trigger: { target: ["rewriteGainResult", "rewriteDiscardResult"] },
 		direct: true,
 		preHidden: true,
+		// 文本是"同势力角色"，没写"其他"（"其他角色"指的是造成获得/弃置的另一方，不是这里的
+		// event.player），卞夫人自己的牌被别人获得/弃置时也该能发动
 		filter(event, player) {
-			return event.player != player && event.player.isFriendOf(player);
+			return event.player.isFriendOf(player);
 		},
 		audio: 2,
 		async content(event, trigger, player) {
@@ -16502,8 +16504,9 @@ export default {
 			const result = await player
 				.chooseCardTarget({
 					selectCard: Math.floor(player.countCards("h") / 2),
+					// 文本是"一名其他角色"，收牌的人不能是鲁肃自己
 					filterTarget(card, player, target) {
-						return target.isMinHandcard();
+						return target != player && target.isMinHandcard();
 					},
 					prompt: "将一半的手牌交给场上手牌数最少的一名角色",
 					forced: true,
@@ -22550,11 +22553,11 @@ export default {
 		aiShowTag: "response",
 		sourceSkill: "huangtian",
 		trigger: { global: "useCard" },
+		// 文本是"与你势力相同角色使用闪电时"，没写"其他"，玩家自己使用闪电也该算
 		filter(event, player) {
 			return (
 				!!event.card &&
 				event.card.name == "shandian" &&
-				event.player != player &&
 				event.player.isFriendOf(player) &&
 				game.hasPlayer(current => current != event.player)
 			);
@@ -25007,7 +25010,8 @@ export default {
 				return false;
 			}
 			if (name == "damageSource") {
-				return !!(event.player && event.player.isIn());
+				// 文本是"当你对其他角色造成伤害后"，受伤角色不能是自己
+				return !!(event.player && event.player.isIn() && event.player != player);
 			}
 			return true;
 		},
