@@ -6664,7 +6664,12 @@ export default {
 		skillAnimation: true,
 		animationColor: "soil",
 		audio: 2,
-		forced: true,
+		// 不能在这里写forced:true——引擎里info.forced为true时会直接短路成
+		// result={bool:true}，完全跳过cost()，chooseTarget那步压根不会跑，event.targets
+		// 就是undefined，content里useCard(card, undefined)自然什么都不生效。
+		// "锁定技，必须选至少一个人"改成靠chooseTarget自己的forced参数(第4个true)实现——
+		// selectTarget:[1,4]保证至少选1个，forced去掉这一步的取消按钮，效果上等价于锁定技，
+		// 但不会跟cost()冲突
 		trigger: {
 			player: "phaseJieshuBegin",
 		},
@@ -6681,7 +6686,8 @@ export default {
 						const { huogong } = get.event();
 						return target != player && player.canUse(huogong, target);
 					},
-					[1, 4]
+					[1, 4],
+					true
 				)
 				.set("huogong", card)
 				.set("ai", target => {
