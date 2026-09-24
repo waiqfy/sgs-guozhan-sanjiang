@@ -16333,9 +16333,15 @@ export default {
 		aiShowTag: "support",
 		audio: 2,
 		// "compareAfter"这个事件名整个引擎里根本不存在，导致这个技能从来没有触发过；
-		// 拼点结束后真正的事件叫"chooseToCompareAfter"(参考同文件jyzongshi的用法)
-		trigger: { player: "chooseToCompareAfter", target: "chooseToCompareAfter" },
+		// 拼点结束后真正的事件叫"chooseToCompareAfter"。同文件jyzongshi也是监听这个事件，
+		// 但用的是global+手动比对event.player/event.target，不是player/target角色写法——
+		// 这个事件不是常规按角色分发的trigger，role写法(trigger:{player:...,target:...})
+		// 匹配不上，照抄jyzongshi的写法才会真正触发
+		trigger: { global: "chooseToCompareAfter" },
 		filter(event, player) {
+			if (player != event.player && player != event.target) {
+				return false;
+			}
 			return [event.card1, event.card2].filterInD("d").some(card => player.hasUseTarget(card));
 		},
 		async content(event, trigger, player) {
@@ -24555,10 +24561,14 @@ export default {
 		},
 		async content(event, trigger, player) {
 			const target = trigger.player;
-			const result = await player.chooseToCompare(target).forResult();
+			// forResult()拿到的是event.result这个子对象，card1/card2是直接挂在拼点事件本身
+			// (event.card1/event.card2)上的，不在.result里——之前从result上取一直是undefined，
+			// 这才是"用不了"的真正原因，改成先留住事件引用，再从事件本身上取card1/card2
+			const compareEvent = player.chooseToCompare(target);
+			const result = await compareEvent.forResult();
 			const winner = result.bool ? player : target;
-			const opponentCard = result.bool ? result.card2 : result.card1;
-			const winnerOwnCard = result.bool ? result.card1 : result.card2;
+			const opponentCard = result.bool ? compareEvent.card2 : compareEvent.card1;
+			const winnerOwnCard = result.bool ? compareEvent.card1 : compareEvent.card2;
 			const loser = result.bool ? target : player;
 			// opponentCard这时已经不在winner的手牌/装备区里了（拼点牌结算后进了弃牌堆），
 			// 普通chooseToUse按位置筛选牌根本选不到这张牌，一直没生效；参考同文件hanzhan(酣战)
