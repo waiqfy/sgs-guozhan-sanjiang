@@ -6681,8 +6681,7 @@ export default {
 						const { huogong } = get.event();
 						return target != player && player.canUse(huogong, target);
 					},
-					[1, 4],
-					true
+					[1, 4]
 				)
 				.set("huogong", card)
 				.set("ai", target => {
@@ -16694,6 +16693,9 @@ export default {
 				return false;
 			}
 			return game.hasPlayer(current => {
+				if (current == player) {
+					return false;
+				}
 				var evt = event.getl(current);
 				if (!evt || !evt.cards2 || evt.cards2.filterInD("d").length < 2) {
 					return false;
@@ -16719,6 +16721,9 @@ export default {
 				cardsList = [],
 				players = game.filterPlayer().sortBySeat(_status.currentPhase);
 			for (const current of players) {
+				if (current == player) {
+					continue;
+				}
 				const cards = [];
 				const evt = trigger.getl(current);
 				if (!evt || !evt.cards2) {
