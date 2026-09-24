@@ -4281,7 +4281,9 @@ export default {
 			return event.player != player && event.player.isFriendOf(player) && event.player.hasMark("xianqu_mark");
 		},
 		async content(event, trigger, player) {
-			trigger.phaseList.splice(trigger.num, 0, `phaseUse|${event.name}`);
+			// phaseBegin触发时trigger.num还是0(指向即将执行的phaseZhunbei)，直接splice(trigger.num,...)
+			// 会把额外出牌阶段插到准备阶段前面；应该插在准备阶段和判定阶段之间，所以是trigger.num+1
+			trigger.phaseList.splice(trigger.num + 1, 0, `phaseUse|${event.name}`);
 		},
 		group: ["zhengxian_show", "zhengxian_self"],
 		global: "zhengxian_ai",
@@ -4307,7 +4309,8 @@ export default {
 					event.result = await player.chooseBool(get.prompt("zhengxian")).forResult();
 				},
 				async content(event, trigger, player) {
-					trigger.phaseList.splice(trigger.num, 0, `phaseUse|${event.name}`);
+					// 同上：插在准备阶段和判定阶段之间，不是准备阶段前面
+					trigger.phaseList.splice(trigger.num + 1, 0, `phaseUse|${event.name}`);
 				},
 			},
 			ai: {
@@ -11676,6 +11679,11 @@ export default {
 				player.countMark("xianqu_mark") > 0 &&
 				!(player.storage.xianfu_targets || []).includes(event.player)
 			);
+		},
+		// 只要还有活着的友方廖化(zhengxian)，自己的"先驱"标记留着就能在自己回合开始时白嫖一个
+		// 额外出牌阶段，价值比先辅这个绑定效果更高，AI不应该主动消耗掉；廖化死了之后再正常使用
+		check(event, player) {
+			return !game.hasPlayer(current => current.isIn() && current.hasSkill("zhengxian") && current.isFriendOf(player));
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseBool(get.prompt2("xianfu", trigger.player)).forResult();
@@ -26237,7 +26245,10 @@ export default {
 				}
 			}
 			if (killed) {
-				player.addTempSkill("xishe_change", "phaseAfter");
+				// 不能直接用"phaseAfter"当过期条件——xishe_change自己的trigger也是phaseAfter，
+				// 触发事件名撞过期条件会导致引擎在该触发的这一刻先把技能过期删掉，永远等不到执行
+				// (跟duojing_after是同一类bug)，改成不会自然满足的{global:[]}，靠content自己收尾
+				player.addTempSkill("xishe_change", { global: [] });
 			}
 		},
 		ai: { threaten: 1.6 },
@@ -26251,6 +26262,9 @@ export default {
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseBool(get.prompt("xishe_change"), "是否变更一次副将（变更后的副将处于暗置状态）？").forResult();
+			// expire改成了{global:[]}不会自然过期，不管选是否都要在这里手动收尾，
+			// 否则以后每个phaseAfter都会再问一次
+			player.removeSkill("xishe_change");
 		},
 		async content(event, trigger, player) {
 			// xishe_change是附加的临时技能，不属于任何角色，无法通过技能id反查槽位，
