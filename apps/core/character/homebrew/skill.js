@@ -35,11 +35,10 @@ function isCharacterShown(player, skill) {
 }
 
 // 所有"变更此武将牌"类技能的通用逻辑：从当前不在场的武将里随机亮出2个供玩家选择
-// （而不是直接随机抽1个焗给玩家），适用于caishi(才识)/xiongyi(雄异)/jianglve(将略)/
-// xishe_change(袭射)。
+// （而不是直接随机抽1个焗给玩家），适用于caishi(才识)/xiongyi(雄异)/jianglve(将略)。
 // slotOrSkillId传技能id时，自动判断该技能实际挂在主将(0)/副将(1)/第三将(2，3将/sanjiang
-// 模式专属)中的哪一个槽位；传数字时直接指定槽位（用于xishe_change这类不属于任何角色、
-// 而是固定改副将的临时技能，无法通过技能id反查槽位）。
+// 模式专属)中的哪一个槽位；传数字时直接指定槽位（用于不属于任何角色、而是固定改某个
+// 槽位的临时技能，无法通过技能id反查槽位的情况）。
 // 第三将槽位不走player.changeCharacter——引擎的changeCharacter/reinit2从设计上就只处理
 // name1/name2这一对，完全不认识name3（见content.ts的changeCharacter实现），所以第三将槽位
 // 换将照抄xushuTransThird()换第三将时的写法：直接removeSkill旧技能、置换name3、更新
@@ -58,8 +57,8 @@ function pickCharacterCandidates() {
 // 这样async content的技能可以await它，非async(旧的"step N"写法，比如guiyin/jianglve)
 // 的技能也能直接调用而不需要处理Promise。
 // slotOrSkillId传技能id时，自动判断该技能实际挂在主将(0)/副将(1)/第三将(2，3将/sanjiang
-// 模式专属)中的哪一个槽位；传数字时直接指定槽位（用于xishe_change这类不属于任何角色、
-// 而是固定改副将的临时技能，无法通过技能id反查槽位）。
+// 模式专属)中的哪一个槽位；传数字时直接指定槽位（用于不属于任何角色、而是固定改某个
+// 槽位的临时技能，无法通过技能id反查槽位的情况）。
 // 第三将槽位不走player.changeCharacter——引擎的changeCharacter/reinit2从设计上就只处理
 // name1/name2这一对，完全不认识name3（见content.ts的changeCharacter实现），所以第三将槽位
 // 换将照抄xushuTransThird()换第三将时的写法：直接removeSkill旧技能、置换name3、更新
@@ -111,9 +110,9 @@ function applyCharacterChange(player, slotOrSkillId, chosen) {
 }
 
 // 所有"变更此武将牌"类技能的通用逻辑（async版本）：从当前不在场的武将里随机亮出2个供
-// 玩家选择（而不是直接随机抽1个焗给玩家），适用于caishi(才识)/xiongyi(雄异)/jugu2(巨贾)/
-// xishe_change(袭射)这几个async content写的技能。旧式"step N"写法的技能（jianglve/guiyin）
-// 没法直接await这个函数，改成自己在content里插入chooseButton步骤、拿到chosen后调用上面的
+// 玩家选择（而不是直接随机抽1个焗给玩家），适用于caishi(才识)/xiongyi(雄异)/jugu2(巨贾)
+// 这几个async content写的技能。旧式"step N"写法的技能（jianglve/guiyin）没法直接await
+// 这个函数，改成自己在content里插入chooseButton步骤、拿到chosen后调用上面的
 // applyCharacterChange。
 async function pickAndChangeCharacter(player, slotOrSkillId, prompt) {
 	const candidates = pickCharacterCandidates();
@@ -26252,40 +26251,15 @@ export default {
 					break;
 				}
 			}
+			// 参考官方gzxishe：击杀判定之后直接调用mayChangeVice，官方原版压根没有"回合结束时"
+			// 这个延迟结算的设计——之前按字面翻译搞了一套phaseAfter延迟触发，不仅难对时机
+			// (袭射发生在target的回合里，不是黄祖自己的回合)，也跟官方实现不一致，直接照抄
+			// 官方这里最简单可靠
 			if (killed) {
-				// 袭射发生在目标的准备阶段(target的回合里)，不是黄祖自己的回合，"此回合结束时"
-				// 指的是target当前这个回合结束，不是黄祖自己下一次回合结束——之前trigger写
-				// {player:"phaseAfter"}绑定的是黄祖自己的phaseAfter，要等到黄祖自己下一次
-				// 回合结束才会触发，跟"此回合结束"完全对不上，参照duojing_after同款写法，
-				// 记下具体是哪个回合(target)，改成监听global的phaseAfter再比对
-				player.storage.xishe_change_turn = target;
-				// 不能直接用"phaseAfter"当过期条件——xishe_change自己的trigger也是phaseAfter，
-				// 触发事件名撞过期条件会导致引擎在该触发的这一刻先把技能过期删掉，永远等不到执行
-				// (跟duojing_after是同一类bug)，改成不会自然满足的{global:[]}，靠content自己收尾
-				player.addTempSkill("xishe_change", { global: [] });
+				await player.mayChangeVice(null, "hidden");
 			}
 		},
 		ai: { threaten: 1.6 },
-	},
-	xishe_change: {
-		charlotte: true,
-		trigger: { global: "phaseAfter" },
-		forced: true,
-		filter(event, player) {
-			return event.player === player.storage.xishe_change_turn && !!player.name2;
-		},
-		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt("xishe_change"), "是否变更一次副将（变更后的副将处于暗置状态）？").forResult();
-			// expire改成了{global:[]}不会自然过期，不管选是否都要在这里手动收尾，
-			// 否则以后每个phaseAfter都会再问一次
-			delete player.storage.xishe_change_turn;
-			player.removeSkill("xishe_change");
-		},
-		async content(event, trigger, player) {
-			// xishe_change是附加的临时技能，不属于任何角色，无法通过技能id反查槽位，
-			// 所以固定传1(副将)——这个技能本来就是"变更一次副将"，不是通用换将
-			await pickAndChangeCharacter(player, 1, "袭射：请选择要变更为的副将");
-		},
 	},
 
 // ========== lvlingqi 吕玲绮 ==========
