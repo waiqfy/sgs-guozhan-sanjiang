@@ -291,10 +291,12 @@ export default {
 			if (trigger.delay == false) {
 				await game.delay();
 			}
-			// 这里只是给"下一次drawAfter是不是甚贤摸的"打一个一次性标记，方便枪舞的
-			// 触发条件识别；真正的叠加计数器在枪舞自己发动时才+1，跟这里无关
-			player.shenxian_draw_flag = true;
-			await player.draw();
+			// 参考skill_old.js：用摸牌事件自带的gaintag(而不是自己拍脑袋加的player属性/
+			// 事件标记)来标识"这张牌是甚贤摸的"——gaintag是引擎里draw()会原样透传给内部
+			// gain事件的原生字段，qiangwu那边配合trigger:"gainAfter"读，比自造的标记稳
+			const next = player.draw();
+			next.gaintag.add("hb_shenxian");
+			await next;
 		},
 		ai: {
 			threaten: 1.5,
@@ -304,22 +306,20 @@ export default {
 	// 枪舞：当你因“甚贤”的效果摸牌后，你可以弃置一张牌，然后你的下回合，你使用【杀】的距离和基础次数+1。 参考gz_qiangwu
 	qiangwu: {
 		audio: 2,
-		trigger: { player: "drawAfter" },
+		trigger: { player: "gainAfter" },
 		filter(event, player) {
-			// 触发条件：这次摸牌是不是甚贤造成的，只看这个一次性标记
-			return !!player.shenxian_draw_flag && player.countCards("h") > 0;
+			return !!(event.gaintag && event.gaintag.includes("hb_shenxian")) && player.countCards("h") > 0;
 		},
 		async cost(event, trigger, player) {
-			// 不管最后弃没弃成，这次"甚贤摸牌"的机会都算用掉了，标记先清掉
-			player.shenxian_draw_flag = false;
 			event.result = await player.chooseToDiscard("he").set("prompt", get.prompt2("qiangwu")).forResult();
 		},
 		async content(event, trigger, player) {
 			// 叠加计数器：枪舞自己成功发动(弃牌)才+1，跟甚贤摸牌本身无关——
 			// 这样如果一回合内因甚贤多次摸牌、多次发动枪舞，下回合的加成按次数叠加。
-			// 用真正的addMark挂一个可见标记(而不是只存在player属性里)，方便直接在
-			// 武将头像上看到"枪舞发动了几次"，不用凭记忆
-			player.addTempSkill("qiangwu_mark");
+			// addMark内部自己会调用markSkill把标记画出来，不需要也不能再额外
+			// addTempSkill——之前多此一举地先addTempSkill("qiangwu_mark")，这个
+			// 子技能本身没有trigger/mod，会被当成"空技能"立刻清掉，连带标记也被
+			// unmarkSkill抹掉，导致标记发动后立刻消失
 			player.addMark("qiangwu_mark", 1, false);
 			player.addTempSkill("qiangwu_arm");
 		},
@@ -2591,31 +2591,39 @@ export default {
 			return target != player && target.inRange(player) && target.countCards("he") > 0;
 		},
 		async content(event, trigger, player) {
+			// 之前的写法是先chooseToUse杀、成功之后再补一刀chooseToDiscard，跟描述
+			// "弃置一张手牌并对你使用一张【杀】"的顺序反了，而且这个"补弃牌"的步骤
+			// 经常没有真正执行。改成参考skill_old.js的结构：先问是否弃牌，弃了才能
+			// 继续用杀，两步都不做/中途放弃就走"你弃置其一张牌"这条兜底分支
 			const target = event.target;
-			const result = await target
-				.chooseToUse(
-					function (card, player, event) {
+			let attempted = false;
+			if (target.countCards("h") > 0) {
+				const result = await target
+					.chooseToDiscard("h", true)
+					.set("prompt", "挑衅：你可以弃置一张手牌，然后对" + get.translation(player) + "使用一张【杀】，否则" + get.translation(player) + "将弃置你一张牌")
+					.forResult();
+				attempted = !!(result && result.bool);
+			}
+			if (attempted) {
+				const result2 = await target
+					.chooseToUse(function (card, player, event) {
 						if (get.name(card) != "sha") {
 							return false;
 						}
 						return lib.filter.filterCard.apply(this, arguments);
-					},
-					"挑衅：弃置一张手牌并对" + get.translation(player) + "使用一张杀，或令其弃置你的一张牌"
-				)
-				.set("targetRequired", true)
-				.set("complexSelect", true)
-				.set("complexTarget", true)
-				.set("filterTarget", function (card, player, target) {
-					if (target != _status.event.sourcex && !ui.selected.targets.includes(_status.event.sourcex)) {
-						return false;
-					}
-					return lib.filter.filterTarget.apply(this, arguments);
-				})
-				.set("sourcex", player)
-				.forResult();
-			if (result.bool) {
-				if (target.countCards("h") > 0) {
-					await target.chooseToDiscard("he", true);
+					}, "挑衅：对" + get.translation(player) + "使用一张【杀】")
+					.set("complexSelect", true)
+					.set("complexTarget", true)
+					.set("filterTarget", function (card, plyr, tgt) {
+						if (tgt != _status.event.sourcex) {
+							return false;
+						}
+						return lib.filter.filterTarget.apply(this, arguments);
+					})
+					.set("sourcex", player)
+					.forResult();
+				if ((!result2 || !result2.bool) && target.countCards("he") > 0) {
+					player.discardPlayerCard(target, "he", true);
 				}
 			} else if (target.countCards("he") > 0) {
 				player.discardPlayerCard(target, "he", true);
