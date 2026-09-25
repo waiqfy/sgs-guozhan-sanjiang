@@ -24769,6 +24769,8 @@ export default {
 
 // ========== caifuren 蔡夫人 ==========
 	// 窃聽：其他角色的回合结束时，若其有未明置武将或未于此回合内对除其外的角色使用过牌，你可以选择一项：1.将其装备区里的一张牌置入你的装备区；2.摸一张牌。 参考qieting(yijiang)
+	// 按old版本的结构：不单独拆cost，"选获得装备/摸牌"直接放在content里当唯一决定点，
+	// 跟old(skill_old.js)保持一致，只保留"装备真的移入装备区而不是进手牌"这一处修正
 	qieting: {
 		aiShowTag: "offense",
 		audio: 2,
@@ -24777,27 +24779,24 @@ export default {
 			if (event.player == player) {
 				return false;
 			}
-			if (event.player.isUnseen && (event.player.isUnseen(0) || event.player.isUnseen(1))) {
+			if (event.player.isUnseen(0) || event.player.isUnseen(1)) {
 				return true;
 			}
 			return !event.player.getHistory("useCard", evt => evt.targets && evt.targets.some(target => target != event.player)).length;
 		},
-		async cost(event, trigger, player) {
+		async content(event, trigger, player) {
+			const target = trigger.player;
 			const result = await player
 				.chooseControl("获得装备", "摸一张牌")
 				.set("prompt", get.prompt2("qieting", trigger.player))
 				.forResult();
-			event.result = { bool: true, cost_data: result.control };
-		},
-		async content(event, trigger, player) {
-			const target = trigger.player;
-			if (event.cost_data == "获得装备" && target.getEquips().length) {
-				const result = await player.choosePlayerCard(target, "e", true).forResult();
-				if (result.cards && result.cards.length) {
-					// 文本是"将其装备区里的一张牌置入你的装备区"，是直接装备上，不是单纯
-					// 获得到手牌——普通gain()默认进手牌，equip()才会正确地把原持有者(不管
-					// 是不是自己)那张牌摘下来再装到player身上
-					await player.equip(result.cards[0]);
+			if (result.control == "获得装备" && target.getEquips().length) {
+				const cardResult = await player.choosePlayerCard(target, "e", true).forResult();
+				if (cardResult.cards && cardResult.cards.length) {
+					const card = cardResult.cards[0];
+					// old版本是target.give(card, player)进手牌后再判断类型去equip，
+					// 这里的牌来自装备区一定是装备类，直接equip()等效且更直接
+					await player.equip(card);
 				}
 			} else {
 				await player.draw();
@@ -24808,9 +24807,9 @@ export default {
 
 	// 獻州：限定技，出牌阶段，你可以将装备区里的所有牌交给一名其他角色，然后其选择一项：1.令你回复X点体力；2.对其攻击范围内至多X名角色各造成1点伤害。（X为你给出的牌数） 参考xianzhou(yijiang)
 	xianzhou: {
-		// "recover"标签在shouldRiskShow里本来就是无条件放行，不影响AI行为，
-		// 但aiShowTag会让applyAiShowGates重新包一层filter——先去掉排除这个变量，
-		// 定位"技能列表里完全没有这个按钮"到底是不是这层包装造成的
+		// 之前为了排查"没有按钮"临时去掉过这行做诊断，old版本(skill_old.js)确认
+		// 本来就有这个标签，退回来
+		aiShowTag: "recover",
 		audio: 2,
 		enable: "phaseUse",
 		limited: true,
