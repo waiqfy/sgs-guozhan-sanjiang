@@ -20247,15 +20247,27 @@ export default {
 		},
 		async content(event, trigger, player) {
 			const target = event.targets[0];
+			// 只要target手上还有能拿到奖励的牌(方块/受伤时的红桃)，就不该选黑牌——弃黑牌只是单纯
+			// 损失，之前"5-value"的兜底分数在黑牌点数很小、红利牌点数很大时会反而让黑牌胜出，
+			// 改成只要有奖励牌可选，黑牌(以及没受伤时的红桃)一律垫底
+			const hasBonusCard = target.countCards("h", card => {
+				const suit = get.suit(card, target);
+				return suit == "diamond" || (suit == "heart" && target.isDamaged());
+			});
 			const result = await target
 				.chooseToDiscard("h", true, 1)
+				.set("hasBonusCard", hasBonusCard)
 				.set("ai", card => {
 					const chooser = get.player();
-					if (get.suit(card, chooser) == "diamond") {
-						return 10 - get.value(card);
+					const suit = get.suit(card, chooser);
+					if (suit == "diamond") {
+						return 100 - get.value(card);
 					}
-					if (get.suit(card, chooser) == "heart" && chooser.isDamaged()) {
-						return 9 - get.value(card);
+					if (suit == "heart" && chooser.isDamaged()) {
+						return 90 - get.value(card);
+					}
+					if (get.event().hasBonusCard) {
+						return get.value(card) - 100;
 					}
 					return 5 - get.value(card);
 				})
@@ -25360,7 +25372,13 @@ export default {
 				}
 			},
 		},
-		trigger: { source: "damageBegin1" },
+		// 描述是"当有角色使用【杀】或伤害类锦囊牌指定目标时"——指定目标的那一刻，不是伤害结算
+		// 开始时。之前用damageBegin1太晚了：闪/防具(比如藤甲)/铁索连环这些判定都是在目标响应
+		// 阶段(指定目标之后、伤害真正结算之前)就已经用原花色/属性跑完了，等damageBegin1才改，
+		// 只能影响最终伤害数字本身的属性加成，改变不了闪的判定(冰属性杀的"弃2张牌代替闪"完全
+		// 触发不到)、防具的免疫判定、铁索连环的属性传导。改成useCardToTargeted，在目标响应
+		// 之前就把花色/属性定下来，后续所有判定都能吃到
+		trigger: { global: "useCardToTargeted" },
 		usable: 1,
 		filter(event, player) {
 			if (!event.card || (event.card.name != "sha" && get.type(event.card) != "trick")) {
