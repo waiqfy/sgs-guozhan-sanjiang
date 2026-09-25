@@ -14735,8 +14735,6 @@ export default {
 // ========== lvfan 吕范 ==========
 	// 调度：同势力角色使用装备牌时，若其装备区没有该类别装备，可以摸一张牌。准备阶段，你可以将与一名同势力角色装备区里的一张牌移动至另一名同势力角色的装备区。 参考gz_diaodu_best
 	diaodu: {
-		skillAnimation: true,
-		animationColor: "wood",
 		audio: "diaodu",
 		trigger: {
 			global: "useCard",
@@ -17217,19 +17215,13 @@ export default {
 		logTarget(event, player, name) {
 			return event?.[name === "useCardToPlayered" ? "player" : "target"];
 		},
-		async cost(event, trigger, player, name) {
-			const bool = name === "useCardToPlayered";
-			const target = trigger[bool ? "player" : "target"];
-			const result = await target
-				.chooseBool(get.prompt2("yicheng"))
-				.set("ai", () => (get.attitude(get.player(), get.event().player) < 0 ? false : true))
-				.forResult();
-			event.result = { bool: result.bool, cost_data: target };
-		},
+		// 官方gz_yicheng_new没有cost，是"你(徐盛)可以令其摸牌弃牌"——决定权在徐盛(引擎默认的
+		// 是否发动兜底问的就是徐盛)，不是让被摸牌弃牌的那个队友自己决定；之前额外加的cost把
+		// 决定权错误地转移给了目标，而且多出一个可以拒绝的步骤，跟官方"没有单独的是否发动"
+		// (相当于锁定技)的效果不一致
 		async content(event, trigger, player) {
-			const target = event.cost_data;
-			await target.draw();
-			await target.chooseToDiscard("he", true);
+			await event.targets[0].draw();
+			await event.targets[0].chooseToDiscard("he", true);
 		},
 	},
 
