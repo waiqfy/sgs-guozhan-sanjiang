@@ -291,10 +291,9 @@ export default {
 			if (trigger.delay == false) {
 				await game.delay();
 			}
-			// 打事件标记(next.shenxian_draw)实测不可靠(drawAfter触发时拿到的event
-			// 不一定跟这里的next是同一个引用)。改成在player身上直接记一个计数器，
-			// qiangwu那边只认这个计数器，不再依赖事件对象/祖先链
-			player.shenxian_draw_count = (player.shenxian_draw_count || 0) + 1;
+			// 这里只是给"下一次drawAfter是不是甚贤摸的"打一个一次性标记，方便枪舞的
+			// 触发条件识别；真正的叠加计数器在枪舞自己发动时才+1，跟这里无关
+			player.shenxian_draw_flag = true;
 			await player.draw();
 		},
 		ai: {
@@ -307,14 +306,18 @@ export default {
 		audio: 2,
 		trigger: { player: "drawAfter" },
 		filter(event, player) {
-			// 不再依赖事件标记/祖先链，直接读shenxian摸牌时打在player身上的计数器
-			return !!player.shenxian_draw_count && player.countCards("h") > 0;
+			// 触发条件：这次摸牌是不是甚贤造成的，只看这个一次性标记
+			return !!player.shenxian_draw_flag && player.countCards("h") > 0;
 		},
 		async cost(event, trigger, player) {
+			// 不管最后弃没弃成，这次"甚贤摸牌"的机会都算用掉了，标记先清掉
+			player.shenxian_draw_flag = false;
 			event.result = await player.chooseToDiscard("he").set("prompt", get.prompt2("qiangwu")).forResult();
 		},
 		async content(event, trigger, player) {
-			player.shenxian_draw_count--;
+			// 叠加计数器：枪舞自己成功发动(弃牌)才+1，跟甚贤摸牌本身无关——
+			// 这样如果一回合内因甚贤多次摸牌、多次发动枪舞，下回合的加成按次数叠加
+			player.qiangwu_stack = (player.qiangwu_stack || 0) + 1;
 			player.addTempSkill("qiangwu_arm");
 		},
 		ai: {
@@ -328,27 +331,33 @@ export default {
 		popup: false,
 		async content(event, trigger, player) {
 			player.removeSkill("qiangwu_arm");
+			player.qiangwu_active_stack = player.qiangwu_stack || 1;
+			player.qiangwu_stack = 0;
 			player.addTempSkill("qiangwu_buff", "phaseUseAfter");
 		},
 	},
 	qiangwu_buff: {
 		charlotte: true,
 		// 之前用attackRange给整体攻击范围+1，影响了所有牌而不只是"杀"，跟文本"使用【杀】的
-		// 距离...+1"对不上；改成old版本的targetInRange写法，只对"杀"这一种牌生效
+		// 距离...+1"对不上；改成old版本的targetInRange写法，只对"杀"这一种牌生效。
+		// 加成按qiangwu_active_stack(本回合开始前枪舞总共发动了几次)叠加
 		mod: {
 			targetInRange(card, player, target) {
-				if (card.name == "sha" && get.distance(player, target) <= player.getAttackRange() + 1) {
+				const num = player.qiangwu_active_stack || 1;
+				if (card.name == "sha" && get.distance(player, target) <= player.getAttackRange() + num) {
 					return true;
 				}
 			},
 			cardUsable(card, player, num) {
 				if (card.name == "sha") {
-					return num + 1;
+					return num + (player.qiangwu_active_stack || 1);
 				}
 			},
 		},
 		intro: {
-			content: "本回合你使用【杀】的距离和基础次数各+1",
+			content(storage, player) {
+				return "本回合你使用【杀】的距离和基础次数各+" + (player.qiangwu_active_stack || 1);
+			},
 		},
 	},
 
@@ -24780,6 +24789,12 @@ export default {
 		filter(event, player) {
 			if (event.player == player || !event.player.isIn()) {
 				return false;
+			}
+			// translate.js里qieting_info写的是"若其有未明置武将或未于此回合内对除其外
+			// 的角色使用过牌"——官方参考的条件里没有"未明置武将"这个OR分支，但这是咱们
+			// 自己的技能描述，按描述加回来
+			if (event.player.isUnseen(0) || event.player.isUnseen(1)) {
+				return true;
 			}
 			const history = event.player.getHistory("useCard");
 			for (let i = 0; i < history.length; i++) {
