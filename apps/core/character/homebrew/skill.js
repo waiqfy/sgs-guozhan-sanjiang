@@ -2612,12 +2612,15 @@ export default {
 			// 之前的写法是先chooseToUse杀、成功之后再补一刀chooseToDiscard，跟描述
 			// "弃置一张手牌并对你使用一张【杀】"的顺序反了，而且这个"补弃牌"的步骤
 			// 经常没有真正执行。改成参考skill_old.js的结构：先问是否弃牌，弃了才能
-			// 继续用杀，两步都不做/中途放弃就走"你弃置其一张牌"这条兜底分支
+			// 继续用杀，两步都不做/中途放弃就走"你弃置其一张牌"这条兜底分支。
+			// 这里的chooseToDiscard不能传forced:true——描述是"选择一项"，target应该能
+			// 直接选择"不弃牌"从而走兜底分支2，forced:true会导致只要还有手牌就必须弃，
+			// 兜底分支2永远排不上号(错误兜底)，改成默认可取消
 			const target = event.target;
 			let attempted = false;
 			if (target.countCards("h") > 0) {
 				const result = await target
-					.chooseToDiscard("h", true)
+					.chooseToDiscard("h")
 					.set("prompt", "挑衅：你可以弃置一张手牌，然后对" + get.translation(player) + "使用一张【杀】，否则" + get.translation(player) + "将弃置你一张牌")
 					.forResult();
 				attempted = !!(result && result.bool);
