@@ -24810,7 +24810,9 @@ export default {
 
 	// 獻州：限定技，出牌阶段，你可以将装备区里的所有牌交给一名其他角色，然后其选择一项：1.令你回复X点体力；2.对其攻击范围内至多X名角色各造成1点伤害。（X为你给出的牌数） 参考xianzhou(yijiang)
 	xianzhou: {
-		aiShowTag: "recover",
+		// "recover"标签在shouldRiskShow里本来就是无条件放行，不影响AI行为，
+		// 但aiShowTag会让applyAiShowGates重新包一层filter——先去掉排除这个变量，
+		// 定位"技能列表里完全没有这个按钮"到底是不是这层包装造成的
 		audio: 2,
 		enable: "phaseUse",
 		limited: true,
