@@ -13387,8 +13387,11 @@ export default {
 					} = result;
 					player.line(target, "green");
 					await target.damage();
-					if (target != player && target.isIn() && target.canUse("sha", player, false)) {
-						await target.useCard({ name: "sha", isCard: true }, player, false, "noai");
+					// "视为使用一张杀"是锁定技效果的一部分，是强制的，不应该被target自己的
+					// 使用次数/范围限制卡住——之前的canUse检查会导致target本回合已经用过杀
+					// (或距离不够)时这里直接被跳过，"刚打完人却没触发视为出杀"
+					if (target != player && target.isIn()) {
+						await target.useCard({ card: get.autoViewAs({ name: "sha", isCard: true }), targets: [player] });
 					}
 				}
 			}
@@ -24793,7 +24796,10 @@ export default {
 			if (event.cost_data == "获得装备" && target.getEquips().length) {
 				const result = await player.choosePlayerCard(target, "e", true).forResult();
 				if (result.cards && result.cards.length) {
-					await player.gain(result.cards, target, "give");
+					// 文本是"将其装备区里的一张牌置入你的装备区"，是直接装备上，不是单纯
+					// 获得到手牌——普通gain()默认进手牌，equip()才会正确地把原持有者(不管
+					// 是不是自己)那张牌摘下来再装到player身上
+					await player.equip(result.cards[0]);
 				}
 			} else {
 				await player.draw();
