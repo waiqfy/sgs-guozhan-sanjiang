@@ -17863,7 +17863,11 @@ export default {
 	},
 
 // ========== chengpu 程普 ==========
-	// 蹈火：你可以将两张颜色不同的牌当火【杀】使用，并将“阴阳鱼”标记补至1。当你的【酒】【杀】造成伤害时，你可以选择一名与目标角色势力相同的另一名角色，令其与目标角色交换副将牌。 参考gz_ol_daohuo(guozhan)
+	// 蹈火：你可以将两张颜色不同的牌当火【杀】使用并获得一枚”阴阳鱼”标记。此【杀】造成伤害后，你选择另一名与目标同势力的角色，令其与目标角色副将易位。 参考gz_ol_daohuo(guozhan)结构，机制按咱们自己更新的描述——官方原版是”造成伤害后由目标二选一(给你标记/换将)”，这里改成用牌就直接给标记、伤害后由蹈火owner自己选人换将
+	// 之前两处都跟最新描述对不上：①”补至1”改成了直接获得一枚(不再封顶)；②效果判定
+	// 条件写的是event.card.hasNature(“jiu”)(酒属性)，但viewAs给的牌本身nature是
+	// “fire”不是”jiu”，导致这个效果几乎永远碰不到——描述里”此【杀】”指的是蹈火自己
+	// 视为使用的这张杀本身，不是”酒杀”，改成在viewAs的牌上打个storage标记来识别
 	daohuo: {
 		audio: 2,
 		enable: "phaseUse",
@@ -17877,6 +17881,7 @@ export default {
 		viewAs: {
 			name: "sha",
 			nature: "fire",
+			storage: { daohuo: true },
 		},
 		viewAsFilter(player) {
 			return (
@@ -17891,9 +17896,7 @@ export default {
 			return 6 - get.value(card);
 		},
 		async content(event, trigger, player) {
-			if (!player.countMark("yinyang_mark")) {
-				player.addMark("yinyang_mark", 1, false);
-			}
+			player.addMark("yinyang_mark", 1, false);
 		},
 		ai: {
 			threaten: 1.2,
@@ -17904,7 +17907,7 @@ export default {
 		sourceSkill: "daohuo",
 		trigger: { source: "damageSource" },
 		filter(event, player) {
-			return event.card && event.card.name == "sha" && event.card.hasNature && event.card.hasNature("jiu") && event.player && event.player.isIn();
+			return event.card?.storage?.daohuo && event.player && event.player.isIn();
 		},
 		async cost(event, trigger, player) {
 			const target = trigger.player;
@@ -17928,10 +17931,12 @@ export default {
 		},
 	},
 
-	// 醇醪：锁定技，与你势力相同的角色可以移去一个“阴阳鱼”标记或“珠联璧合”标记，视为使用一张【酒】。 参考gz_ol_chunlao(guozhan)
+	// 醇醪：锁定技，与你势力相同的角色可以移去一个”阴阳鱼”标记或”珠联璧合”标记，视为使用一张【酒】。 参考gz_ol_chunlao(guozhan)
+	// “锁定技”描述的意思不是”必须触发/强制执行”——这个技能本身是给队友一个可以自己选择要不要用
+	// 的选项，”锁定”只是说这个授权不会被”使非锁定技失效”类效果(比如马超own的技能)屏蔽掉。
+	// 官方gz_ol_chunlao本身也没有locked:true这种字段(不是真实存在的引擎属性)，去掉
 	chunlao: {
 		audio: "chunlao",
-		locked: true,
 		global: "chunlao_jiu",
 		subSkill: {
 			jiu: {
