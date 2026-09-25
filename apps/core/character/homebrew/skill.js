@@ -291,11 +291,11 @@ export default {
 			if (trigger.delay == false) {
 				await game.delay();
 			}
-			// 给这次摸牌打个标记，方便张星彩"枪舞"识别"这张牌是不是甚贤摸的"——
-			// 比在qiangwu那边爬事件祖先链猜"第几层是shenxian"要稳得多
-			const next = player.draw();
-			next.shenxian_draw = true;
-			await next;
+			// 打事件标记(next.shenxian_draw)实测不可靠(drawAfter触发时拿到的event
+			// 不一定跟这里的next是同一个引用)。改成在player身上直接记一个计数器，
+			// qiangwu那边只认这个计数器，不再依赖事件对象/祖先链
+			player.shenxian_draw_count = (player.shenxian_draw_count || 0) + 1;
+			await player.draw();
 		},
 		ai: {
 			threaten: 1.5,
@@ -307,14 +307,14 @@ export default {
 		audio: 2,
 		trigger: { player: "drawAfter" },
 		filter(event, player) {
-			// 之前靠爬事件祖先链猜"第几层是shenxian"，深度不一定够、也不稳定；
-			// 现在shenxian摸牌时直接在事件上打了shenxian_draw标记，直接读这个标记就行
-			return !!event.shenxian_draw && player.countCards("h") > 0;
+			// 不再依赖事件标记/祖先链，直接读shenxian摸牌时打在player身上的计数器
+			return !!player.shenxian_draw_count && player.countCards("h") > 0;
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseToDiscard("he").set("prompt", get.prompt2("qiangwu")).forResult();
 		},
 		async content(event, trigger, player) {
+			player.shenxian_draw_count--;
 			player.addTempSkill("qiangwu_arm");
 		},
 		ai: {
@@ -24889,9 +24889,13 @@ export default {
 
 			const result = await target
 				.chooseTarget({
-					prompt: "令" + get.translation(player) + "回复" + num + "点体力，或对攻击范围内的" + num + "名角色造成1点伤害",
+					prompt: "令" + get.translation(player) + "回复" + num + "点体力，或对" + get.translation(player) + "攻击范围内的" + num + "名角色造成1点伤害",
 					filterTarget(card, player, target2) {
-						return _status.event.player.inRange(target2);
+						// 文本里"你"一直指蔡夫人本人——伤害要按蔡夫人的攻击范围算，不是
+						// 拿装备的这个target自己的范围。这里的filterTarget/player形参是
+						// 这个嵌套chooseTarget自己的player(=target/拿装备的人)，不能直接用，
+						// 要从父级content事件拿真正的蔡夫人
+						return _status.event.getParent().player.inRange(target2);
 					},
 					selectTarget: [1, num],
 					ai(target2) {
