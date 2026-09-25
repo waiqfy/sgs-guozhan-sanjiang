@@ -316,12 +316,21 @@ export default {
 		},
 		async content(event, trigger, player) {
 			// 叠加计数器：枪舞自己成功发动(弃牌)才+1，跟甚贤摸牌本身无关——
-			// 这样如果一回合内因甚贤多次摸牌、多次发动枪舞，下回合的加成按次数叠加
-			player.qiangwu_stack = (player.qiangwu_stack || 0) + 1;
+			// 这样如果一回合内因甚贤多次摸牌、多次发动枪舞，下回合的加成按次数叠加。
+			// 用真正的addMark挂一个可见标记(而不是只存在player属性里)，方便直接在
+			// 武将头像上看到"枪舞发动了几次"，不用凭记忆
+			player.addTempSkill("qiangwu_mark");
+			player.addMark("qiangwu_mark", 1, false);
 			player.addTempSkill("qiangwu_arm");
 		},
 		ai: {
 			combo: "shenxian",
+		},
+		subSkill: {
+			mark: {
+				charlotte: true,
+				intro: { content: "已因甚贤摸牌发动了#次枪舞，将在你下回合生效" },
+			},
 		},
 	},
 	qiangwu_arm: {
@@ -331,8 +340,11 @@ export default {
 		popup: false,
 		async content(event, trigger, player) {
 			player.removeSkill("qiangwu_arm");
-			player.qiangwu_active_stack = player.qiangwu_stack || 1;
-			player.qiangwu_stack = 0;
+			const stack = player.countMark("qiangwu_mark");
+			player.qiangwu_active_stack = stack || 1;
+			if (stack) {
+				player.removeMark("qiangwu_mark", stack);
+			}
 			player.addTempSkill("qiangwu_buff", "phaseUseAfter");
 		},
 	},
