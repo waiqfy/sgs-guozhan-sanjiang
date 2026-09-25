@@ -2710,6 +2710,45 @@ export default {
 			threaten: 1.2,
 		},
 	},
+	// "看破"(kanpo)：黑色手牌可以当无懈可击使用——之前yizhi直接addTempSkill("kanpo")，
+	// 但这个项目里根本没有任何地方真正定义过kanpo这个技能(只有几处hasSkill("kanpo")的
+	// 兼容性判断和inherit:"kanpo"的引用，都要求kanpo本身已存在)，等于每次发动yizhi都在
+	// 授予一个不存在的技能，target拿到"看破"之后什么效果都没有。照抄_merged_skill_all.md
+	// 里的官方kanpo(张昭)实现补上
+	kanpo: {
+		mod: {
+			aiValue(player, card, num) {
+				if (get.name(card) != "wuxie" && get.color(card) != "black") {
+					return;
+				}
+				const cards = player.getCards("hs", card => get.name(card) == "wuxie" || get.color(card) == "black");
+				cards.sort((a, b) => (get.name(b) == "wuxie" ? 1 : 2) - (get.name(a) == "wuxie" ? 1 : 2));
+				const geti = () => (cards.includes(card) ? cards.indexOf(card) : cards.length);
+				if (get.name(card) == "wuxie") {
+					return Math.min(num, [6, 4, 3][Math.min(geti(), 2)]) * 0.6;
+				}
+				return Math.max(num, [6, 4, 3][Math.min(geti(), 2)]);
+			},
+			aiUseful() {
+				return lib.skill.kanpo.mod.aiValue.apply(this, arguments);
+			},
+		},
+		audio: 2,
+		enable: "chooseToUse",
+		filterCard(card) {
+			return get.color(card) == "black";
+		},
+		viewAsFilter(player) {
+			return player.countCards("hs", { color: "black" }) > 0;
+		},
+		viewAs: { name: "wuxie" },
+		position: "hs",
+		prompt: "将一张黑色手牌当无懈可击使用",
+		check(card) {
+			return 8 - get.value(card);
+		},
+		threaten: 1.2,
+	},
 
 // ========== liushan 刘禅 ==========
 	// 放权：你可以跳过出牌阶段，然后本回合结束时，你可以弃置一张手牌或者使用一张非伤害类牌，令一名其他角色执行一个额外的回合。 参考fangquan(shenhua)
