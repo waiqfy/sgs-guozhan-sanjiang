@@ -1445,7 +1445,7 @@ xugong: {
 		sex: "male",
 		group: "qun",
 		hp: 4,
-		skills: ["gzzhidao", "gzyjili"],
+		skills: ["zhidao", "jili"],
 	},
 	huangfusong: {
 		sex: "male",

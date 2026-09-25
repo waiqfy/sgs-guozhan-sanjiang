@@ -25274,149 +25274,112 @@ export default {
 	},
 
 // ========== yanbaihu 严白虎 ==========
-	// 雉盜：锁定技，出牌阶段开始时，你选择一名其他角色，然后直到此回合结束，你与其的距离视为1且你不能使用牌指定除你与其外的角色为目标；当你于出牌阶段内首次对其造成伤害后，你获得其区域内的一张牌。 参考本项目guozhan模式自带的gzzhidao(mode/guozhan/src/skill/character/rest.js)，直接照抄到这里，避免分散在多个文件里
-	gzzhidao: {
-		skillAnimation: true,
-		animationColor: "qun",
+	// 雉盜：出牌阶段开始时，你可以选择一名其他角色，直到回合结束，你与其距离视为1且你不能使用牌指定除你与其外的角色为目标，然后当你于此阶段内对其造成伤害后，你获得其区域内的一张牌。
+	// 之前character.js里挂的是引擎自带国战模式的gzzhidao(锁定技/必须选人/仅首次伤害摸牌)，
+	// 跟translate.js里咱们自己写的zhidao_info(非锁定技"你可以"/不限首次)完全对不上，是挂错了
+	// 技能，现改成照描述文本重写、并在character.js里换成这里的zhidao
+	zhidao: {
 		audio: 2,
 		trigger: { player: "phaseUseBegin" },
-		forced: true,
-		preHidden: true,
-		content() {
-			"step 0";
-			player.chooseTarget("请选择【雉盗】的目标", "本回合内只能对自己和该角色使用牌，且第一次对其造成伤害时摸一张牌", lib.filter.notMe, true).set("ai", function (target) {
-				var player = _status.event.player;
-				return (1 - get.sgn(get.attitude(player, target))) * Math.max(1, get.distance(player, target));
-			});
-			"step 1";
-			if (result.bool) {
-				var target = result.targets[0];
-				player.line(target, "green");
-				game.log(player, "选择了", target);
-				player.storage.gzzhidao2 = target;
-				player.addTempSkill("gzzhidao2");
-			}
+		filter(event, player) {
+			return game.hasPlayer(target => target != player);
+		},
+		async cost(event, trigger, player) {
+			event.result = await player
+				.chooseTarget(get.prompt2("zhidao"), lib.filter.notMe)
+				.set("ai", target => {
+					const player = get.event().player;
+					return (1 - get.sgn(get.attitude(player, target))) * Math.max(1, get.distance(player, target));
+				})
+				.forResult();
+		},
+		async content(event, trigger, player) {
+			const target = event.targets[0];
+			player.line(target, "green");
+			player.storage.zhidao_target = target;
+			player.addTempSkill("zhidao_move", { player: "phaseAfter" });
+			player.addTempSkill("zhidao_gain", { player: "phaseUseAfter" });
+		},
+		ai: {
+			order: 9,
+			result: { target: 1 },
 		},
 	},
-	gzzhidao2: {
+	zhidao_move: {
+		charlotte: true,
 		mod: {
 			playerEnabled(card, player, target) {
-				if (target != player && target != player.storage.gzzhidao2) {
+				if (target != player && target != player.storage.zhidao_target) {
 					return false;
 				}
 			},
 			globalFrom(from, to) {
-				if (to == from.storage.gzzhidao2) {
+				if (to == from.storage.zhidao_target) {
 					return -Infinity;
 				}
 			},
 		},
-		audio: "gzzhidao",
+	},
+	zhidao_gain: {
+		charlotte: true,
+		audio: "zhidao",
 		trigger: { source: "damageSource" },
 		forced: true,
-		charlotte: true,
 		filter(event, player) {
-			return (
-				event.player == player.storage.gzzhidao2 &&
-				player
-					.getHistory("sourceDamage", function (evt) {
-						return evt.player == event.player;
-					})
-					.indexOf(event) == 0 &&
-				event.player.countGainableCards(player, "hej") > 0
-			);
+			return event.player == player.storage.zhidao_target && event.player.countGainableCards(player, "hej") > 0;
 		},
 		logTarget: "player",
-		content() {
-			player.gainPlayerCard(trigger.player, "hej", true);
+		async content(event, trigger, player) {
+			await player.gainPlayerCard(trigger.player, "hej", true);
 		},
 	},
 
-	// 寄篱：锁定技。当你成为红色基本牌或红色普通锦囊牌的唯一目标后，你令此牌的使用者于此牌结算完成后视为对你使用一张牌名和属性相同的牌。当你于一个阶段内第二次受到伤害时，你防止此伤害并移除此武将牌。 参考本项目guozhan模式自带的gzyjili(mode/guozhan/src/skill/character/rest.js)，直接照抄到这里，避免分散在多个文件里
-	gzyjili: {
+	// 寄篱：当你成为红色基本牌或红色普通锦囊牌的唯一目标后，你可以令此牌结算执行两次。当你于任意一个阶段内受到第二次伤害时，你可以防止此伤害，然后变更该武将牌。
+	// 之前character.js里挂的是引擎自带国战模式的gzyjili(锁定技/使用者视为再使用一张同名牌/
+	// 移除武将牌)，跟translate.js里咱们自己写的jili_info(两处都是"你可以"的主动选择/直接让这
+	// 张牌结算两次而不是"使用者再用一张"/是"变更"不是"移除")完全对不上，现改成照描述文本重写
+	jili: {
 		audio: 2,
-		forced: true,
-		preHidden: ["gzyjili_remove"],
 		trigger: { target: "useCardToTargeted" },
 		filter(event, player) {
 			if (get.color(event.card) != "red" || event.targets.length != 1) {
 				return false;
 			}
-			var type = get.type(event.card);
+			const type = get.type(event.card);
 			return type == "basic" || type == "trick";
 		},
-		check() {
-			return false;
+		async cost(event, trigger, player) {
+			event.result = await player.chooseBool(get.prompt2("jili", trigger.card)).forResult();
 		},
-		content() {
-			player.addTempSkill("gzyjili2");
-			var evt = trigger.getParent();
-			if (!evt.gzyjili) {
-				evt.gzyjili = [];
-			}
-			evt.gzyjili.add(player);
+		async content(event, trigger, player) {
+			trigger.getParent().effectCount++;
 		},
-		group: "gzyjili_remove",
+		group: "jili_shield",
 		subSkill: {
-			remove: {
-				audio: "gzyjili",
+			shield: {
+				audio: "jili",
 				trigger: { player: "damageBegin2" },
-				forced: true,
 				filter(event, player) {
-					var evt = false;
-					for (var i of lib.phaseName) {
+					let evt = false;
+					for (const i of lib.phaseName) {
 						evt = event.getParent(i);
 						if (evt && evt.player) {
 							break;
 						}
 					}
-					return (
-						evt &&
-						evt.player &&
-						player.getHistory("damage", function (evtx) {
-							return evtx.getParent(evt.name) == evt;
-						}).length == 1
-					);
+					return evt && evt.player && player.getHistory("damage", evtx => evtx.getParent(evt.name) == evt).length == 1;
 				},
-				content() {
+				async cost(event, trigger, player) {
+					event.result = await player.chooseBool(get.prompt2("jili_shield")).forResult();
+				},
+				async content(event, trigger, player) {
 					trigger.cancel();
-					player.removeCharacter(get.character(player.name1, 3).includes("gzyjili") ? 0 : 1);
+					await pickAndChangeCharacter(player, "jili", "寄篱：请选择要变更为的武将");
 				},
 			},
 		},
-	},
-	gzyjili2: {
-		trigger: { global: "useCardAfter" },
-		charlotte: true,
-		popup: false,
-		forced: true,
-		filter(event, player) {
-			return (
-				event.gzyjili &&
-				event.gzyjili.includes(player) &&
-				!event.addedTarget &&
-				event.player &&
-				event.player.isAlive() &&
-				event.player.canUse(
-					{
-						name: event.card.name,
-						nature: event.card.nature,
-						isCard: true,
-					},
-					player
-				)
-			);
-		},
-		content() {
-			trigger.player.useCard(
-				{
-					name: trigger.card.name,
-					nature: trigger.card.nature,
-					isCard: true,
-				},
-				player,
-				false
-			);
+		ai: {
+			expose: 0.2,
 		},
 	},
 
