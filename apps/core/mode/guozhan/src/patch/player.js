@@ -812,9 +812,6 @@ export class PlayerGuozhan extends lib.element.Player {
 					next.setContent("zhulian");
 				}
 			}
-			// 临时排查日志：珠联璧合+野心家同时满足时野心家标记没发的问题，跑一次看这几个
-			// 值到底是什么，确认后会清理掉
-			console.log("[DEBUG showCharacter]", this.name1, this.name2, "identity=", this.identity, "_ye=", this._ye, "showYe=", showYe, "perfectPair=", this.perfectPair());
 			if (showYe) {
 				this.addMark("yexinjia_mark", 1);
 			}
