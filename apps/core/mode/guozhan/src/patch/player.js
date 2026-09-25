@@ -651,6 +651,13 @@ export class PlayerGuozhan extends lib.element.Player {
 				this.identity = this.group;
 			} else {
 				this.identity = "ye";
+				// gz3: 这个分支是"普通角色随机判定成野心家身份"，跟上面"主将本身就是ye系
+				// 势力"那个分支一样都是identity=="ye"的结果，之前只有那个分支设了
+				// showYe=true，这里漏了，导致随机判成野心家的角色永远拿不到"野心家"标记
+				if (!this._ye) {
+					this._ye = true;
+					showYe = true;
+				}
 			}
 			this.setIdentity(this.identity);
 			this.ai.shown = 1;

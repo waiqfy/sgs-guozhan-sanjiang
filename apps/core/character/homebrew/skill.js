@@ -18846,15 +18846,13 @@ export default {
 				.forResult();
 		},
 		async content(event, trigger, player) {
+			// 是祖茂主动去抽，不是让对方自己选一张给出来——不该询问/弹窗给被抽的人，
+			// 直接随机拿一张
 			for (const target of event.targets) {
 				if (!target.isIn() || !target.countCards("h")) continue;
-				const { cards } = await target
-					.chooseCard("h", true, get.prompt2("yinbing", target))
-					.set("ai", card => 6 - get.value(card))
-					.set("target", player)
-					.forResult();
-				if (cards && cards.length) {
-					const next = player.addToExpansion(cards, target, "give");
+				const card = target.getCards("h").randomGet();
+				if (card) {
+					const next = player.addToExpansion([card], target, "give");
 					next.gaintag.add("yinbing");
 					await next;
 				}
