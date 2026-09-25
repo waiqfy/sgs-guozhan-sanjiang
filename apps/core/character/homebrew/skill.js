@@ -20236,9 +20236,11 @@ export default {
 					const player = _status.event.player;
 					const attitude = get.attitude(player, target);
 					// 弃牌是强制的(chooseToDiscard里forced:true)，如果目标手里根本没有红色牌，
-					// 队友只会白白弃掉一张有用的黑色牌、什么好处也拿不到——这种情况不该选这个目标
+					// 队友(或自己)只会白白弃掉一张有用的黑色牌、什么好处也拿不到——这种情况不该
+					// 选这个目标。target==player(选自己)单独判一次，不完全依赖attitude>0——
+					// get.attitude(player,player)不一定总落在">0"这个区间
 					const hasRed = target.countCards("h", card => get.color(card, target) == "red") > 0;
-					if (attitude > 0 && !hasRed) {
+					if ((target == player || attitude > 0) && !hasRed) {
 						return -1;
 					}
 					return attitude;
