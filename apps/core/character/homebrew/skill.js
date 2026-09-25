@@ -333,8 +333,13 @@ export default {
 			// 就会被自动清掉(见player.js的addTempSkill实现)——也就是当前这个回合(往往是
 			// 别人的回合，因为甚贤是"你回合外"触发的)一结束，qiangwu_arm就被引擎自动摘掉
 			// 了，根本活不到张星彩自己下一次准备阶段，标记就一直卡在那里不会转化成加成。
-			// 显式把expire指定成它自己要等的那个触发点，让它撑到该触发的时候
-			player.addTempSkill("qiangwu_arm", { player: "phaseZhunbeiBegin" });
+			// 显式把expire指定成一个安全网——但不能跟它自己的trigger用同一个事件名！
+			// gameEvent.ts里"到期自动removeSkill"的检查发生在"把技能加进本次事件待发动
+			// 列表"之前，如果expire跟trigger是同一个事件名，qiangwu_arm会在"phaseZhunbeiBegin"
+			// 这次事件刚好触发时被expire机制先一步删掉，永远排不上自己的filter/content。
+			// 改成晚一步的"phaseZhunbeiAfter"：content里已经会手动removeSkill，这里只是防止
+			// 万一没触发到时不至于一直挂在身上
+			player.addTempSkill("qiangwu_arm", { player: "phaseZhunbeiAfter" });
 		},
 		ai: {
 			combo: "shenxian",
@@ -2668,6 +2673,9 @@ export default {
 	},
 
 	// 遗志：每轮限一次，一名同势力角色的准备阶段开始时，你可以发动"观星"，其本回合视为拥有"看破"。 参考skill_old.js
+	// translate.js原文写的是"一名同势力角色"，不是"一名同势力其他角色"——没有排除自己的意思，
+	// 姜维自己的准备阶段也该能发动。之前照抄skill_old.js多加了event.player!=player这个自己
+	// 拍脑袋加的排除条件(skill_old.js本身也没有官方参考，属于同一个错误)，去掉
 	yizhi: {
 		skillAnimation: true,
 		animationColor: "soil",
@@ -2676,7 +2684,7 @@ export default {
 		round: 1,
 		trigger: { global: "phaseZhunbeiBegin" },
 		filter(event, player) {
-			return event.player != player && event.player.isIn() && event.player.isFriendOf(player);
+			return event.player.isIn() && event.player.isFriendOf(player);
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseBool("遗志：是否发动“观星”，令" + get.translation(trigger.player) + "本回合视为拥有“看破”？").forResult();
