@@ -21148,12 +21148,20 @@ export default {
 			} else if (h === x) {
 				const target = trigger.target || trigger.targets[0];
 				if (target && target.isIn()) {
-					player.addTempSkill("zuowei_eq", { player: "phaseAfter" });
-					await target.damage();
+					// 三档效果描述里都是"你可以"，不是锁定/强制效果——之前这一档和小于X那一档
+					// 都直接执行了，没有问，只有大于X那一档靠chooseTarget能取消才算问了
+					const result = await player.chooseBool(get.prompt2("zuowei")).forResult();
+					if (result.bool) {
+						player.addTempSkill("zuowei_eq", { player: "phaseAfter" });
+						await target.damage();
+					}
 				}
 			} else {
-				player.addTempSkill("zuowei_lt", { player: "phaseAfter" });
-				await player.draw();
+				const result = await player.chooseBool(get.prompt2("zuowei")).forResult();
+				if (result.bool) {
+					player.addTempSkill("zuowei_lt", { player: "phaseAfter" });
+					await player.draw();
+				}
 			}
 		},
 		ai: {
