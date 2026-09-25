@@ -3769,7 +3769,7 @@ export default {
 		filterTarget: true,
 		skillAnimation: true,
 		animationColor: "orange",
-		derivation: "gzyongjue",
+		derivation: "yongjue",
 		// 移除武将牌是很大的代价，AI不应该在满血时就随便发动——只有自己已经受伤(或者
 		// 濒死本来就要触发)时才值得考虑
 		check(event, player) {
@@ -3786,7 +3786,7 @@ export default {
 			} else {
 				await player.removeCharacter(1);
 			}
-			target.addSkills("gzyongjue");
+			target.addSkills("yongjue");
 			if (target != player) {
 				await target.draw(2);
 			}
@@ -3806,6 +3806,30 @@ export default {
 				},
 			},
 			threaten: 0.7,
+		},
+	},
+
+	// 勇决：锁定技，你的出牌阶段，当你使用的第一张牌结算结束后，若此牌为【杀】，你可以获得之，然后其不计入本回合的使用次数。 存嗣(cunsi)的衍生技能，跟引擎自带的官方gzyongjue机制不同——
+	// 官方版是"同势力任意一名角色首次出杀后，你获得连环/铁索溢出的牌"(watcher式，不是给
+	// 获得者自己用的)，跟这里的描述完全对不上；按描述重写成"自己出的第一张杀结算完直接
+	// 拿回来，且这次使用不计入次数"，之前一直是直接addSkills("gzyongjue")挂引擎自带的
+	// 那个不相干技能，等于这张牌从没真正做出来过
+	yongjue: {
+		audio: "yongjue",
+		locked: true,
+		trigger: { player: "useCardAfter" },
+		filter(event, player) {
+			return _status.currentPhase == player && event == player.getHistory("useCard")[0] && event.card.name == "sha";
+		},
+		async cost(event, trigger, player) {
+			event.result = await player.chooseBool(get.prompt2("yongjue")).forResult();
+		},
+		async content(event, trigger, player) {
+			await player.gain(trigger.card, "gain2");
+			trigger.addCount = false;
+		},
+		ai: {
+			threaten: 1.1,
 		},
 	},
 
@@ -24311,7 +24335,10 @@ export default {
 			if (control == "弃置装备区内的一张牌") {
 				await target.chooseToDiscard("e", true);
 			} else {
-				const skills = target.getSkills().filter(skill => lib.skill[skill] && lib.skill[skill].forced);
+				// 之前只认lib.skill[skill].forced，漏掉了靠mod或显式locked:true判定成
+				// 锁定技的技能(比如没有trigger+forced、纯group挂载的那些)——统一改用
+				// get.is.locked()，跟引擎自己判断"这个技能算不算锁定技"的逻辑保持一致
+				const skills = target.getSkills().filter(skill => lib.skill[skill] && get.is.locked(skill, target));
 				for (const skill of skills) {
 					target.tempBanSkill(skill, "phaseEnd");
 				}
