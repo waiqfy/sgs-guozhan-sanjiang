@@ -6764,8 +6764,15 @@ export default {
 					player: "chooseToDiscardBegin",
 				},
 				charlotte: true,
+				// chooseToDiscardBegin的直接父级是chooseToDiscard事件，不是huogong本身——
+				// huogong的content()里是直接await player.chooseToDiscard(...)，所以要
+				// getParent(2)才能拿到真正的huogong事件(.name/.card/.target/.targets都在
+				// 这一层)。之前filter和else分支里都只用了getParent()(1层)，一直拿到的是
+				// chooseToDiscard事件本身，name永远不是"huogong"，filter恒为false，
+				// 这个子技能实际上从来没有触发过——"必须弃牌造成伤害"和"取消剩余目标"
+				// 这两条核心效果都没生效，"否则查看你的手牌"也一样没走到。
 				filter(event, player) {
-					const evt = event.getParent();
+					const evt = event.getParent(2);
 					return evt.name == "huogong" && evt.card?.storage?.huoe;
 				},
 				async cost(event, trigger, player) {
@@ -6781,7 +6788,7 @@ export default {
 						const evt = trigger.getParent(2);
 						evt.targets.splice(evt.num + 1);
 					} else if (player.countCards("h")) {
-						const evt = trigger.getParent();
+						const evt = trigger.getParent(2);
 						const next = evt.target.viewHandcards(player);
 						event.next.remove(next);
 						trigger.next.push(next);
