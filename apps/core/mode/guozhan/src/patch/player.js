@@ -383,6 +383,16 @@ export class PlayerGuozhan extends lib.element.Player {
 					list[i].setIdentity();
 				}
 			}, yelist);
+			// gz3: 君主死亡后，原本跟随他的整个势力集体转为野心家——这也是identity变成"ye"
+			// 的一条路径，跟$showCharacter里两个"判定成野心家"的分支性质一样，但这里之前完全
+			// 没有addMark("yexinjia_mark")，导致因为主公战死而集体变成野心家的角色永远拿不到
+			// 这个标记
+			for (const p of yelist) {
+				if (!p._ye) {
+					p._ye = true;
+					p.addMark("yexinjia_mark", 1);
+				}
+			}
 			// @ts-expect-error 类型就是这么写的
 			_status.yeidentity.add(this.identity);
 		}
