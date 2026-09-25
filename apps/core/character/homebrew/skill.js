@@ -342,12 +342,16 @@ export default {
 	},
 	qiangwu_buff: {
 		charlotte: true,
+		// 之前用attackRange给整体攻击范围+1，影响了所有牌而不只是"杀"，跟文本"使用【杀】的
+		// 距离...+1"对不上；改成old版本的targetInRange写法，只对"杀"这一种牌生效
 		mod: {
-			attackRange(player, num) {
-				return num + 1;
+			targetInRange(card, player, target) {
+				if (card.name == "sha" && get.distance(player, target) <= player.getAttackRange() + 1) {
+					return true;
+				}
 			},
 			cardUsable(card, player, num) {
-				if (get.name(card, false) == "sha") {
+				if (card.name == "sha") {
 					return num + 1;
 				}
 			},
