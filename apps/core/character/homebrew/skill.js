@@ -3723,6 +3723,7 @@ export default {
 	// 闺秀：当你明置此武将牌时，你可以摸两张牌；锁定技，当你移除此武将牌时，你可以将体力回复至一点或回复1点体力。 参考gz_guixiu(guozhan)
 	guixiu: {
 		audio: "guixiu",
+		locked: true,
 		trigger: {
 			player: ["showCharacterAfter", "removeCharacterBefore"],
 		},
@@ -15125,6 +15126,7 @@ export default {
 	jiahe: {
 		aiShowTag: "support",
 		audio: 2,
+		locked: true,
 		enable: "phaseUse",
 		usable: 1,
 		filterCard(card, player) {
@@ -21995,6 +21997,7 @@ export default {
 		audioname: ["yuanshao"],
 		aiShowTag: "defense",
 		audio: 2,
+		locked: true,
 		trigger: { player: "damageEnd" },
 		filter(event, player) {
 			return !!(event.player && event.player.isIn() && event.player.isUnseen(2));
@@ -22719,6 +22722,7 @@ export default {
 	huangtian: {
 		aiShowTag: "response",
 		audio: 2,
+		locked: true,
 		group: ["huangtian_gain", "huangtian_leiji"],
 	},
 
@@ -24474,6 +24478,7 @@ export default {
 	shejia: {
 		aiShowTag: "support",
 		audio: 2,
+		locked: true,
 		group: ["shejia_armor", "shejia_weapon", "shejia_reset", "shejia_share", "shejia_clear"],
 		ai: { threaten: 0.8 },
 	},
@@ -25788,6 +25793,7 @@ export default {
 	yingmen: {
 		skillAnimation: true,
 		animationColor: "qun",
+		locked: true,
 		init(player) {
 			if (!_status.characterlist) {
 				game.initCharacterList();
