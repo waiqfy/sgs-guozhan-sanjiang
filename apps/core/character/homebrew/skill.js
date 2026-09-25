@@ -21025,54 +21025,76 @@ export default {
 	},
 
 // ========== sunhuan 孙桓 ==========
-	// 逆击：当你成为基本牌或锦囊牌的目标后，你可以摸一张牌。结束阶段，你弃置所有本回合以此法摸到的牌，弃牌前你可以先使用其中一张牌。 参考dcniji(sp2)
-	// 官方原实现filter限定"仅基本牌/普通锦囊牌"且要求"使用者不是自己"，改用get.type(card)!=="equip"（非装备牌）扩大范围并去掉多余限制，以匹配描述"基本牌或锦囊牌"；并补充frequent标记。
+	// 逆击：当你成为基本牌或锦囊牌的目标后，你可以摸一张牌。结束阶段，你弃置所有本回合以此法摸到的牌，弃牌前你可以先使用其中一张牌。 参考_merged_skill_all.md里的官方dcniji(sp2)
+	// 之前是自己瞎拼的结构(手动cost+addTempSkill("niji_end",{player:"phaseJieshuBegin"})，
+	// 只在孙桓自己的结束阶段生效)，跟官方真正的实现差得很远：
+	// 1. "结束阶段"官方是group出一个恒定存在的discard子技能，trigger是{global:"phaseJieshuBegin"}——
+	//    不分是谁的回合，只要到了"结束阶段"这个时机、且孙桓自己身上还挂着标记的牌就处理，
+	//    不是只等孙桓自己的结束阶段(逆击是"你成为目标"触发的，绝大多数时候发生在别人回合，
+	//    等到孙桓自己回合结束时黄花菜都凉了，标记早被addTempSkill的默认到期机制清没了)。
+	// 2. 官方没有单独的cost，摸牌直接发动(非锁定技靠frequent+默认的是否发动询问)。
+	// 3. 清除标记(clear)是靠addTempSkill的默认到期(本回合结束)+onremove钩子清gaintag，
+	//    不是自己再手动判断一遍。
 	niji: {
 		aiShowTag: "draw",
 		audio: 2,
 		trigger: { target: "useCardToTargeted" },
-		frequent: true,
 		filter(event, player) {
 			return get.type(event.card) !== "equip";
 		},
-		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2(event.skill)).forResult();
-		},
+		frequent: true,
+		group: "niji_discard",
 		async content(event, trigger, player) {
 			const next = player.draw();
-			next.gaintag.add("niji");
+			next.gaintag = ["niji"];
+			player.addTempSkill("niji_clear");
 			await next;
-			player.addTempSkill("niji_end", { player: "phaseAfter" });
+		},
+		subSkill: {
+			clear: {
+				charlotte: true,
+				onremove(player) {
+					player.removeGaintag("niji");
+				},
+			},
+			discard: {
+				audio: "niji",
+				trigger: { global: "phaseJieshuBegin" },
+				filter(event, player) {
+					return player.hasCard(card => card.hasGaintag("niji"), "h");
+				},
+				forced: true,
+				locked: false,
+				async content(event, trigger, player) {
+					const cards = player.getCards("h", card => card.hasGaintag("niji") && lib.filter.cardDiscardable(card, player, "niji"));
+					if (cards.some(card => player.hasUseTarget(card))) {
+						const result = await player
+							.chooseToUse({
+								prompt: "是否使用一张“逆击”牌？",
+								filterCard(card, player) {
+									if (![card].concat(card.cards || []).some(current => get.itemtype(current) === "card" && current.hasGaintag("niji"))) {
+										return false;
+									}
+									return lib.filter.filterCard.apply(this, arguments);
+								},
+								ai1(card) {
+									return get.player().getUseValue(card);
+								},
+							})
+							.forResult();
+						if (result.bool) {
+							await game.delayex();
+						}
+					}
+					const remainingCards = cards.filter(card => get.owner(card) === player && get.position(card) === "h" && lib.filter.cardDiscardable(card, player, "niji"));
+					if (remainingCards.length) {
+						await player.discard({ cards: remainingCards });
+					}
+				},
+			},
 		},
 		ai: {
 			threaten: 1,
-		},
-	},
-	niji_end: {
-		charlotte: true,
-		trigger: { player: "phaseJieshuBegin" },
-		filter(event, player) {
-			return player.countCards("he", card => card.hasGaintag("niji")) > 0;
-		},
-		forced: true,
-		popup: false,
-		async content(event, trigger, player) {
-			if (player.countCards("he", card => card.hasGaintag("niji"))) {
-				await player.chooseToUse({
-					filterCard(card) {
-						// chooseToUse探测阶段(checkSkipped/arrangeTrigger)可能拿非真实
-						// Card对象的候选项来试探这个filterCard，直接调用hasGaintag会崩溃
-						// 并拖累同批次其他技能触发，先判断方法存在
-						return !!card?.hasGaintag && card.hasGaintag("niji");
-					},
-					prompt: get.prompt2("niji"),
-					complexSelect: false,
-				});
-			}
-			const cards = player.getCards("he", card => card.hasGaintag("niji"));
-			if (cards.length) {
-				await player.discard(cards);
-			}
 		},
 	},
 
