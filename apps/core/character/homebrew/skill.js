@@ -24768,87 +24768,154 @@ export default {
 	},
 
 // ========== caifuren 蔡夫人 ==========
-	// 窃聽：其他角色的回合结束时，若其有未明置武将或未于此回合内对除其外的角色使用过牌，你可以选择一项：1.将其装备区里的一张牌置入你的装备区；2.摸一张牌。 参考qieting(yijiang)
-	// 按old版本的结构：不单独拆cost，"选获得装备/摸牌"直接放在content里当唯一决定点，
-	// 跟old(skill_old.js)保持一致，只保留"装备真的移入装备区而不是进手牌"这一处修正
+	// 窃聽：其他角色的回合结束时，若其未于此回合内对除其外的角色使用过牌，你可以选择一项：1.将其一张可装备的牌移至你的装备区；2.摸一张牌。 参考qieting(yijiang)
+	// 之前用skill_old.js当参考，跟真正的官方merged参考(yijiang原版)差异很大——官方是
+	// direct(不是cost)，条件只看"这回合有没有对别人使用过牌"(没有"未明置武将"这个OR分支)，
+	// "移动装备"是通过chooseControl三选一(含显式取消)再choosePlayerCard，不是
+	// chooseControl二选一+choosePlayerCard(true)。照抄官方实现，只是把target.$give
+	// 换成完整的player.equip流程(逻辑一致，$give只是客户端动画)
 	qieting: {
-		aiShowTag: "offense",
 		audio: 2,
-		trigger: { player: "phaseEnd" },
+		trigger: { global: "phaseEnd" },
 		filter(event, player) {
-			if (event.player == player) {
+			if (event.player == player || !event.player.isIn()) {
 				return false;
 			}
-			if (event.player.isUnseen(0) || event.player.isUnseen(1)) {
-				return true;
-			}
-			return !event.player.getHistory("useCard", evt => evt.targets && evt.targets.some(target => target != event.player)).length;
-		},
-		async content(event, trigger, player) {
-			const target = trigger.player;
-			const result = await player
-				.chooseControl("获得装备", "摸一张牌")
-				.set("prompt", get.prompt2("qieting", trigger.player))
-				.forResult();
-			if (result.control == "获得装备" && target.getEquips().length) {
-				const cardResult = await player.choosePlayerCard(target, "e", true).forResult();
-				if (cardResult.cards && cardResult.cards.length) {
-					const card = cardResult.cards[0];
-					// old版本是target.give(card, player)进手牌后再判断类型去equip，
-					// 这里的牌来自装备区一定是装备类，直接equip()等效且更直接
-					await player.equip(card);
+			const history = event.player.getHistory("useCard");
+			for (let i = 0; i < history.length; i++) {
+				if (!history[i].targets) {
+					continue;
 				}
-			} else {
-				await player.draw();
-			}
-		},
-		ai: { threaten: 1.0 },
-	},
-
-	// 獻州：限定技，出牌阶段，你可以将装备区里的所有牌交给一名其他角色，然后其选择一项：1.令你回复X点体力；2.对其攻击范围内至多X名角色各造成1点伤害。（X为你给出的牌数） 参考xianzhou(yijiang)
-	xianzhou: {
-		// 之前为了排查"没有按钮"临时去掉过这行做诊断，old版本(skill_old.js)确认
-		// 本来就有这个标签，退回来
-		aiShowTag: "recover",
-		audio: 2,
-		enable: "phaseUse",
-		limited: true,
-		skillAnimation: true,
-		animationColor: "gold",
-		filterTarget(card, player, target) {
-			return target != player;
-		},
-		filter(event, player) {
-			return player.getEquips().length > 0;
-		},
-		async content(event, trigger, player) {
-			player.awakenSkill(event.name);
-			const target = event.target;
-			const cards = player.getEquips();
-			if (!cards.length || !target.isIn()) {
-				return;
-			}
-			const x = cards.length;
-			await target.gain(cards, player, "give");
-			const result = await target
-				.chooseControl("回复体力", "造成伤害")
-				.set("prompt", `献州：请选择令${get.translation(player)}回复${get.cnNumber(x)}点体力，或对你攻击范围内至多${get.cnNumber(x)}名角色各造成1点伤害`)
-				.forResult();
-			if (result.control == "回复体力") {
-				if (player.isIn()) {
-					await player.recover(x);
-				}
-			} else {
-				const targets = await target
-					.chooseTarget(true, [1, x], (card, plyr, tgt) => get.distance(target, tgt) <= target.getAttackRange())
-					.forResult();
-				if (targets.bool && targets.targets && targets.targets.length) {
-					for (const tgt of targets.targets) {
-						if (tgt.isIn()) {
-							await tgt.damage(1);
-						}
+				for (let j = 0; j < history[i].targets.length; j++) {
+					if (history[i].targets[j] != event.player) {
+						return false;
 					}
 				}
+			}
+			return true;
+		},
+		direct: true,
+		async content(event, trigger, player) {
+			let result;
+			if (trigger.player.hasCard(card => player.canEquip(card), "e")) {
+				result = await player
+					.chooseControl({
+						prompt: get.prompt("qieting", trigger.player),
+						controls: ["移动装备", "draw_card", "cancel2"],
+						ai(event, player) {
+							const source = _status.event.sourcex;
+							const att = get.attitude(player, source);
+							if (source.hasSkillTag("noe")) {
+								if (att > 0) {
+									return "移动装备";
+								}
+							} else {
+								if (att <= 0 && source.countCards("e", card => get.value(card, source) > 0 && get.effect(player, card, player, player) > 0)) {
+									return "移动装备";
+								}
+							}
+							return "draw_card";
+						},
+					})
+					.set("sourcex", trigger.player)
+					.forResult();
+			} else {
+				result = await player
+					.chooseControl({
+						prompt: get.prompt("qieting", trigger.player),
+						controls: ["draw_card", "cancel2"],
+						ai() {
+							return "draw_card";
+						},
+					})
+					.forResult();
+			}
+			if (result.control != "移动装备") {
+				if (result.control == "draw_card") {
+					player.logSkill("qieting");
+					await player.draw();
+				}
+				return;
+			}
+			player.logSkill("qieting", trigger.player);
+			result = await player
+				.choosePlayerCard({
+					prompt: "将一张装备牌移至你的装备区",
+					target: trigger.player,
+					filterButton(button) {
+						return _status.event.player.canEquip(button.link);
+					},
+					position: "e",
+					forced: true,
+					ai(button) {
+						return get.effect(player, button.link, player, player);
+					},
+				})
+				.forResult();
+			if (!result || !result.links || !result.links.length) {
+				return;
+			}
+			await game.delay(2);
+			trigger.player.$give(result.links[0], player, false);
+			await player.equip(result.links[0]);
+			player.addExpose(0.2);
+		},
+	},
+
+	// 獻州：限定技，出牌阶段，你可以将装备区里的所有牌交给一名其他角色，然后其选择一项：1.令你回复X点体力；2.对你攻击范围内至多X名角色各造成1点伤害。（X为你给出的牌数） 参考xianzhou(yijiang)
+	// 官方实现是一次chooseTarget:不选目标(取消/0个)=回复体力，选了目标=造成伤害，
+	// 不是先chooseControl二选一再各自处理；照抄官方
+	xianzhou: {
+		skillAnimation: true,
+		animationColor: "gray",
+		audio: 2,
+		audioname: ["xin_caifuren", "ol_caifuren"],
+		limited: true,
+		enable: "phaseUse",
+		filter(event, player) {
+			return player.countCards("e") > 0;
+		},
+		filterTarget(card, player, target) {
+			return player != target;
+		},
+		delay: false,
+		async content(event, trigger, player) {
+			const cards = player.getCards("e");
+			const target = event.target;
+			const num = cards.length;
+			player.awakenSkill(event.name);
+			await player.give(cards, target);
+			await game.delay();
+
+			const result = await target
+				.chooseTarget({
+					prompt: "令" + get.translation(player) + "回复" + num + "点体力，或对攻击范围内的" + num + "名角色造成1点伤害",
+					filterTarget(card, player, target2) {
+						return _status.event.player.inRange(target2);
+					},
+					selectTarget: [1, num],
+					ai(target2) {
+						const target = _status.event.player;
+						const player = _status.event.getParent().player;
+						if (get.attitude(target, player) > 0) {
+							if (player.hp + num <= player.maxHp || player.hp == 1) {
+								return -1;
+							}
+						}
+						return get.damageEffect(target2, target, target);
+					},
+				})
+				.forResult();
+			if (!result.bool) {
+				await player.recover({
+					num,
+					source: target,
+				});
+				return;
+			}
+			target.line(result.targets, "green");
+			for (const targetx of result.targets) {
+				await targetx.damage({ source: target });
 			}
 		},
 	},
