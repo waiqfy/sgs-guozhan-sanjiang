@@ -2615,10 +2615,13 @@ export default {
 			// 继续用杀，两步都不做/中途放弃就走"你弃置其一张牌"这条兜底分支。
 			// 这里的chooseToDiscard不能传forced:true——描述是"选择一项"，target应该能
 			// 直接选择"不弃牌"从而走兜底分支2，forced:true会导致只要还有手牌就必须弃，
-			// 兜底分支2永远排不上号(错误兜底)，改成默认可取消
+			// 兜底分支2永远排不上号(错误兜底)，改成默认可取消。
+			// 另外：只有target手上确实有杀可以打出时才问"要不要弃牌走选项1"——如果他压根
+			// 打不出杀，选项1就是白白多弃一张牌(弃了以后还是打不出杀，照样要走选项2被弃牌，
+			// 等于比直接选选项2多亏一张)，没有理性的target会选，问了也是白问
 			const target = event.target;
 			let attempted = false;
-			if (target.countCards("h") > 0) {
+			if (target.countCards("h") > 0 && target.canUse({ name: "sha", isCard: true }, player)) {
 				const result = await target
 					.chooseToDiscard("h")
 					.set("prompt", "挑衅：你可以弃置一张手牌，然后对" + get.translation(player) + "使用一张【杀】，否则" + get.translation(player) + "将弃置你一张牌")
