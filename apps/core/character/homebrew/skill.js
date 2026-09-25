@@ -297,6 +297,14 @@ export default {
 			const next = player.draw();
 			next.gaintag.add("hb_shenxian");
 			await next;
+			// gaintag除了给事件打标记，引擎还会顺手把它显示成牌面上的一行文字
+			// (card.addGaintag，因为没有翻译会直接显示"hb_shenxian"这种看不懂的英文)。
+			// 这里只是想借事件上的gaintag给qiangwu识别用，不想让摸到的牌真的带着这行字，
+			// 摸完之后马上把牌面上这个视觉标记去掉——不影响next.gaintag本身，
+			// qiangwu的filter看的是事件的gaintag，不是牌上的
+			for (const card of next.result?.cards || []) {
+				card.removeGaintag("hb_shenxian");
+			}
 		},
 		ai: {
 			threaten: 1.5,
@@ -321,7 +329,12 @@ export default {
 			// 子技能本身没有trigger/mod，会被当成"空技能"立刻清掉，连带标记也被
 			// unmarkSkill抹掉，导致标记发动后立刻消失
 			player.addMark("qiangwu_mark", 1, false);
-			player.addTempSkill("qiangwu_arm");
+			// addTempSkill不传第二个参数(expire)时，默认在"phaseAfter/phaseBeforeStart"
+			// 就会被自动清掉(见player.js的addTempSkill实现)——也就是当前这个回合(往往是
+			// 别人的回合，因为甚贤是"你回合外"触发的)一结束，qiangwu_arm就被引擎自动摘掉
+			// 了，根本活不到张星彩自己下一次准备阶段，标记就一直卡在那里不会转化成加成。
+			// 显式把expire指定成它自己要等的那个触发点，让它撑到该触发的时候
+			player.addTempSkill("qiangwu_arm", { player: "phaseZhunbeiBegin" });
 		},
 		ai: {
 			combo: "shenxian",
