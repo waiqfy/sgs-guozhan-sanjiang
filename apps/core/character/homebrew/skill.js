@@ -291,7 +291,11 @@ export default {
 			if (trigger.delay == false) {
 				await game.delay();
 			}
-			await player.draw();
+			// 给这次摸牌打个标记，方便张星彩"枪舞"识别"这张牌是不是甚贤摸的"——
+			// 比在qiangwu那边爬事件祖先链猜"第几层是shenxian"要稳得多
+			const next = player.draw();
+			next.shenxian_draw = true;
+			await next;
 		},
 		ai: {
 			threaten: 1.5,
@@ -303,22 +307,9 @@ export default {
 		audio: 2,
 		trigger: { player: "drawAfter" },
 		filter(event, player) {
-			// 甚贤(shenxian)自己的filter要求_status.currentPhase != player（只在别人回合触发），
-			// 所以真正由甚贤摸的牌绝不可能发生在玩家自己回合开始时；这里加一道保险，
-			// 避免event.getParent("shenxian")在别的场合（比如玩家自己回合的正常摸牌）误判为真。
-			if (_status.currentPhase == player) {
-				return false;
-			}
-			let evt = event,
-				found = false;
-			for (let i = 0; i < 6 && evt; i++) {
-				evt = evt.getParent?.();
-				if (evt && evt.skill === "shenxian") {
-					found = true;
-					break;
-				}
-			}
-			return found && player.countCards("h") > 0;
+			// 之前靠爬事件祖先链猜"第几层是shenxian"，深度不一定够、也不稳定；
+			// 现在shenxian摸牌时直接在事件上打了shenxian_draw标记，直接读这个标记就行
+			return !!event.shenxian_draw && player.countCards("h") > 0;
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseToDiscard("he").set("prompt", get.prompt2("qiangwu")).forResult();
