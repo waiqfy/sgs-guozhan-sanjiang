@@ -147,8 +147,13 @@ export function applyAiShowGates(skillDict) {
 				return true;
 			}
 			const tag = info.aiShowClassify ? info.aiShowClassify(event, player) : info.aiShowTag;
+			// 很多"其他角色触发时"的反应型技能，真正要判断"明置没明置"的那个人是
+			// event.player(比如"其他角色回合结束时"这种)，不是event.target——只认
+			// event.target的话，这类技能在offense分支下会全部退化成"场上有没有
+			// 随便哪个已明置的敌人"这种更粗糙、经常判不出来的兜底条件，等于长期
+			// 压制到"完全不发动"。event.target优先，没有就退回event.player。
 			return shouldRiskShow(player, tag, {
-				target: event?.target,
+				target: event?.target ?? event?.player,
 				hasCost: !!info.aiShowCost,
 			});
 		};
