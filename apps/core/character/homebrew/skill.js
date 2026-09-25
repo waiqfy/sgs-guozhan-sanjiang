@@ -20974,7 +20974,10 @@ export default {
 			if (player.countCards("he", card => card.hasGaintag("niji"))) {
 				await player.chooseToUse({
 					filterCard(card) {
-						return card.hasGaintag("niji");
+						// chooseToUse探测阶段(checkSkipped/arrangeTrigger)可能拿非真实
+						// Card对象的候选项来试探这个filterCard，直接调用hasGaintag会崩溃
+						// 并拖累同批次其他技能触发，先判断方法存在
+						return !!card?.hasGaintag && card.hasGaintag("niji");
 					},
 					prompt: get.prompt2("niji"),
 					complexSelect: false,
