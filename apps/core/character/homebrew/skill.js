@@ -10269,7 +10269,10 @@ export default {
 	},
 
 // ========== yujin 于禁 ==========
-	// 节钺：准备阶段，你可以交给不为魏势力的一名角色一张手牌，然后令其执行一次“军令”。若其执行，你摸一张牌；若其不执行，你本回合的摸牌阶段多摸三张牌。 参考gz_jieyue
+	// 节钺：准备阶段，你可以交给一名与你势力不同的角色一张手牌，然后令其执行一次”军令”。若其执行，你摸一张牌；若其不执行，你本回合的摸牌阶段多摸三张牌。 参考gz_jieyue
+	// 之前写死了”不为魏势力”(current.group != “wei”)——但描述是”与你势力不同”，是相对
+	// 玩家自己当前势力判断的，不是写死魏。于禁一旦变节/野心家等导致自己势力不再是wei，
+	// 之前的写法就会判断错。改用项目里统一的diffGroup(a,b)(处理暗置/野心家等边界情况)
 	jieyue: {
 		skillAnimation: true,
 		animationColor: "water",
@@ -10281,7 +10284,7 @@ export default {
 			return (
 				player.countCards("h") > 0 &&
 				game.hasPlayer(function (current) {
-					return current != player && current.group != "wei";
+					return current != player && diffGroup(current, player);
 				})
 			);
 		},
@@ -10293,7 +10296,7 @@ export default {
 					position: "h",
 					filterCard: true,
 					filterTarget(card, player, target) {
-						return target.group != "wei" && target != player;
+						return diffGroup(target, player) && target != player;
 					},
 					ai1(card, player, target) {
 						if (get.attitude(player, target) > 0) {
