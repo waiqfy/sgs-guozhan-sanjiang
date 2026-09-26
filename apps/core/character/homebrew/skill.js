@@ -17328,24 +17328,20 @@ export default {
 				.forResult();
 		},
 		popup: false,
-		// 之前"孤军判定摸牌"是拆成一个单独的keshou_draw子技能，挂在{player:"loseAfter",
+		// 之前"孤军摸牌"是拆成一个单独的keshou_draw子技能，挂在{player:"loseAfter",
 		// global:"loseAsyncAfter"}这种弃牌相关事件上，跟"受到伤害"这个真正的发动时机完全
-		// 脱节——弃两张牌造成伤害-1这一步跟"孤军判定摸牌"应该是同一次发动里紧接着的两步，
-		// 不该靠监听"弃牌"这个副作用事件来间接触发(而且这个监听条件本身大概率也从来没有
-		// 真正满足过，导致判定摸牌这一步实际上从没发生过)。照官方_merged_skill_all.md的
-		// keshou(非fake版)结构，把判定摸牌合并回同一个content里，紧接着弃牌减伤那一步之后
+		// 脱节——弃两张牌造成伤害-1这一步跟"孤军摸牌"应该是同一次发动里紧接着的两步，不该
+		// 靠监听"弃牌"这个副作用事件来间接触发(而且这个监听条件本身大概率也从来没有真正
+		// 满足过，导致这一步实际上从没发生过)。合并回同一个content里，紧接着弃牌减伤那一步
+		// 之后执行。注意：官方_merged_skill_all.md里的keshou这一步是"进行判定，若为红色才
+		// 摸牌"，但咱们自己的keshou_info写的是"孤军：你摸一张牌"，没有判定这个环节——按咱们
+		// 自己的描述来，不要为了对齐官方机制反而改出跟描述不符的效果
 		async content(event, trigger, player) {
 			if (event.result?.bool && event.result.cards?.length) {
 				trigger.num--;
 			}
 			if (!player.isUnseen() && !game.hasPlayer(current => current != player && current.isFriendOf(player))) {
-				const judgeResult = await player
-					.judge(card => (get.color(card) == "red" ? 1 : 0))
-					.set("prompt2", "恪守：进行一次判定，若为红色，你摸一张牌")
-					.forResult();
-				if (judgeResult.judge > 0) {
-					await player.draw();
-				}
+				await player.draw();
 			}
 		},
 	},
