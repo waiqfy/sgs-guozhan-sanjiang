@@ -21653,7 +21653,12 @@ export default {
 		audio: "chulao",
 		enable: "phaseUse",
 		usable: 1,
-		filterCard(card, player) {
+		// 之前用的是filterCard——在没有viewAs的enable:"phaseUse"技能上，filterCard会让
+		// 引擎走"选牌confirm"的通用流程,等于发动这个技能之前先强制选一张牌，然后content()
+		// 里才轮到"选择一项"。但描述是"你可以选择一项：1.../2..."——应该先选分支，各分支
+		// 弃什么牌是分支自己内部决定的，不该在发动前就先弃一次。改成单纯判断"能不能发动"
+		// 的filter，不再触发提前选牌
+		filter(event, player) {
 			return player.countCards("he") > 0;
 		},
 		async content(event, trigger, player) {
