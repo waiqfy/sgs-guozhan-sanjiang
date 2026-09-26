@@ -13787,8 +13787,10 @@ export default {
 		audioname2: { new_simayi: "reguicai_new_simayi" },
 		trigger: { global: "judge" },
 		preHidden: true,
+		// 描述是"打出一张牌"，没有限制手牌——之前用的"hs"是手牌+特殊区(木牛流马牌的位置)，
+		// 根本不包括装备区，跟"包括装备"的要求对不上。改成"he"(手牌+装备区)
 		filter(event, player) {
-			return player.hasCards("hs");
+			return player.hasCards("he");
 		},
 		async cost(event, trigger, player) {
 			event.result = await player
@@ -13806,7 +13808,7 @@ export default {
 						}
 						return true;
 					},
-					position: "hs",
+					position: "he",
 					ai(card) {
 						const trigger = get.event().getTrigger();
 						const { player, judging } = get.event();
@@ -17321,46 +17323,25 @@ export default {
 				.forResult();
 		},
 		popup: false,
+		// 之前"孤军判定摸牌"是拆成一个单独的keshou_draw子技能，挂在{player:"loseAfter",
+		// global:"loseAsyncAfter"}这种弃牌相关事件上，跟"受到伤害"这个真正的发动时机完全
+		// 脱节——弃两张牌造成伤害-1这一步跟"孤军判定摸牌"应该是同一次发动里紧接着的两步，
+		// 不该靠监听"弃牌"这个副作用事件来间接触发(而且这个监听条件本身大概率也从来没有
+		// 真正满足过，导致判定摸牌这一步实际上从没发生过)。照官方_merged_skill_all.md的
+		// keshou(非fake版)结构，把判定摸牌合并回同一个content里，紧接着弃牌减伤那一步之后
 		async content(event, trigger, player) {
-			trigger.num--;
-		},
-		group: "keshou_draw",
-		subSkill: {
-			draw: {
-				audio: "keshou",
-				trigger: {
-					player: "loseAfter",
-					global: "loseAsyncAfter",
-				},
-				filter(event, player) {
-					if (event.type != "discard" || event.getlx === false) {
-						return false;
-					}
-					if (
-						!(
-							!player.isUnseen() &&
-							!game.hasPlayer(current => {
-								return current != player && current.isFriendOf(player);
-							})
-						)
-					) {
-						return false;
-					}
-					const evt = event.getl(player);
-					return evt && evt.cards2 && evt.cards2.length > 1;
-				},
-				prompt2: "进行一次判定，若为红色，则你摸一张牌",
-				async content(event, trigger, player) {
-					const result = await player
-						.judge(card => {
-							return get.color(card) == "red" ? 1 : 0;
-						})
-						.forResult();
-					if (result.judge > 0) {
-						await player.draw();
-					}
-				},
-			},
+			if (event.result?.bool && event.result.cards?.length) {
+				trigger.num--;
+			}
+			if (!player.isUnseen() && !game.hasPlayer(current => current != player && current.isFriendOf(player))) {
+				const judgeResult = await player
+					.judge(card => (get.color(card) == "red" ? 1 : 0))
+					.set("prompt2", "恪守：进行一次判定，若为红色，你摸一张牌")
+					.forResult();
+				if (judgeResult.judge > 0) {
+					await player.draw();
+				}
+			}
 		},
 	},
 
@@ -22890,7 +22871,13 @@ export default {
 					return player.isFriendOf(event.player) && ui.cardPile.firstChild;
 				},
 				async content(_event, _trigger, player) {
-					const result = await player.chooseBool("是否展示牌堆顶一张牌，将其置于武将牌上作为“千幻”？").forResult();
+					// 之前这个chooseBool完全没给ai提示，默认走保守的"不发动"，导致AI永远不会
+					// 攒"千幻"标记——没有标记，后面"use"子技能自然也就从来没东西可用。收集标记
+					// 本身没有代价，直接给个正面ai
+					const result = await player
+						.chooseBool("是否展示牌堆顶一张牌，将其置于武将牌上作为“千幻”？")
+						.set("ai", () => true)
+						.forResult();
 					if (!result.bool) {
 						return;
 					}
