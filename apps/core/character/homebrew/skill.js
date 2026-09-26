@@ -14381,19 +14381,34 @@ export default {
 	shijiu: {
 		aiShowTag: "support",
 		audio: 2,
-		trigger: { player: "showCharacterAfter" },
+		// 找到了国战官方同款设计(libnoname/noname PR#4368, gz_ol_jiushi)，文本和咱们的
+		// 描述基本一致，说明当初这个"全新设计"其实就是照着这套官方国战版本写的。差的是
+		// content的实现方式——官方用current.chooseUseTarget(vcard, true)，这是本项目
+		// 已经确认过的"强制使用指定牌"标准写法；之前这里直接用current.useCard(card, current)，
+		// 跳过了chooseUseTarget自己的一整套目标确定/使用流程，导致"视为使用"没有真正走完
+		// 【酒】卡的完整效果链，加成没生效。改成chooseUseTarget，filter也改用hasUseTarget
+		// (官方同款，判断"这张牌有没有合法目标可用"，而不是canUse(card, current)这种针对
+		// 单个候选目标的判断)
+		trigger: { player: "showCharacterEnd" },
 		filter(event, player) {
 			const current = _status.currentPhase;
-			return !!(current && current.isIn() && current.canUse({ name: "jiu", isCard: true }, current));
+			if (!current?.isIn()) {
+				return false;
+			}
+			const card = new lib.element.VCard({ name: "jiu", isCard: true });
+			return current.hasUseTarget(card);
 		},
 		async cost(event, trigger, player) {
 			const current = _status.currentPhase;
-			event.result = await player.chooseBool(`诗酒：是否令${get.translation(current)}视为使用一张【酒】？`).forResult();
+			event.result = await player
+				.chooseBool(`诗酒：是否令${get.translation(current)}视为使用一张【酒】？`)
+				.set("ai", () => true)
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			const current = _status.currentPhase;
-			if (current.isIn() && current.canUse({ name: "jiu", isCard: true }, current)) {
-				await current.useCard({ name: "jiu", isCard: true }, current);
+			if (current?.isIn()) {
+				await current.chooseUseTarget(new lib.element.VCard({ name: "jiu", isCard: true }), true);
 			}
 		},
 		group: "shijiu_recast",
