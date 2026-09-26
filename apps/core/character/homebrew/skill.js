@@ -4176,6 +4176,24 @@ export default {
 		filter(event, player) {
 			return event.player != player && player.countCards("he") > 0 && !player.storage.xuanhuo_locked;
 		},
+		// 这个技能没有cost，"是否发动"完全交给引擎默认的是否发动询问；AI这一步实际吃的是
+		// check()，不是ai.result.player(那个更多是"多个候选目标里怎么选"的打分，这里目标
+		// 是trigger.player定死的，没有选择余地)。之前只在ai.result.player里写了"等队友"的
+		// 逻辑，没有对应的check()，AI很可能压根没走到那段判断就已经决定发动了。这里补一份
+		// 同样逻辑的check()，确保"对敌人不要着急，等等看后面有没有队友"真正生效
+		check(event, player) {
+			const target = event.player;
+			const isAlly = t => (player.identity == "ye" || t.identity == "ye" ? sameGroup(t, player) : t.group == player.group);
+			if (isAlly(target)) {
+				return true;
+			}
+			for (let p = target.getNext(); p != player; p = p.getNext()) {
+				if (p.isIn() && isAlly(p)) {
+					return target.countCards("h", card => get.name(card) == "tao") > 0;
+				}
+			}
+			return true;
+		},
 		subSkill: {
 			reset: {
 				sub: true,
@@ -21623,10 +21641,20 @@ export default {
 					if (get.attitude(target, player) >= 0) {
 						return list[0];
 					}
-					if (player.countCards("e") > 0) {
+					// 选项3(给一张装备牌换视为对士燮无距离次数限制使用一杀)对敌对目标来说
+					// 通常比"弃装备+自损1点体力"更划算——能直接造成伤害，优先考虑
+					if (list.length > 2) {
+						const hasGoodEquip = target.getCards("he", card => get.type(card) == "equip" && get.value(card, target) > 0).length > 0;
+						if (hasGoodEquip && get.effect(target, { name: "sha" }, player, target) > 0) {
+							return list[2];
+						}
+					}
+					// 选项2要自己付出1点体力代价，之前只要士燮有装备就无脑选，完全不考虑自己
+					// 掉血划不划算——只有士燮装备区确实有值得弃的牌、且自己血量还承受得起时才选
+					if (target.hp > 1 && player.countCards("e", card => get.value(card, player) > 0) > 0) {
 						return list[1];
 					}
-					return list[Math.floor(Math.random() * list.length)];
+					return list[0];
 				})
 				.forResult();
 			const choice = list.indexOf(result.control);
@@ -27451,7 +27479,11 @@ export default {
 				.chooseToGive(target, "h", true, `谗逆：选择至少一张手牌交给${get.translation(target)}`, [1, player.countCards("h")])
 				.set("ai", card => (target.isFriendOf(player) ? 10 - get.value(card) : -1))
 				.forResult();
-			if (!target.isIn() || !target.countCards("h") || !target.canUse({ name: "juedou", isCard: true }, null, false)) {
+			// canUse(card, target, distance, includecard)——target传null、distance传false
+			// 完全用错了参数位置(想传的是"不计入使用次数"应该是第4个includecard参数，结果
+			// 传成了第3个distance)，而且判断"能不能用决斗"根本不该指定单个target，应该用
+			// hasUseTarget(有没有任意合法目标)，这也是本项目其他地方(dcniji等)的标准写法
+			if (!target.isIn() || !target.countCards("h") || !target.hasUseTarget({ name: "juedou", isCard: true })) {
 				return;
 			}
 			const dealtBefore = target.getHistory("sourceDamage").length;
