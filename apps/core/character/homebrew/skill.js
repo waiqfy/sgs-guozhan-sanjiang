@@ -10860,9 +10860,14 @@ export default {
 
 // ========== guohuai 郭淮 ==========
 	// 精策：回合结束时，若你本回合使用过至少X张牌，你可以选择一项：1.执行一个额外的摸牌阶段；2.执行一个额外的出牌阶段。若你本回合使用过至少X种花色的牌，改为你可以依次执行所有项（X为你的体力值）。 参考jingce(yijiang)
+	// 官方guozhan参考(_merged_skill_all.md的gzjingce)用的是trigger:{player:"phaseEnd"}，
+	// 不是"phaseAfter"——"phaseEnd"在"phase"这个事件还没真正结束、仍处于活跃状态时就触发，
+	// insertPhase()内部靠_status.event.getParent("phase")去找父级phase事件来插入新阶段，
+	// 需要这个phase事件还在活跃链上；"phaseAfter"要等整个phase事件彻底跑完才触发，这时
+	// 再插入额外阶段很可能已经找不到有效的挂载点了，这正是"技能无效"的原因。改成phaseEnd
 	jingce: {
 		audio: 2,
-		trigger: { player: "phaseAfter" },
+		trigger: { player: "phaseEnd" },
 		filter(event, player) {
 			return player.countUsed(null, true) >= player.hp;
 		},
