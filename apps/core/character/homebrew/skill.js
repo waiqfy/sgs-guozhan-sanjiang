@@ -7999,16 +7999,21 @@ export default {
 								.sortBySeat()
 						: event.player;
 				},
+				// 之前两个分支都读event.targets——"phaseEnd"是个普通阶段事件，根本没有跟"我镇骨
+				// 了谁"相关的targets字段，这个属性要么是undefined要么是从别处(比如祖先事件)
+				// 顺出来的不相干数据，导致镇骨的对象跟本该操作的目标对不上(表现为"另一个座位
+				// 也莫名被镇骨了")。真正记录"镇骨了谁"的数据源是player.getStorage(event.name)，
+				// filter和logTarget两处已经在这么用了，content也改成一致的读法
 				async content(event, trigger, player) {
 					if (player == trigger.player) {
-						for (const target of event.targets.sortBySeat()) {
+						for (const target of player.getStorage(event.name).sortBySeat()) {
 							if (!target.isIn()) {
 								continue;
 							}
 							await lib.skill.drlt_zhengu.sync(player, target);
 						}
 					} else {
-						const target = event.targets[0];
+						const target = event.player;
 						player.unmarkAuto(event.name, [target]);
 						if (!player.getStorage(event.name).length) {
 							player.removeSkill(event.name);
@@ -22902,10 +22907,14 @@ export default {
 					return event.target && player.isFriendOf(event.target) && event.targets.length == 1 && player.getExpansions("qianhuan").length > 0;
 				},
 				async cost(event, trigger, player) {
+					// 之前ai判断的是"于吉对trigger.target(被指定的盟友)的好感是不是负的"——
+					// 但filter已经要求了player.isFriendOf(event.target)，对方是盟友的情况下
+					// 这个好感度基本不可能是负数，等于按钮的ai分数恒定接近0，导致AI从不发动。
+					// 真正该判断的是"这张即将命中盟友的牌对盟友有没有害"，有害才值得消耗标记
 					const result = await player
 						.chooseButton([get.prompt("qianhuan"), player.getExpansions("qianhuan")])
 						.set("ai", function (button) {
-							return get.attitude(get.player(), trigger.target) < 0 ? 1 : 0;
+							return get.effect(trigger.target, trigger.card, trigger.player, trigger.target) < 0 ? 1 : 0;
 						})
 						.forResult();
 					event.result = {
