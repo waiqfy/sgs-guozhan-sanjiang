@@ -4169,7 +4169,10 @@ export default {
 		skillAnimation: true,
 		animationColor: "soil",
 		audio: 2,
-		trigger: { player: "phaseUseBegin" },
+		// 之前trigger用的是{player:"phaseUseBegin"}——这个scope要求event.player==player(自己
+		// 的出牌阶段)，但filter又要求event.player!=player(别人的出牌阶段)，两者互相矛盾，
+		// 导致这个技能永远不可能触发。描述是"其他角色的出牌阶段开始时"，改成global
+		trigger: { global: "phaseUseBegin" },
 		filter(event, player) {
 			return event.player != player && player.countCards("he") > 0 && !player.storage.xuanhuo_locked;
 		},
