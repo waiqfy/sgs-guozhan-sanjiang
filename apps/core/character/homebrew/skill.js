@@ -1143,7 +1143,24 @@ export default {
 		content() {
 			"step 0";
 			if (trigger.name == "gameStart") {
-				player.chooseBool(get.prompt("wuhun"), "是否明置此武将牌？").set("ai", () => Math.random() > 0.5);
+				player
+					.chooseBool(get.prompt("wuhun"), "是否明置此武将牌？")
+					// gz3: 原来是无条件五五开，完全没考虑势力名额够不够——游戏一开始势力局势
+					// 还没展开，随手就有一半概率把自己亮成会被直接挤成野心家的结果，跟国战里
+					// 其他"要不要明置"的判断（bumingzhi/_mingzhi2/chiling）不是一套逻辑，也是
+					// "开局莫名其妙亮将"的来源之一。改成跟那几处一致：亮出来不安全时基本不亮，
+					// 安全且已经有队友在外面时才愿意亮。
+					.set("ai", () => {
+						if (!player.wontYe()) {
+							return Math.random() < 0.05;
+						}
+						var group = lib.character[player.name1][1];
+						var popu = get.population(group);
+						if (popu >= 2 || (popu == 1 && game.players.length <= 4)) {
+							return true;
+						}
+						return Math.random() < 0.3;
+					});
 			} else {
 				trigger.source.addTempSkill("wuhun_ban");
 				event.finish();
@@ -17340,7 +17357,10 @@ export default {
 			if (event.result?.bool && event.result.cards?.length) {
 				trigger.num--;
 			}
-			if (!player.isUnseen() && !game.hasPlayer(current => current != player && current.isFriendOf(player))) {
+			// "孤军"只看"有没有同势力的人"，不要求自己已经明置——技能本身preHidden:true，
+			// 就是允许暗置时也能触发。且isFriendOf对未确定身份的一方本来就恒定返回false，
+			// 所以player暗置时这个hasPlayer判断天然就是"没有队友"，不用再额外判断isUnseen
+			if (!game.hasPlayer(current => current != player && current.isFriendOf(player))) {
 				await player.draw();
 			}
 		},
