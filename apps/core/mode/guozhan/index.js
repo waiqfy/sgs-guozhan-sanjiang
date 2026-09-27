@@ -45,6 +45,7 @@ export default {
 	// 模式的其余内容（诸如武将等级）
 	aozhanRank: info.rank.aozhan,
 	guozhanRank: info.rank.guozhan,
+	guozhanType: info.type.type,
 
 	// 特定配置下所需要的内容
 	junList: info.junList,

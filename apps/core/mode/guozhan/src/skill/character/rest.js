@@ -18911,24 +18911,35 @@ export default {
 						var viceGroup = lib.character[player.name2][1];
 						var mainSafe = player.wontYe(mainGroup);
 						var viceSafe = mainGroup == viceGroup ? mainSafe : player.wontYe(viceGroup);
+						// gz3: 不安全（人数超编，会被直接判野心家）不等于差——野心家本身有额外
+						// 奖励，比"安全但一个队友都没有、纯孤家寡人"还要好，只是不如"真的加入了
+						// 有队友的势力"理想。三档打分：有队友的安全选项最高，判野心家居中，安全
+						// 但没队友的垫底。
+						function scoreOfControl(safe, group) {
+							if (safe) {
+								var popu = get.population(group);
+								return popu > 0 ? 10 + popu : 0;
+							}
+							return 5;
+						}
 						function pickControl() {
 							if (mainGroup == viceGroup) {
 								return Math.random() < 0.5 ? 3 : 1;
 							}
-							if (viceSafe && (!mainSafe || get.population(viceGroup) > get.population(mainGroup))) {
-								return 2;
-							}
-							if (mainSafe) {
-								return Math.random() < 0.5 ? 3 : 1;
-							}
-							return 2;
+							// gz3: 主副权重一样，不能"先看主将行不行，不行才轮到副将"——两边用同一套
+							// 标准各自打分，再直接比大小，谁都不占"先手"优势。
+							var mainScore = scoreOfControl(mainSafe, mainGroup);
+							var viceScore = scoreOfControl(viceSafe, viceGroup);
+							return viceScore > mainScore ? 2 : Math.random() < 0.5 ? 3 : 1;
 						}
 						// gz3: 亮出来会被直接挤成野心家时，宁愿再等等看后面还有没有真队友，不能
 						// 因为"己方公开人数已经不少"（下面的 popu 判断）就无脑往上冲——popu 大
 						// 恰恰经常就是名额已经满了、亮出来会被判野的时候。只留一个很小的概率，
-						// 给"实在等不了"的极端情况兜底。
+						// 给"实在等不了"的极端情况兜底。这个概率还要按武将定位调一调：过牌型
+						// 更该沉住气藏着攒资源，爆发型更值得赌一把（get.revealBias）。
+						var bias = get.revealBias(player.name1);
 						if (!mainSafe && !viceSafe) {
-							return Math.random() < 0.05 ? pickControl() : 0;
+							return Math.random() < 0.05 * bias ? pickControl() : 0;
 						}
 						var popu = get.population(lib.character[player.name1][1]);
 						if (popu >= 2 || (popu == 1 && game.players.length <= 4)) {
@@ -18938,7 +18949,7 @@ export default {
 							return 0;
 						}
 						if (get.population(group) > 0) {
-							return Math.random() < 0.2 ? pickControl() : 0;
+							return Math.random() < 0.2 * bias ? pickControl() : 0;
 						}
 						var nming = 0;
 						for (var i = 0; i < game.players.length; i++) {
@@ -18947,9 +18958,9 @@ export default {
 							}
 						}
 						if (nming == game.players.length - 1) {
-							return Math.random() < 0.5 ? pickControl() : 0;
+							return Math.random() < 0.5 * bias ? pickControl() : 0;
 						}
-						return Math.random() < (0.1 * nming) / game.players.length ? pickControl() : 0;
+						return Math.random() < ((0.1 * nming) / game.players.length) * bias ? pickControl() : 0;
 					})
 					.forResult();
 				control = result.control;
@@ -19024,9 +19035,11 @@ export default {
 					}
 					// gz3: 会被直接挤成野心家的话，宁愿再等等看后面还有没有真队友，不要为了用
 					// 一个技能就贸然把自己搭进去变野——技能本身标了愿意亮（上面 ai.mingzhi/
-					// ai.maixie）的场景已经优先处理过了。
+					// ai.maixie）的场景已经优先处理过了。这个概率按武将定位调整（get.revealBias）：
+					// 过牌型更该沉住气，爆发型更值得赌一把。
+					const bias = get.revealBias(player.name1);
 					if (!player.wontYe()) {
-						return Math.random() < 0.05;
+						return Math.random() < 0.05 * bias;
 					}
 					// gz3: 原来这里有个不管技能值不值、队友情况如何都先五五开的判断，导致随便
 					// 一个不起眼的暗置技能（比如单纯换手牌这种）想触发，AI 就有一半概率在别人
@@ -19039,7 +19052,7 @@ export default {
 						return true;
 					}
 					if (get.population(group) > 0) {
-						return Math.random() < 0.2 ? true : false;
+						return Math.random() < 0.2 * bias ? true : false;
 					}
 					let nming = 0;
 					for (let i = 0; i < game.players.length; i++) {
@@ -19048,9 +19061,9 @@ export default {
 						}
 					}
 					if (nming == game.players.length - 1) {
-						return Math.random() < 0.5 ? true : false;
+						return Math.random() < 0.5 * bias ? true : false;
 					}
-					return Math.random() < (0.1 * nming) / game.players.length ? true : false;
+					return Math.random() < ((0.1 * nming) / game.players.length) * bias ? true : false;
 				})();
 				if (bool1 && bool2) {
 					event.name1 = player.name1;
@@ -19062,9 +19075,11 @@ export default {
 							if (!choice) {
 								return 0;
 							}
-							// gz3: 主副将可能不同势力，选亮哪个直接决定最终身份是哪个势力，不能没
-							// 有偏好地都给1分——优先选人多的那个势力，安不安全（会不会被挤成野
-							// 心家）优先级更高：这个选项会被挤野、另一个选项不会时，就别选这个。
+							// gz3: 主副将可能不同势力，选亮哪个直接决定最终身份是哪个势力。主副权重
+							// 一样，两个按钮各自只按"这个选项本身安不安全、有几个真队友"打分，引擎会
+							// 直接比较两个按钮的分数高低，不存在谁先手、谁只是"对面不行才轮到我"的
+							// 问题。不安全（会被直接判野心家）不等于差——野心家本身有额外奖励，比
+							// "安全但没队友"还要好，只是不如"真的加入了有队友的势力"理想。
 							var mainGroup = lib.character[player.name1][1];
 							var viceGroup = lib.character[player.name2][1];
 							if (mainGroup == viceGroup) {
@@ -19072,11 +19087,12 @@ export default {
 							}
 							var isMain = button.link == player.name1;
 							var group = isMain ? mainGroup : viceGroup;
-							var otherGroup = isMain ? viceGroup : mainGroup;
-							if (!player.wontYe(group) && player.wontYe(otherGroup)) {
-								return 0;
+							var safe = player.wontYe(group);
+							if (!safe) {
+								return 5;
 							}
-							return 1 + Math.max(0, get.population(group) - get.population(otherGroup));
+							var popu = get.population(group);
+							return popu > 0 ? 10 + popu : 0;
 						})
 						.set("choice", choice)
 						.forResult();

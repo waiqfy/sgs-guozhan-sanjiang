@@ -125,17 +125,17 @@ export class GetGuozhan extends Get {
 		if (get.is.double(name2)) {
 			return false;
 		}
-		if (["gz_xunyou", "gz_lvfan", "gz_liubei"].includes(name2)) {
+		if (["xunyou", "lvfan", "liubei"].includes(name2)) {
 			return true;
 		}
-		if (name1 == "gz_re_xushu") {
+		if (name1 == "re_xushu") {
 			return true;
 		}
-		if (name2 == "gz_dengai") {
+		if (name2 == "dengai") {
 			return lib.character[name1][2] % 2 == 1;
 		}
-		if (["gz_sunce", "gz_jiangwei"].includes(name1)) {
-			return name2 == "gz_zhoutai" || lib.character[name2][2] % 2 == 1;
+		if (["sunce", "jiangwei"].includes(name1)) {
+			return name2 == "zhoutai" || lib.character[name2][2] % 2 == 1;
 		}
 		return false;
 	}
@@ -175,6 +175,38 @@ export class GetGuozhan extends Get {
 			}
 		}
 		return 0;
+	}
+
+	/**
+	 * 获取武将的国战定位（防御/爆发/过牌），跟 guozhanRank（强弱）是两套独立的表，
+	 * 数据来自 info/type.js。没被收录的武将统一算 "mixed"（不偏不倚，不影响判断）。
+	 *
+	 * @param {string} name
+	 * @returns {"fangyu"|"baofa"|"guopai"|"mixed"}
+	 */
+	guozhanType(name) {
+		for (var i in lib.guozhanType) {
+			if (lib.guozhanType[i].includes(name)) {
+				return i;
+			}
+		}
+		return "mixed";
+	}
+
+	/**
+	 * 根据武将定位调整"要不要冒险明置组队"的意愿：过牌型更该藏着攒资源，
+	 * 爆发型更值得为了一个机会去搏一把，防御型略保守，mixed/没分类的不受影响。
+	 * 用法：把原来写死的随机阈值（比如 0.05）乘上这个系数。
+	 *
+	 * @param {string} name
+	 * @returns {number}
+	 */
+	revealBias(name) {
+		var t = get.guozhanType(name);
+		if (t == "guopai") return 0.5;
+		if (t == "baofa") return 1.5;
+		if (t == "fangyu") return 0.8;
+		return 1;
 	}
 
 	/**

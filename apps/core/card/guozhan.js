@@ -1035,8 +1035,11 @@ export default {
 				// 不能因为己方公开人数已经不少（下面的 popu 判断）就无脑去亮——
 				// popu 大恰恰经常就是名额已经满了、亮出来会被判野的时候，这时候
 				// 弃装备/掉血反而是更划算的选择。
+				// gz3: 这个明置意愿也按武将定位调一调（get.revealBias）：过牌型更该沉住气，
+				// 爆发型更值得赌一把去搏组队机会；概率封顶 0.95，避免爆发型直接变成必亮。
+				const bias = get.revealBias(player.name1);
 				if (!player.wontYe()) {
-					return Math.random() < 0.05 ? "选项一" : "选项二";
+					return Math.random() < Math.min(0.95, 0.05 * bias) ? "选项一" : "选项二";
 				}
 				const group = lib.character[player.name1][1];
 				const popu = get.population(group);
@@ -1044,9 +1047,9 @@ export default {
 					return "选项一";
 				}
 				if (popu > 0) {
-					return Math.random() < 0.8 ? "选项一" : "选项二";
+					return Math.random() < Math.min(0.95, 0.8 * bias) ? "选项一" : "选项二";
 				}
-				return Math.random() < 0.5 ? "选项一" : "选项二";
+				return Math.random() < Math.min(0.95, 0.5 * bias) ? "选项一" : "选项二";
 			},
 			async content(event, trigger, player) {
 				const target = event.target;

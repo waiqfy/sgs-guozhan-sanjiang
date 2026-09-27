@@ -1,0 +1,35 @@
+export const type = {
+	fangyu: [
+		"beimihu", "bianfuren", "bulianshi", "caochong", "caohong", "chengyu", "daqiao", "dongyun", "dongzhuo",
+		"fuhuanghou", "ganfuren", "haozhao", "huanghao", "huatuo", "huaxiong", "kongrong", "liubei", "liushan", "luji",
+		"luxun", "luyusheng", "manchong", "mengda", "menghuo", "mifuren", "pangtong", "qinmi", "shixie", "sunluyu",
+		"taoqian", "wangping", "wangyi", "wenpin", "wuguotai", "wujing", "xiaoqiao", "xinxianying", "xizhicai", "xushu",
+		"yangxiu", "yangyi", "yanyan", "yuji", "zhoutai", "zhugeliang", "zhurong", "zhuzhi", "zongyu",
+	],
+	baofa: [
+		"caomao", "chendao", "chendong", "chengong", "chengpu", "dianwei", "diaochan", "dingfeng", "fengxi", "fushiren",
+		"gaoshun", "guanping", "guanqiujian", "guanxing", "guanyinping", "guanyu", "handang", "hanhaoshihuan", "hansui",
+		"hejin", "hetaihou", "huangfusong", "huanggai", "huangzhong", "huangzu", "jiangqing", "jiangwei", "jiaxu",
+		"jiling", "liqueguosi", "liru", "liubiao", "liuchen", "liuyan", "lvbu", "lvdai", "lvlingqi", "machao", "madai",
+		"maliang", "masu", "meifang", "miheng", "niujin", "panfeng", "pangde", "panzhangmazhong", "pengyang", "quyi",
+		"simashi", "sunce", "sunluban", "sunru", "taishici", "tianyu", "wangyun", "weiyan", "wenyang", "wuyi", "xiahouba",
+		"xiahoudun", "xiahouyuan", "xugong", "xunchen", "xunyu", "xurong", "xusheng", "xuzhu", "yanbaihu",
+		"yanliangwenchou", "yl_luzhi", "yuanshao", "zangba", "zhangbao", "zhangchunhua", "zhangfei", "zhangjiao",
+		"zhangren", "zhangxingcai", "zhangxiu", "zhoucang", "zhouchu", "zhugeke", "zoushi",
+	],
+	guopai: [
+		"buzhi", "caifuren", "caoang", "caocao", "caofang", "caopi", "caoren", "caorui", "caozhen", "caozhi", "cuimao",
+		"dengai", "dengzhi", "dongzhao", "duyu", "ganning", "guohuai", "guojia", "huangyueying", "jiachong", "jianggan",
+		"jiangwanfeiyi", "jianyong", "kanze", "liaohua", "lidian", "lifeng", "lingtong", "liuba", "liubian", "liuqi",
+		"liuxie", "liuzan", "longyufei", "lukang", "lusu", "luzhi", "lvfan", "lvmeng", "mateng", "mizhu", "panjun",
+		"quancong", "shamoke", "simaliang", "simayi", "simazhao", "sunchen", "sundeng", "sunhao", "sunhuan", "sunjian",
+		"sunquan", "sunshangxiang", "sunxiu", "sunyi", "wangji", "wanglang", "xuezong", "xuhuang", "xunyou", "xuyou",
+		"yanfuren", "yangwan", "yj_jushou", "yuanshu", "yuejin", "zhanghe", "zhangliao", "zhanglu", "zhangsong",
+		"zhangyi", "zhangzhang", "zhaotongguang", "zhenji", "zhonghui", "zhoufang", "zhouyi", "zhouyu", "zhugedan",
+		"zhugejin", "zhugezhan", "zhuran", "zumao", "zuoci",
+	],
+	mixed: [
+		"caiwenji", "caoshuang", "fazheng", "huaxin", "jiananfeng", "koufeng", "liuhong", "liuzhang", "sunjun",
+		"sunliang", "tianfeng", "xushao", "yanghu", "yujin", "zhaoyun",
+	],
+};
