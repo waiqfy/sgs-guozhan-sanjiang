@@ -15574,19 +15574,18 @@ export default {
 		subSkill: {
 			after: {
 				charlotte: true,
-				// insertPhase()内部靠_status.event.getParent("phase")找一个还活着的祖先"phase"事件来插入，
-				// phaseAfter要等目标的phase事件完全结束、从事件链上摘除之后才触发，那时已经找不到祖先"phase"了，
-				// insertPhase()等于白调用——player永远拿不到自己的回合。改成phaseEnd（phase事件还在处理中）
-				trigger: { global: "phaseEnd" },
+				// 官方无双廉颇的gz_lianpo(apps/core/mode/guozhan/src/skill/character/wushuang.js)
+				// 就是trigger:{global:"phaseAfter"}配合player.insertPhase()（不带参数）实现"额外回合"，
+				// 且同样是不限定event.player是不是自己、可以在别人回合触发——跟这里的场景完全一致，
+				// 照抄这个已确认能用的官方写法
+				trigger: { global: "phaseAfter" },
 				forced: true,
 				popup: false,
 				filter(event, player) {
-					console.log("[duojing_after filter check] this player seat=", player.playerid, "phaseEnd owner seat=", event.player?.playerid, "stored target seat=", player.storage.duojing_target?.playerid, "hasSkill=", player.hasSkill("duojing_after"));
 					return event.player === player.storage.duojing_target;
 				},
 				async content(event, trigger, player) {
-					console.log("[duojing_after] MATCHED, granting extra phase to seat=", player.playerid);
-					player.insertPhase(null, true);
+					player.insertPhase();
 					delete player.storage.duojing_target;
 					player.removeSkill("duojing_after");
 					player.removeSkill("duojing");
