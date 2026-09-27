@@ -15585,7 +15585,7 @@ export default {
 					return event.player === player.storage.duojing_target;
 				},
 				async content(event, trigger, player) {
-					player.insertPhase();
+					player.insertPhase().set("phaseList", ["phaseUse"]);
 					delete player.storage.duojing_target;
 					player.removeSkill("duojing_after");
 					player.removeSkill("duojing");
