@@ -21760,15 +21760,10 @@ export default {
 				}
 				await player.discard(cardResult.cards);
 				for (const target of targets.targets) {
-					// 这里应该是华佗随机弃置对方的一张牌，不是让对方自己选/让华佗自己挑一张点选——
-					// 直接从he里随机取一张
 					if (target.countCards("he") > 0) {
-						const card = target.getCards("he").randomGet();
-						if (card) {
-							await target.discard(card);
-							if (get.suit(card) == "spade") {
-								drawList.push(target);
-							}
+						const result = await player.discardPlayerCard(target, "he", true).forResult();
+						if (result.bool && result.cards?.length && get.suit(result.cards[0]) == "spade") {
+							drawList.push(target);
 						}
 					}
 				}
