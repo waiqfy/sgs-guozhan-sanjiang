@@ -12373,6 +12373,20 @@ export default {
 		},
 		ai: {
 			threaten: 1.6,
+			order: 8,
+			result: {
+				// 限定技只能用一次，不能"能用就用"——留给"有敌人快死了、自己手牌不多(不怕被
+				// 连累弃牌/移出游戏)"这种明显划算的时机，不然大概率是浪费
+				player(player) {
+					if (player.countCards("h") > 3) {
+						return 0;
+					}
+					return game.hasPlayer(current => current != player && current.isEnemyOf(player) && current.hp <= 2) ? 1 : 0;
+				},
+				target(player, target) {
+					return get.attitude(player, target);
+				},
+			},
 		},
 	},
 
@@ -15352,6 +15366,14 @@ export default {
 			return get.color(card, player) === "red";
 		},
 		viewAs: { name: "yiyi" },
+		// viewAs默认应该会沿用以逸待劳本身的filterTarget/selectTarget(国战下是"对所有己方角色
+		// 自动使用"，selectTarget:-1)，但之前观察到的实际表现是只对自己生效，说明这条继承在
+		// enable:"phaseUse"+viewAs这条路径上没有可靠地拿到以逸待劳原本的目标设置。显式在
+		// 这里补一份一模一样的filterTarget/selectTarget，不依赖隐式继承
+		filterTarget(card, player, target) {
+			return target.isFriendOf(player);
+		},
+		selectTarget: -1,
 		check(card) {
 			return 5 - get.value(card);
 		},
@@ -26201,6 +26223,12 @@ export default {
 					}
 					let info = get.info(event.skill);
 					if (info.charlotte) {
+						return false;
+					}
+					// 描述是"访客的无类型标签技能"——锁定技不该算在内：锁定技本来就是无条件
+					// 自动发动、没有"是否发动"这个选择点，这里却弹窗询问"是否发动"，跟锁定技
+					// 的定义矛盾，之前漏了这个排除
+					if (get.is.locked(event.skill, player)) {
 						return false;
 					}
 					let skills = lib.skill.yingmen.getSkills(player.getStorage("yingmen"), player);
