@@ -15558,15 +15558,19 @@ export default {
 		async content(event, trigger, player) {
 			trigger.cancel();
 			player.storage.duojing_target = trigger.player;
-			console.log("[duojing] player seat=", player.playerid, "target seat=", trigger.player.playerid);
-			player.addTempSkill("duojing_after", { global: [] });
+			// 不能用group声明duojing_after——group声明的子技能只要玩家拥有duojing就永远挂着
+			// (跟fengying_grant那次踩过的坑一样)，那样一来player从游戏开始就一直"拥有"
+			// duojing_after，下面这句addTempSkill会因为"已经hasSkill"直接短路空跑，
+			// filter实际是靠一次很晚才补上的重新扫描才生效，结果匹配到的是player自己后面
+			// 某次phaseEnd而不是target那次。改成手动addSkill，交给子技能自己content里
+			// removeSkill掉
+			player.addSkill("duojing_after");
 		},
 		ai: {
 			order: 9,
 			result: { player: 1 },
 			threaten: 1.4,
 		},
-		group: "duojing_after",
 		subSkill: {
 			after: {
 				charlotte: true,
@@ -15580,11 +15584,7 @@ export default {
 					return event.player === player.storage.duojing_target;
 				},
 				async content(event, trigger, player) {
-					// 临时诊断：确认这个content到底有没有真正执行到、insertPhase()造出来的
-					// 事件对象挂到了哪里，方便下次实测时定位到底卡在哪一步
-					console.log("[duojing_after] content fired, player seat=", player.playerid, "matched event.player seat=", event.player?.playerid);
-					const next = player.insertPhase(null, true);
-					console.log("[duojing_after] insertPhase created:", next.name, "player seat=", next.player?.playerid, "parent=", next.parent?.name, "parent.next length=", next.parent?.next?.length, "index in parent.next=", next.parent?.next?.indexOf(next));
+					player.insertPhase(null, true);
 					delete player.storage.duojing_target;
 					player.removeSkill("duojing_after");
 					player.removeSkill("duojing");
