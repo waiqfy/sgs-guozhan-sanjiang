@@ -15582,7 +15582,7 @@ export default {
 					// 临时诊断：确认这个content到底有没有真正执行到、insertPhase()造出来的
 					// 事件对象挂到了哪里，方便下次实测时定位到底卡在哪一步
 					console.log("[duojing_after] content fired, player=", player.name, "target=", event.player?.name);
-					const next = player.insertPhase(null, true).set("phaseList", ["phaseUse"]);
+					const next = player.insertPhase(null, true);
 					console.log("[duojing_after] insertPhase created:", next.name, "player=", next.player?.name, "parent=", next.parent?.name);
 					delete player.storage.duojing_target;
 					player.removeSkill("duojing_after");
