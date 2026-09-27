@@ -1143,30 +1143,26 @@ export default {
 		content() {
 			"step 0";
 			if (trigger.name == "gameStart") {
-				player
-					.chooseBool(get.prompt("wuhun"), "是否明置此武将牌？")
-					// gz3: 原来是无条件五五开，完全没考虑势力名额够不够——游戏一开始势力局势
-					// 还没展开，随手就有一半概率把自己亮成会被直接挤成野心家的结果，跟国战里
-					// 其他"要不要明置"的判断（bumingzhi/_mingzhi2/chiling）不是一套逻辑，也是
-					// "开局莫名其妙亮将"的来源之一。改成跟那几处一致：亮出来不安全时基本不亮，
-					// 安全且已经有队友在外面时才愿意亮。
-					.set("ai", () => {
-						if (!player.wontYe()) {
-							return Math.random() < 0.05;
-						}
-						var group = lib.character[player.name1][1];
-						var popu = get.population(group);
-						if (popu >= 2 || (popu == 1 && game.players.length <= 4)) {
-							return true;
-						}
-						return Math.random() < 0.3;
-					});
+				// gz3: 三将模式下，关羽如果是被抽到当"第三个武将"，武魂会跟着 addSkill 一起
+				// 正常挂到玩家身上——但第三个武将从一开始就是明置状态（不走 isUnseen/
+				// showCharacter 那套流程），"是否明置此武将牌"这个问题对它来说没有意义，
+				// 下面 step 1 算 index 的公式也是照搬两将制主/副二选一那套、完全没考虑
+				// 第三个武将这个情况，真问出来、真去 showCharacter(index)，就会把这名玩家
+				// 真正的主将或副将也一起误亮出去。这里先排除关羽是第三个武将的情况。
+				if (player.name3 && get.character(player.name3, 3).includes("wuhun")) {
+					event.finish();
+				} else {
+					// gz3: 武魂就是设计给"开局主动亮"用的（明置后杀死你的角色不能用桃回血，
+					// 是关羽这张牌的核心机制），不是"要不要冒险组队"的判断，AI 应该无条件执行，
+					// 不用像 bumingzhi/_mingzhi2/chiling 那样按势力名额/安全与否衡量。
+					player.chooseBool(get.prompt("wuhun"), "是否明置此武将牌？").set("ai", () => true);
+				}
 			} else {
 				trigger.source.addTempSkill("wuhun_ban");
 				event.finish();
 			}
 			"step 1";
-			if (result.bool) {
+			if (result?.bool) {
 				var index = get.character(player.name2, 3).includes("wuhun") && !get.character(player.name, 3).includes("wuhun") ? 1 : 0;
 				player.showCharacter(index);
 			}
@@ -10980,10 +10976,7 @@ export default {
 				.forResult();
 			if (!result.bool) {
 				const { junling, targets } = await player.chooseJunlingFor(player).forResult();
-				const { index } = await target.chooseJunlingControl(player, junling, targets).set("prompt", get.prompt("junxing")).forResult();
-				if (index == 0) {
-					await target.carryOutJunling(player, junling, targets);
-				}
+				await target.carryOutJunling(player, junling, targets);
 			}
 		},
 		ai: {
@@ -17532,13 +17525,14 @@ export default {
 			let extra = 0;
 			const max = player.hp - 1;
 			if (max > 0) {
+				const choiceList = Array.from({ length: max + 1 }, (_, i) => (i === 0 ? "不失去体力" : `失去${i}点体力，可移动装备牌数+${i}`));
 				const { control } = await player
-					.chooseControl(Array.from({ length: max + 1 }, (_, i) => String(i)))
+					.chooseControl(choiceList)
 					.set("prompt", "勇进：是否失去体力以增加本次可移动的装备牌数量？")
-					.set("choiceList", Array.from({ length: max + 1 }, (_, i) => (i === 0 ? "不失去体力" : `失去${i}点体力，可移动装备牌数+${i}`)))
-					.set("ai", () => "0")
+					.set("choiceList", choiceList)
+					.set("ai", () => choiceList[0])
 					.forResult();
-				extra = Number(control) || 0;
+				extra = choiceList.indexOf(control);
 			}
 			event.result = { bool: true, cost_data: extra };
 		},
@@ -21713,6 +21707,14 @@ export default {
 		// 的filter，不再触发提前选牌
 		filter(event, player) {
 			return player.countCards("he") > 0;
+		},
+		// 没有filterCard/viewAs，纯content()内部自选分支的phaseUse主动技，官方参考同样没写ai，
+		// 引擎默认的兜底热情度评估基本不会主动发动这类技能，补一个合理的默认值（参考zhuanzheng的处理）
+		ai: {
+			order: 6,
+			result: {
+				player: 1,
+			},
 		},
 		async content(event, trigger, player) {
 			const choice = await player
