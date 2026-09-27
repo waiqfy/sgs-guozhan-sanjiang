@@ -11618,7 +11618,7 @@ export default {
 			if (result.bool) {
 				event.cardname = result.links[0][2];
 				player.logSkill("shefu");
-				const result2 = await player.chooseCard("he", "选择一张牌作为“伏兵”", true).forResult();
+				const result2 = await player.chooseCard("h", "选择一张手牌作为伏兵", true).forResult();
 				if (result2.bool) {
 					const card = result2.cards[0];
 					event.card = card;
@@ -14150,12 +14150,19 @@ export default {
 			effect: {
 				audio: "luoyi",
 				charlotte: true,
-				mod: {
-					cardDamage(card, player, num) {
-						if (get.name(card) == "sha" || get.name(card) == "juedou") {
-							return num + 1;
-						}
-					},
+				// mod.cardDamage不是引擎里真实存在的mod钩子(搜遍引擎源码找不到这个hook名，
+				// 大概率是瞎编的)，之前这么写等于完全没有生效。这类"使用某张牌造成伤害时+N"
+				// 效果在本项目里的正确写法是trigger:{source:"damageBegin1"}+trigger.num++，
+				// 参考同文件里chanhui/tianxiang等已确认能用的实现改写
+				trigger: { source: "damageBegin1" },
+				forced: true,
+				popup: false,
+				filter(event, player) {
+					const cardEvt = event.getParent();
+					return !!cardEvt && (cardEvt.name == "sha" || cardEvt.name == "juedou");
+				},
+				async content(event, trigger, player) {
+					trigger.num++;
 				},
 			},
 		},
@@ -17947,6 +17954,11 @@ export default {
 		filter(event, player) {
 			return player.isDamaged() && game.players.length > 1;
 		},
+		// 限定技只能用一次，不能光"能用就用"——得有个值得的目标(关系够好，且确实需要
+		// 摸牌/回血/复原)才发动，不然大概率是浪费在一个中庸队友身上
+		check(event, player) {
+			return game.hasPlayer(target => target != player && get.attitude(player, target) > 3 && (target.isDamaged() || target.isTurnedOver() || target.getHp() <= 2));
+		},
 		async cost(event, trigger, player) {
 			event.result = await player
 				.chooseTarget({
@@ -21427,6 +21439,9 @@ export default {
 							const result2 = await player
 								.chooseTarget("邀宴：获得任意名未参与议事的角色各一张手牌", [0, others.length], (card, player, target) => get.event().others.includes(target))
 								.set("others", others)
+								// 没有ai打分的话，[0,N]这种"可以不选"的多选一律默认按0个处理——
+								// 拿牌对自己纯获利，得给个正分让AI真的会去选
+								.set("ai", target => get.effect(target, { name: "guohe_copy2" }, player, player))
 								.forResult();
 							if (result2.bool) {
 								for (const target of result2.targets) {
