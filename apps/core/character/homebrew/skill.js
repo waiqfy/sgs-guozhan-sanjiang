@@ -15581,9 +15581,11 @@ export default {
 				forced: true,
 				popup: false,
 				filter(event, player) {
+					console.log("[duojing_after filter check] this player seat=", player.playerid, "phaseEnd owner seat=", event.player?.playerid, "stored target seat=", player.storage.duojing_target?.playerid, "hasSkill=", player.hasSkill("duojing_after"));
 					return event.player === player.storage.duojing_target;
 				},
 				async content(event, trigger, player) {
+					console.log("[duojing_after] MATCHED, granting extra phase to seat=", player.playerid);
 					player.insertPhase(null, true);
 					delete player.storage.duojing_target;
 					player.removeSkill("duojing_after");
