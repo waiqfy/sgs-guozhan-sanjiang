@@ -15558,6 +15558,7 @@ export default {
 		async content(event, trigger, player) {
 			trigger.cancel();
 			player.storage.duojing_target = trigger.player;
+			console.log("[duojing] player seat=", player.playerid, "target seat=", trigger.player.playerid);
 			player.addTempSkill("duojing_after", { global: [] });
 		},
 		ai: {
@@ -15581,9 +15582,9 @@ export default {
 				async content(event, trigger, player) {
 					// 临时诊断：确认这个content到底有没有真正执行到、insertPhase()造出来的
 					// 事件对象挂到了哪里，方便下次实测时定位到底卡在哪一步
-					console.log("[duojing_after] content fired, player=", player.name, "target=", event.player?.name);
+					console.log("[duojing_after] content fired, player seat=", player.playerid, "matched event.player seat=", event.player?.playerid);
 					const next = player.insertPhase(null, true);
-					console.log("[duojing_after] insertPhase created:", next.name, "player=", next.player?.name, "parent=", next.parent?.name);
+					console.log("[duojing_after] insertPhase created:", next.name, "player seat=", next.player?.playerid, "parent=", next.parent?.name, "parent.next length=", next.parent?.next?.length, "index in parent.next=", next.parent?.next?.indexOf(next));
 					delete player.storage.duojing_target;
 					player.removeSkill("duojing_after");
 					player.removeSkill("duojing");
