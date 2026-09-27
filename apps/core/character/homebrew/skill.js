@@ -11917,7 +11917,17 @@ export default {
 			player.line(target, "green");
 		},
 		ai: {
+			// 引擎自带的"国战标记"通用出牌阶段效果(_guozhan_marks)里，先驱标记默认可以直接
+			// 弃置换"摸牌摸至4张+看一张暗置武将牌"，除非玩家有技能对"keepXianqu"这个tag
+			// 返回true(告诉引擎"我自己有更好的用途，别自动拿去摸牌")。之前这里的
+			// skillTagFilter不管传进来的是什么tag都按get.attitude(player,target)算，对
+			// "keepXianqu"这种没有具体target的查询完全文不对题，等于从来没真正保留过标记。
+			// 只要还有活着的盟友，先驱标记就应该留给xianfu2(先辅)用来结成共伤共疗的绑定，
+			// 而不是被通用摸牌效果先花掉；真的孤军作战、没有盟友时才没必要留，随手当摸牌用。
 			skillTagFilter(player, tag, target) {
+				if (tag === "keepXianqu") {
+					return game.hasPlayer(current => current.isIn() && current !== player && current.isFriendOf(player));
+				}
 				return get.attitude(player, target) > 0;
 			},
 		},
