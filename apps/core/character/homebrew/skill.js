@@ -15535,7 +15535,10 @@ export default {
 		subSkill: {
 			after: {
 				charlotte: true,
-				trigger: { global: "phaseAfter" },
+				// insertPhase()内部靠_status.event.getParent("phase")找一个还活着的祖先"phase"事件来插入，
+				// phaseAfter要等目标的phase事件完全结束、从事件链上摘除之后才触发，那时已经找不到祖先"phase"了，
+				// insertPhase()等于白调用——player永远拿不到自己的回合。改成phaseEnd（phase事件还在处理中）
+				trigger: { global: "phaseEnd" },
 				forced: true,
 				popup: false,
 				filter(event, player) {
@@ -21037,11 +21040,31 @@ export default {
 		audio: 2,
 		trigger: { target: "useCardToTargeted" },
 		usable: 1,
+		// 玉碎发动就要先失去1点体力，如果发动时player已经是1血，这一下会让player自己阵亡；
+		// content()后半段"逼target弃牌/掉血"仍然要结算，不能被player自己的死亡打断——
+		// 没有forceDie:true的话，player一旦在content执行途中死亡，引擎会在恢复执行时
+		// 直接判定这个content事件isPrevented并中断剩余代码，导致target那部分效果不生效
+		forceDie: true,
 		filter(event, player) {
 			return event.player !== player && event.player.isIn() && get.color(event.card) === "black";
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2(event.skill)).forResult();
+			event.result = await player
+				.chooseBool(get.prompt2(event.skill))
+				.set("ai", () => {
+					const target = trigger.player;
+					if (get.attitude(player, target) > -1) {
+						return false;
+					}
+					if (player.hp <= 2) {
+						return true;
+					}
+					if (player.hp < target.hp) {
+						return true;
+					}
+					return Math.min(target.maxHp, target.countCards("h")) > 3;
+				})
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			await player.loseHp();
