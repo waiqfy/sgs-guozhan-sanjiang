@@ -5686,27 +5686,53 @@ export default {
 
 // ========== maliang 马良 ==========
 	// 协穆：其他与你势力相同的角色的出牌阶段，其可以展示并交给你一张基本牌，然后其于本回合内计算与其他角色的距离-1。 参考skill_old.js
+	// 描述是"出牌阶段"随时都能发动，不是"出牌阶段开始时"——原来用trigger:phaseUseBegin只在
+	// 阶段最开始问一次，改成在phaseUseBegin时把机会临时交给目标自己(挂一个enable:"phaseUse"
+	// 的主动技)，本阶段内目标随时可以点出来用
 	xiemu: {
 		aiShowTag: "support",
-		aiShowCost: true,
 		trigger: { global: "phaseUseBegin" },
+		forced: true,
+		popup: false,
 		filter(event, player) {
 			return event.player != player && player.isFriendOf(event.player) && event.player.countCards("h", card => get.type(card) == "basic") > 0;
 		},
 		logTarget: "player",
-		async cost(event, trigger, player) {
-			event.result = await trigger.player
-				.chooseCard("h", false)
-				.set("filterCard", card => get.type(card) == "basic")
-				.set("prompt2", `协穆：是否展示并交给${get.translation(player)}一张基本牌，然后本回合内计算与其他角色的距离-1？`)
-				.forResult();
+		async content(event, trigger, player) {
+			trigger.player.storage.xiemu_from = player;
+			trigger.player.addTempSkill("xiemu_active", { player: "phaseAfter" });
+		},
+	},
+
+	xiemu_active: {
+		charlotte: true,
+		enable: "phaseUse",
+		usable: 1,
+		filter(event, player) {
+			return player.storage.xiemu_from?.isIn() && player.countCards("h", card => get.type(card) == "basic") > 0;
+		},
+		filterCard(card) {
+			return get.type(card) == "basic";
+		},
+		selectCard: 1,
+		check(card) {
+			return 5 - get.value(card);
+		},
+		prompt2(event, player) {
+			return `协穆：是否展示并交给${get.translation(player.storage.xiemu_from)}一张基本牌，然后本回合内计算与其他角色的距离-1？`;
 		},
 		async content(event, trigger, player) {
-			const target = trigger.player;
+			const target = player.storage.xiemu_from;
 			const cards = event.cards;
-			await target.showCards(cards, get.translation(target) + "发动了【协穆】");
-			await target.give(cards, player);
-			target.addTempSkill("xiemu_buff", { player: "phaseAfter" });
+			await player.showCards(cards, get.translation(player) + "发动了【协穆】");
+			await player.give(cards, target);
+			player.addTempSkill("xiemu_buff", { player: "phaseAfter" });
+		},
+		ai: {
+			order: 4,
+			result: {
+				player: 1,
+			},
 		},
 	},
 
@@ -6853,9 +6879,12 @@ export default {
 					true
 				)
 				.set("huogong", card)
+				// 只要有一个目标命中造成伤害，剩下的目标就直接取消，选少了纯属浪费机会——
+				// 应该尽量往4个目标去选。全部给正分保证都会被选上，同时按"越可能值得对其
+				// 造成伤害"降序排在前面（伤害只会在最早命中的目标身上结算一次）
 				.set("ai", target => {
 					const { huogong, player } = get.event();
-					return get.effect(target, huogong, player, player);
+					return 1 + Math.max(0, get.effect(target, huogong, player, player));
 				})
 				.forResult();
 		},
@@ -11558,25 +11587,30 @@ export default {
 				})
 				.set("ai", function (button) {
 					var rand = _status.event.rand;
-					switch (button.link[2]) {
+					var name = button.link[2];
+					// 猜中才有意义——基本牌(杀/闪/桃等)出现频率远高于锦囊，应该整体优先于锦囊，
+					// 而不是按具体牌名各自随便定权重(会导致个别没单独列出的基本牌反而权重
+					// 低于列出的锦囊牌)。先按类别定一个基准分，再按牌名微调
+					var base = get.type(name) == "basic" ? 5 : 2;
+					switch (name) {
 						case "sha":
-							return 5 + rand[1];
+							return base + 1 + rand[1];
 						case "tao":
-							return 4 + rand[2];
+							return base + rand[2];
 						case "lebu":
-							return 3 + rand[3];
+							return base + 1 + rand[3];
 						case "shan":
-							return 4.5 + rand[4];
+							return base + 0.5 + rand[4];
 						case "wuzhong":
-							return 4 + rand[5];
+							return base + 1 + rand[5];
 						case "shunshou":
-							return 3 + rand[6];
+							return base + rand[6];
 						case "nanman":
-							return 2 + rand[7];
+							return base + rand[7];
 						case "wanjian":
-							return 2 + rand[8];
+							return base + rand[8];
 						default:
-							return rand[0];
+							return base + rand[0];
 					}
 				})
 				.set("rand", [Math.random(), Math.random(), Math.random(), Math.random(), Math.random(), Math.random(), Math.random(), Math.random(), Math.random()])
@@ -15545,9 +15579,13 @@ export default {
 					return event.player === player.storage.duojing_target;
 				},
 				async content(event, trigger, player) {
+					// 临时诊断：确认这个content到底有没有真正执行到、insertPhase()造出来的
+					// 事件对象挂到了哪里，方便下次实测时定位到底卡在哪一步
+					console.log("[duojing_after] content fired, player=", player.name, "target=", event.player?.name);
+					const next = player.insertPhase(null, true).set("phaseList", ["phaseUse"]);
+					console.log("[duojing_after] insertPhase created:", next.name, "player=", next.player?.name, "parent=", next.parent?.name);
 					delete player.storage.duojing_target;
 					player.removeSkill("duojing_after");
-					player.insertPhase(null, true).set("phaseList", ["phaseUse"]);
 					player.removeSkill("duojing");
 					player.removeSkill("keji");
 					player.addSkill("shelie");
@@ -15798,13 +15836,24 @@ export default {
 
 	// 焰洄：当你使用牌指定目标后，你可以展示一名目标角色的一张手牌，若此牌本回合已被展示过，你弃置之；本阶段结束时，你选择一项：1.对一名本阶段因此失去过牌的角色造成1点火焰伤害；2.摸X张牌（X为本回合展示过牌的角色数）。 参考bingshi包potyanhui(skill_old.js早期备注称"未找到实现"，实际_merged_skill_all.md已有完整代码，"是否已展示过"按其用game.getGlobalHistory查本回合showCards历史判断，而非只记自己展示过的牌)
 	yanhui: {
-		audio: 2,
+		// _unused_assets/audio_unused_skill/potyanhui1~6.mp3 是原版焰洄的语音，之前用audio:2
+		// 等于没配语音，搬到apps/core/audio/skill/yanhui1~6.mp3并接上
+		audio: "yanhui",
 		trigger: { player: "useCardToTarget" },
 		filter(event, player) {
 			return event.target.countCards("h") > 0;
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt("yanhui")).forResult();
+			event.result = await player
+				.chooseBool(get.prompt("yanhui"))
+				.set("ai", () => {
+					// 展示的是目标的手牌，打自己等于白白暴露自己的手牌，不划算
+					if (trigger.target === player) {
+						return false;
+					}
+					return get.attitude(player, trigger.target) <= 0;
+				})
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			const target = trigger.target;
