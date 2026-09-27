@@ -18899,15 +18899,46 @@ export default {
 						if (player.hasSkillTag("mingzhi_no")) {
 							return 0;
 						}
+						// gz3: "亮主将/亮副将/同时亮"三个选项不是等价的随机三选一——主副将可能
+						// 不同势力，选哪个直接决定最终身份是哪个势力（"同时明置"在引擎里等价于
+						// 按主将定身份，见 getGuozhanGroup）。之前不管主副哪个势力人多、安不安全，
+						// 一律在 1/2/3 里近似瞎选，导致明明副将那个势力已经有队友摆好、副将那边
+						// 又没有名额顾虑，AI 却经常"默认选主"或者随到"同时"（等效选主），选不到
+						// 更该抱团的副将势力。这里改成显式比较主/副两个势力各自的现有公开人数和
+						// "亮出来安不安全"，优先选人多且安全的那个势力对应的选项；只有两边势力
+						// 相同、或者都没法比较时，才退回原来"同时/主将"之间的随机偏好。
+						var mainGroup = lib.character[player.name1][1];
+						var viceGroup = lib.character[player.name2][1];
+						var mainSafe = player.wontYe(mainGroup);
+						var viceSafe = mainGroup == viceGroup ? mainSafe : player.wontYe(viceGroup);
+						function pickControl() {
+							if (mainGroup == viceGroup) {
+								return Math.random() < 0.5 ? 3 : 1;
+							}
+							if (viceSafe && (!mainSafe || get.population(viceGroup) > get.population(mainGroup))) {
+								return 2;
+							}
+							if (mainSafe) {
+								return Math.random() < 0.5 ? 3 : 1;
+							}
+							return 2;
+						}
+						// gz3: 亮出来会被直接挤成野心家时，宁愿再等等看后面还有没有真队友，不能
+						// 因为"己方公开人数已经不少"（下面的 popu 判断）就无脑往上冲——popu 大
+						// 恰恰经常就是名额已经满了、亮出来会被判野的时候。只留一个很小的概率，
+						// 给"实在等不了"的极端情况兜底。
+						if (!mainSafe && !viceSafe) {
+							return Math.random() < 0.05 ? pickControl() : 0;
+						}
 						var popu = get.population(lib.character[player.name1][1]);
 						if (popu >= 2 || (popu == 1 && game.players.length <= 4)) {
-							return Math.random() < 0.5 ? 3 : Math.random() < 0.5 ? 2 : 1;
+							return pickControl();
 						}
 						if (choice == 0) {
 							return 0;
 						}
-						if (get.population(group) > 0 && player.wontYe()) {
-							return Math.random() < 0.2 ? (Math.random() < 0.5 ? 3 : Math.random() < 0.5 ? 2 : 1) : 0;
+						if (get.population(group) > 0) {
+							return Math.random() < 0.2 ? pickControl() : 0;
 						}
 						var nming = 0;
 						for (var i = 0; i < game.players.length; i++) {
@@ -18916,9 +18947,9 @@ export default {
 							}
 						}
 						if (nming == game.players.length - 1) {
-							return Math.random() < 0.5 ? (Math.random() < 0.5 ? 3 : Math.random() < 0.5 ? 2 : 1) : 0;
+							return Math.random() < 0.5 ? pickControl() : 0;
 						}
-						return Math.random() < (0.1 * nming) / game.players.length ? (Math.random() < 0.5 ? 3 : Math.random() < 0.5 ? 2 : 1) : 0;
+						return Math.random() < (0.1 * nming) / game.players.length ? pickControl() : 0;
 					})
 					.forResult();
 				control = result.control;
@@ -18985,21 +19016,29 @@ export default {
 					if (player.identity != "unknown") {
 						return true;
 					}
-					if (Math.random() < 0.5) {
-						return true;
-					}
 					if (info?.ai?.mingzhi === true) {
 						return true;
 					}
 					if (info?.ai?.maixie) {
 						return true;
 					}
+					// gz3: 会被直接挤成野心家的话，宁愿再等等看后面还有没有真队友，不要为了用
+					// 一个技能就贸然把自己搭进去变野——技能本身标了愿意亮（上面 ai.mingzhi/
+					// ai.maixie）的场景已经优先处理过了。
+					if (!player.wontYe()) {
+						return Math.random() < 0.05;
+					}
+					// gz3: 原来这里有个不管技能值不值、队友情况如何都先五五开的判断，导致随便
+					// 一个不起眼的暗置技能（比如单纯换手牌这种）想触发，AI 就有一半概率在别人
+					// 回合里突然亮出来——跟"没事不要贸然暴露身份"的原则相悖。去掉这一步，统一
+					// 走下面按"己方公开人数"衡量的同一套判断（跟 bumingzhi 的自愿明置一致），
+					// 只有确实看起来安全、划算时才愿意为了技能去亮。
 					const group = lib.character[player.name1][1];
 					const popu = get.population(lib.character[player.name1][1]);
 					if (popu >= 2 || (popu == 1 && game.players.length <= 4)) {
 						return true;
 					}
-					if (get.population(group) > 0 && player.wontYe()) {
+					if (get.population(group) > 0) {
 						return Math.random() < 0.2 ? true : false;
 					}
 					let nming = 0;
@@ -19023,7 +19062,21 @@ export default {
 							if (!choice) {
 								return 0;
 							}
-							return 1;
+							// gz3: 主副将可能不同势力，选亮哪个直接决定最终身份是哪个势力，不能没
+							// 有偏好地都给1分——优先选人多的那个势力，安不安全（会不会被挤成野
+							// 心家）优先级更高：这个选项会被挤野、另一个选项不会时，就别选这个。
+							var mainGroup = lib.character[player.name1][1];
+							var viceGroup = lib.character[player.name2][1];
+							if (mainGroup == viceGroup) {
+								return 1;
+							}
+							var isMain = button.link == player.name1;
+							var group = isMain ? mainGroup : viceGroup;
+							var otherGroup = isMain ? viceGroup : mainGroup;
+							if (!player.wontYe(group) && player.wontYe(otherGroup)) {
+								return 0;
+							}
+							return 1 + Math.max(0, get.population(group) - get.population(otherGroup));
 						})
 						.set("choice", choice)
 						.forResult();

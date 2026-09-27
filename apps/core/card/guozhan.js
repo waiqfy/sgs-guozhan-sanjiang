@@ -1030,13 +1030,20 @@ export default {
 				}
 				// gz3: 敕令强制明置前，同样得考虑"能不能安全组队"——己方势力已有人
 				// 且明置不会被挤成野心家时，应当更倾向于明置而不是弃装/掉血，跟
-				// 平时"亮将"意愿(_mingzhi)保持一致，而不是无脑五五开。
+				// 平时"亮将"意愿(_mingzhi)保持一致，而不是无脑五五开。但反过来，
+				// 明置会被直接挤成野心家的话，宁愿再等等看后面还有没有真队友，
+				// 不能因为己方公开人数已经不少（下面的 popu 判断）就无脑去亮——
+				// popu 大恰恰经常就是名额已经满了、亮出来会被判野的时候，这时候
+				// 弃装备/掉血反而是更划算的选择。
+				if (!player.wontYe()) {
+					return Math.random() < 0.05 ? "选项一" : "选项二";
+				}
 				const group = lib.character[player.name1][1];
 				const popu = get.population(group);
 				if (popu >= 2 || (popu == 1 && game.players.length <= 4)) {
 					return "选项一";
 				}
-				if (popu > 0 && player.wontYe()) {
+				if (popu > 0) {
 					return Math.random() < 0.8 ? "选项一" : "选项二";
 				}
 				return Math.random() < 0.5 ? "选项一" : "选项二";
