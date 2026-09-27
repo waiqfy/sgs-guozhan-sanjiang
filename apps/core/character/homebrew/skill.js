@@ -17750,10 +17750,13 @@ export default {
 	},
 
 // ========== wuguotai 吴国太 ==========
-	// 补益：每名角色的回合限一次，当与你势力相同的角色因受到伤害而进入濒死状态被救回后，你可以对伤害来源发起一次“军令”，若其不执行，你令脱离濒死状态的角色回复1点体力。 参考gzbuyi(guozhan)
+	// 补益：每名角色的回合限一次，当与你势力相同的角色因受到伤害而进入濒死状态后，你可以对伤害来源发起一次"军令"，若其不执行，你令受到伤害的角色回复至1点体力。
+	// 跟参考gzbuyi(guozhan)的区别：官方是dyingAfter(濒死流程走完、可能已经被别人用桃救回之后才问)，
+	// 且是"回复1点体力"(+1)；我们自己的描述没有"被救回"这个前提，是在刚进入濒死时就问，
+	// 且是"回复至1点体力"(直接摆到1点，不是+1，避免濒死角色体力为负时+1还救不回来)
 	buyi: {
 		audio: ["buyi", 2],
-		trigger: { global: "dyingAfter" },
+		trigger: { global: "dying" },
 		filter(event, player) {
 			if (!(event.player && event.player.isAlive() && event.source && event.source.isAlive())) {
 				return false;
@@ -17779,7 +17782,7 @@ export default {
 				player.storage.buyi_used = [];
 			}
 			player.storage.buyi_used.push({ source: trigger.source, round: game.roundNumber });
-			const choiceList = ["执行该军令", "令" + get.translation(trigger.player) + (trigger.player == trigger.source ? "（你）" : "") + "回复1点体力"];
+			const choiceList = ["执行该军令", "令" + get.translation(trigger.player) + (trigger.player == trigger.source ? "（你）" : "") + "回复至1点体力"];
 			const result = await trigger.source
 				.chooseJunlingControl(player, junling, targets)
 				.set("prompt", "补益")
@@ -17794,7 +17797,10 @@ export default {
 			if (result.index == 0) {
 				trigger.source.carryOutJunling(player, junling, targets);
 			} else {
-				await trigger.player.recover(player);
+				const delta = 1 - trigger.player.hp;
+				if (delta > 0) {
+					await trigger.player.recover(delta, player);
+				}
 			}
 		},
 	},
