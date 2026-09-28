@@ -17749,7 +17749,7 @@ export default {
 		audio: "fenming",
 		trigger: { player: "phaseJieshuBegin" },
 		filter(event, player) {
-			return player.isLinked() && game.hasPlayer(current => current != player && current.isLinked() && current.countCards("he") > 0);
+			return player.isLinked() && (player.countCards("he") > 0 || game.hasPlayer(current => current != player && current.isLinked() && current.countCards("he") > 0));
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseBool(get.prompt2("fenming")).forResult();
@@ -17757,9 +17757,19 @@ export default {
 		async content(event, trigger, player) {
 			await lib.skill.fenming.doFenming(player);
 		},
+		// 参考fake_fenming(guozhan)：弃置的对象是"所有处于连环状态的角色"，包含自己在内——
+		// 自己弃自己的牌用chooseToDiscard(自选)，弃别人的牌是player弃(盲选)，跟原来只弃
+		// 别人、自己不弃的写法不一样
 		doFenming: async function (player) {
 			const targets = game.filterPlayer(current => current != player && current.isLinked() && current.countCards("he") > 0);
 			const damaged = [];
+			if (player.countCards("he") > 0) {
+				const hadCards = player.countCards("h") > 0;
+				await player.chooseToDiscard(true, "he");
+				if (hadCards && !player.countCards("h")) {
+					damaged.push(player);
+				}
+			}
 			for (const target of targets) {
 				const hadCards = target.countCards("h") > 0;
 				await player.discardPlayerCard(target, "he", true);
