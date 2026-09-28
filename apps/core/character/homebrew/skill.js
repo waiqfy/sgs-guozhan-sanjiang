@@ -17715,7 +17715,14 @@ export default {
 		},
 		selectTarget: [1, 2],
 		async content(event, trigger, player) {
-			const alreadyLinked = player.isLinked();
+			// 用局部const记录"发动前是否已连环"，在content()因为断线重连/事件重放等原因被
+			// 重新执行时会失效——第二次进来时player已经在第一次执行时被link()过了，局部
+			// 变量重新求值就会误判成"本来就连环"，把不该给的奖励也发了。改成挂在event上，
+			// 只在第一次真正求值，后续重入直接读缓存的判断结果
+			if (event._alreadyLinked === undefined) {
+				event._alreadyLinked = player.isLinked();
+			}
+			const alreadyLinked = event._alreadyLinked;
 			for (const target of event.targets) {
 				if (!target.isLinked()) {
 					await target.link();
