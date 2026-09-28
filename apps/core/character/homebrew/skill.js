@@ -10547,16 +10547,34 @@ export default {
 		},
 	},
 
-	// 伤逝：每名角色的每个阶段限一次，当你的手牌数小于X时，你可以将手牌摸至X张（X为你已损失的体力值）。 参考gz_shangshi
+	// 伤逝：每名角色的每个阶段限一次，当你的手牌数小于X时，你可以将手牌摸至X张（X为你已损失的体力值）。
+	// 国战参考gz_shangshi只在phaseEnd检查一次，比身份局原版reshangshi弱很多——原版是失牌/得牌/
+	// 装备/判定/体力变化等一大堆事件都检查一次，机会多很多。改成同样这批触发点，但补上"每个阶段
+	// 限一次"的失效机制(原版没有这个限制，直接照搬机会太多；这里按我们自己描述里明确写的"每个
+	// 阶段限一次"，用当前阶段事件对象本身做一次性标记，同一个阶段实例只能摸一次)
 	shangshi: {
 		audio: "reshangshi",
-		trigger: { global: "phaseAnyEnd" },
+		trigger: {
+			player: ["loseAfter", "changeHp", "gainMaxHpAfter", "loseMaxHpAfter"],
+			global: ["equipAfter", "addJudgeAfter", "gainAfter", "loseAsyncAfter", "addToExpansionAfter"],
+		},
 		filter(event, player) {
-			return player.countCards("h") < player.getDamagedHp();
+			if (event.getl && !event.getl(player)) {
+				return false;
+			}
+			if (player.countCards("h") >= player.getDamagedHp()) {
+				return false;
+			}
+			const phase = event.getParent?.("phase");
+			return !phase || player.storage.shangshi_phase !== phase;
 		},
 		preHidden: true,
 		frequent: true,
 		async content(event, trigger, player) {
+			const phase = trigger.getParent?.("phase");
+			if (phase) {
+				player.storage.shangshi_phase = phase;
+			}
 			await player.drawTo(player.getDamagedHp());
 		},
 	},
