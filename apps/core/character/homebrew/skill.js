@@ -10547,11 +10547,12 @@ export default {
 		},
 	},
 
-	// 伤逝：每名角色的每个阶段限一次，当你的手牌数小于X时，你可以将手牌摸至X张（X为你已损失的体力值）。
-	// 国战参考gz_shangshi只在phaseEnd检查一次，比身份局原版reshangshi弱很多——原版是失牌/得牌/
-	// 装备/判定/体力变化等一大堆事件都检查一次，机会多很多。改成同样这批触发点，但补上"每个阶段
-	// 限一次"的失效机制(原版没有这个限制，直接照搬机会太多；这里按我们自己描述里明确写的"每个
-	// 阶段限一次"，用当前阶段事件对象本身做一次性标记，同一个阶段实例只能摸一次)
+	// 伤逝：每名角色的每个阶段限一次，当你的手牌数小于X时，你可以将手牌摸至X张（X为你已损失的体力值）；
+	// 若本回合内有角色死亡，则此效果本回合失效。你不在自己回合内时，当你受到伤害后，你可以弃置
+	// 任意张手牌，然后将手牌摸至X张。
+	// 触发时机沿用身份局原版reshangshi(失牌/得牌/装备/判定/体力变化等)，比国战参考gz_shangshi只看
+	// phaseEnd机会多很多；用"每阶段限一次"+"本回合有人死亡就失效"两道保险收着，避免死亡连锁的回合
+	// 里被刷太多次。另外补一条身份局原版没有的"回合外受伤可以弃牌换摸牌"分支，按描述实现。
 	shangshi: {
 		audio: "reshangshi",
 		trigger: {
@@ -10566,7 +10567,13 @@ export default {
 				return false;
 			}
 			const phase = event.getParent?.("phase");
-			return !phase || player.storage.shangshi_phase !== phase;
+			if (!phase) {
+				return true;
+			}
+			if (player.storage.shangshi_phase === phase) {
+				return false;
+			}
+			return !game.getGlobalHistory("everything", evt => evt.name === "die" && evt.getParent?.("phase") === phase).length;
 		},
 		preHidden: true,
 		frequent: true,
@@ -10576,6 +10583,36 @@ export default {
 				player.storage.shangshi_phase = phase;
 			}
 			await player.drawTo(player.getDamagedHp());
+		},
+		group: "shangshi_react",
+		subSkill: {
+			react: {
+				audio: "reshangshi",
+				trigger: { player: "damageEnd" },
+				filter(event, player) {
+					if (_status.currentPhase === player || player.countCards("h") >= player.getDamagedHp()) {
+						return false;
+					}
+					const phase = event.getParent?.("phase");
+					return !phase || !game.getGlobalHistory("everything", evt => evt.name === "die" && evt.getParent?.("phase") === phase).length;
+				},
+				async cost(event, trigger, player) {
+					event.result = await player
+						.chooseToDiscard({
+							prompt: "伤逝：你可以弃置任意张手牌，然后将手牌摸至" + get.cnNumber(player.getDamagedHp()) + "张",
+							position: "h",
+							selectCard: [0, player.countCards("h")],
+							forced: true,
+							ai(card) {
+								return 5 - get.value(card);
+							},
+						})
+						.forResult();
+				},
+				async content(event, trigger, player) {
+					await player.drawTo(player.getDamagedHp());
+				},
+			},
 		},
 	},
 
