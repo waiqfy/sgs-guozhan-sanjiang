@@ -8223,7 +8223,13 @@ export default {
 			await player.showCards(result.cards);
 			const type = get.type2(result.cards[0], target);
 			target.storage.choufa2 = type;
-			target.addTempSkill("choufa2", { player: "phaseAfter" });
+			// 之前写的{player:"phaseAfter"}是"直到target自己下一次的回合结束"——choufa是在
+			// 司马昭自己出牌阶段对别人发动的，target当时往往不在回合中，这个条件要等target
+			// 真正轮到自己回合并结束才解除，等于跨了好几个回合都不会失效。参考官方gzchoufa
+			// (inherit choufa)是直接不传expire参数，走addTempSkill默认的
+			// {global:["phaseAfter","phaseBeforeStart"]}——在当前这个回合(不管是谁的)结束
+			// 时就失效，才是"直到其回合结束"该有的效果
+			target.addTempSkill("choufa2");
 		},
 		ai: {
 			order: 9,
