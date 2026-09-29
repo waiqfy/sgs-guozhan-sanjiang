@@ -16750,14 +16750,15 @@ export default {
 			effect: {
 				target(card, player, target) {
 					if (get.tag(card, "damage") || get.tag(card, "loseHp")) {
-						const num = target.getExpansions("buqu").length;
-						// 已经靠不屈躺在1点体力的周泰，再加伤只是逼他再赌一次判定——除非已经
-						// 攒了不少张(重复点数概率变高)，否则这一下基本白打，不该被当成"残血
-						// 好斩杀"去鼓励进攻
-						if (target.hp <= 1 && num < 3) {
+						// 不屈的机制是：只要判定赢了就直接摆回1点体力，跟这一下打掉多少血、
+						// 已经攒了几张判定牌都没关系——已经躺在1血的周泰，继续加伤单纯是又赌
+						// 一次判定，赢了照样是1血，不该被当成"残血好斩杀"去鼓励进攻，跟攒了
+						// 几张牌完全无关
+						if (target.hp <= 1) {
 							return 0;
 						}
-						return ((num || target.getHp()) + 1) / 5;
+						const num = target.getExpansions("buqu").length || target.getHp();
+						return (num + 1) / 5;
 					}
 				},
 			},
