@@ -14571,7 +14571,11 @@ export default {
 			next.set("ai", function (button) {
 				return 20 - get.value(button.link);
 			});
-			next.filterButton = trigger.filterButton;
+			// trigger是chooseToDiscard/choosePlayerCard这类原始事件，用的是filterCard不是
+			// filterButton——之前直接拿trigger.filterButton赋值，读到的是undefined，把
+			// choosePlayerCard构造时已经设好的默认lib.filter.all覆盖成了undefined，导致
+			// 卞夫人自己手牌里任何一张都点不中。这里选的是卞夫人自己的替代牌，本来就不需要
+			// 沿用原事件的筛选条件，直接不覆盖，让它保留默认的"随便选"
 			next.selectButton = trigger.result.cards.length;
 			next.setHiddenSkill("wanwei");
 			const result = await next.forResult();
@@ -25209,10 +25213,14 @@ export default {
 		filter(event, player) {
 			return event.player != player && player.canCompare(event.player);
 		},
-		// 之前没写ai，默认偏保守，导致惴恐几乎不主动发动——赢了能白嫖对方一张牌用，
-		// 输了也只是让对方拿走一张自己本来就要弃置计入拼点成本的牌，怎么样都不亏，直接给true
+		// 之前没写ai，默认偏保守，导致惴恐几乎不主动发动。但也不能无脑一律true——赢了会
+		// 拿对方拼点牌去指定一个目标使用，输了自己的拼点牌被对方拿去用、还被禁一种牌类型，
+		// 对方是已知的队友时这两种结果都可能变成"坑队友"，只应该对关系不好的角色发动
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("zhuikong", trigger.player)).set("ai", () => true).forResult();
+			event.result = await player
+				.chooseBool(get.prompt2("zhuikong", trigger.player))
+				.set("ai", () => get.attitude(player, trigger.player) <= 0)
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			const target = trigger.player;
