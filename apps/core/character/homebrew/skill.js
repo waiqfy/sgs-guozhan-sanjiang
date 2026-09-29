@@ -16795,8 +16795,14 @@ export default {
 			effect: {
 				target(card, player, target) {
 					if (get.tag(card, "damage") || get.tag(card, "loseHp")) {
-						let num = target.getExpansions("buqu").length || target.getHp();
-						return (num + 1) / 5;
+						const num = target.getExpansions("buqu").length;
+						// 已经靠不屈躺在1点体力的周泰，再加伤只是逼他再赌一次判定——除非已经
+						// 攒了不少张(重复点数概率变高)，否则这一下基本白打，不该被当成"残血
+						// 好斩杀"去鼓励进攻
+						if (target.hp <= 1 && num < 3) {
+							return 0;
+						}
+						return ((num || target.getHp()) + 1) / 5;
 					}
 				},
 			},
@@ -26129,7 +26135,16 @@ export default {
 		content(event, trigger, player) {
 			trigger.num--;
 		},
-		ai: { threaten: 0.7 },
+		ai: {
+			threaten: 0.7,
+			// 让其他角色的攻击AI在决定要不要打卑弥呼之前，能查到"如果我打她时她不在我的攻击
+			// 范围内，这次伤害会被减1"，从而正确压低进攻意愿，参考同文件已有的filterDamage
+			// +skillTagFilter用法(王异zhenlie/贾诩jiaxu等)
+			filterDamage: true,
+			skillTagFilter(player, tag, arg) {
+				return !!(arg && arg.player && !player.inRangeOf(arg.player));
+			},
+		},
 	},
 
 // ========== xushao 许劭 ==========
