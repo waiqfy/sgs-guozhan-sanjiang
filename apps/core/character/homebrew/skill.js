@@ -22893,6 +22893,9 @@ export default {
 			return (player.storage.yigui || []).length > 0 && !used.includes(name);
 		},
 		chooseButton: {
+			// 缺失select:2导致只选一个按钮(魂对应的武将)就能直接确定，backup(links)取links[1]
+			// 时崩溃——参考官方rest.js的yigui写死了select:2要求必须选满武将+卡名两个按钮
+			select: 2,
 			dialog(event, player) {
 				const dialog = ui.create.dialog("役鬼", "hidden");
 				dialog.add([player.storage.yigui, "character"]);
@@ -26670,7 +26673,7 @@ export default {
 		},
 		// 弃光手牌是真实代价，没有check时会被默认拒绝——只有手牌本来就少、或对方是敌方角色
 		// 值得反制时才划算；二选一没有ai默认选不中，优先选伤害(收益通常比等量弃牌更大)
-		check(event, player) {
+		check(trigger, player) {
 			return player.countCards("h") <= 2 || get.attitude(player, trigger.player) < 0;
 		},
 		async content(event, trigger, player) {
