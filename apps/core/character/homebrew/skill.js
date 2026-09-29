@@ -24157,11 +24157,21 @@ export default {
 			return !!(event.toShow && event.toShow.includes("huaxiong"));
 		},
 		// 若华雄是作为第三个武将(3将模式)获得的，一开始就是明置状态，没有showCharacterAfter这个环节。
-		// 修复：init()在addSkillTrigger阶段同步调用，此时并未处于游戏主循环的事件栈内，
-		// 在这里直接起一个游离的async IIFE去await chooseBool，实测该询问事件不会被正常推进/结算，
-		// 导致扬威作为第三武将时形同虚设。改成挂一个gameStart触发的子技能，让询问+结算走正常的
-		// 触发器流程（游戏开始时必然在事件循环内运行）。
-		group: ["yangwei_check"],
+		// 之前想用挂一个gameStart触发的子技能来处理，但group声明的子技能一直存在，"gameStart"
+		// 这个触发点本身也不一定能可靠命中这个时机；同文件里jugu/guixiu/xianfu/xiaolian等一
+		// 大批"3将模式已明置"的场景，统一用的都是init()里起一个游离async IIFE直接await
+		// chooseBool的写法，是本项目里验证过能正常工作的通用方案，改成跟它们一致
+		init(player, skill) {
+			if (!player.storage.yangwei_init && isCharacterShown(player, skill)) {
+				player.storage.yangwei_init = true;
+				(async () => {
+					const result = await player.chooseBool(get.prompt2("yangwei")).set("ai", () => true).forResult();
+					if (result.bool) {
+						await lib.skill.yangwei.grant(player);
+					}
+				})();
+			}
+		},
 		async grant(player) {
 			player.awakenSkill("yangwei");
 			await player.draw(2);
@@ -24184,27 +24194,13 @@ export default {
 			}
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("yangwei")).forResult();
+			event.result = await player.chooseBool(get.prompt2("yangwei")).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			await lib.skill.yangwei.grant(player);
 		},
 		ai: {
 			threaten: 1.5,
-		},
-		subSkill: {
-			check: {
-				trigger: { player: "gameStart" },
-				filter(event, player) {
-					return !player.storage.yangwei && isCharacterShown(player, "yangwei");
-				},
-				async cost(event, trigger, player) {
-					event.result = await player.chooseBool(get.prompt2("yangwei")).forResult();
-				},
-				async content(event, trigger, player) {
-					await lib.skill.yangwei.grant(player);
-				},
-			},
 		},
 	},
 
