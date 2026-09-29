@@ -22913,22 +22913,31 @@ export default {
 	},
 
 // ========== zuoci 左慈 ==========
-	// 役鬼：当你首次明置此武将牌后，你获得两张未加入游戏的武将牌作为"魂"牌；每种牌名每回合限一次，你可以移去一张"魂"牌，视为使用任意一张基本牌或普通锦囊牌，且目标必须为与此"魂"牌势力相同或未确定势力的角色。 参考fake_yigui(guozhan，简化改写)
+	// 役鬼：当你首次明置此武将牌后，你获得两张未加入游戏的武将牌作为"魂"牌；每种牌名每回合限一次，你可以移去一张"魂"牌，视为使用任意一张基本牌或普通锦囊牌，且目标必须为与此"魂"牌势力相同或未确定势力的角色。
+	// 参考fake_yigui/fake_yigui2/fake_yigui_backup(mode/guozhan/src/skill/character/bian.js)+官方yigui(rest.js)按结构抄写：
+	// 之前的简化版把"移去魂牌视为用牌"整个塞进了顶层yigui技能下的subSkill.use——但group/expandSkills
+	// 只会展开group数组，不会自动展开subSkill（见game/index.js#expandSkills），而character.js里
+	// 左慈的skills是["yigui","jihun"]，从未把"yigui_use"挂进group，导致这个use技能从未被真正注册到
+	// 玩家的技能/hiddenCard扫描列表里，形同虚设。现在改成官方那种结构：yigui本身就是可以隐匿使用
+	// 基本牌/普通锦囊牌的技能，"首次明置获得两张魂"挪到通过group挂载的yigui_init子技能里；同时补上
+	// 官方原版有而简化版缺失的能力：①濒死时可用魂里的桃/酒对势力不符的人自救的特判
+	// ②万箭齐发/南蛮入侵等changeTarget判定牌的目标合法性检查（这类牌不会逐一调用filterTarget，
+	// 必须在选择时就验证changeTarget算出来的实际目标是否都符合势力限制）③双势力/野心家武将的势力匹配。
 	yigui: {
-		skillAnimation: true,
-		animationColor: "qun",
 		audio: "yigui",
-		trigger: { player: "showCharacterAfter" },
-		forced: true,
-		preHidden: true,
-		filter(event, player) {
-			return !player.storage.yigui_inited;
-		},
-		// 若左慈是作为第三个武将(3将模式)获得的，一开始就是明置状态，没有showCharacterAfter这个环节。
-		init(player, skill) {
-			if (!player.storage.yigui_inited && isCharacterShown(player, skill)) {
-				lib.skill.yigui.grant(player);
+		enable: "chooseToUse",
+		group: ["yigui_init", "yigui_reset"],
+		// 势力匹配专用：character是"魂"牌本身固定的势力，target是场上的真实角色——按文件头部注释，
+		// 要用target.identity而不是target.group来判断：暗置角色target.identity=="unknown"、
+		// 野心家target.identity=="ye"，只有identity才会被引擎正确置成这两种特殊值；target.group
+		// 存的永远是武将牌本身的势力，不能拿来判断"是否未明置"/"是否是野心家"。
+		matchGroup(character, target) {
+			const group = get.character(character, 1);
+			if (group == "ye" || target.identity == "unknown" || target.identity == "ye" || target.identity == group) {
+				return true;
 			}
+			const double = get.is.double(character, true);
+			return !!(double && double.includes(target.identity));
 		},
 		grant(player) {
 			player.storage.yigui_inited = true;
@@ -22942,81 +22951,226 @@ export default {
 			}
 			player.markAuto("yigui", []);
 		},
-		async content(event, trigger, player) {
-			lib.skill.yigui.grant(player);
+		filter(event, player) {
+			if (event.type == "wuxie" || event.type == "respondShan") {
+				return false;
+			}
+			const souls = player.storage.yigui || [];
+			if (!souls.length) {
+				return false;
+			}
+			const used = player.storage.yigui_used || [];
+			const matchGroup = lib.skill.yigui.matchGroup;
+			if (event.type == "dying") {
+				const target = event.dying;
+				const hasTao = !used.includes("tao") && event.filterCard({ name: "tao" }, player, event);
+				const hasJiu = !used.includes("jiu") && event.filterCard({ name: "jiu" }, player, event);
+				if (!hasTao && !hasJiu) {
+					return false;
+				}
+				return souls.some(character => matchGroup(character, target));
+			}
+			return get
+				.inpileVCardList(info => ["basic", "trick"].includes(get.type(info[2])) && !used.includes(info[2]))
+				.some(cardx => {
+					const card = { name: cardx[2], nature: cardx[3] };
+					if (!lib.filter.filterCard(card, player, event)) {
+						return false;
+					}
+					if (event.filterCard && !event.filterCard(card, player, event)) {
+						return false;
+					}
+					const info = get.info(card);
+					return souls.some(character => {
+						if (info.changeTarget) {
+							const list = game.filterPlayer(current => player.canUse(card, current));
+							return list.some(target0 => {
+								const targets = [target0];
+								info.changeTarget(player, targets);
+								return targets.length > 0 && targets.every(t => matchGroup(character, t));
+							});
+						}
+						return game.hasPlayer(current => event.filterTarget(card, player, current) && matchGroup(character, current));
+					});
+				});
+		},
+		hiddenCard(player, name) {
+			if (["shan", "wuxie"].includes(name) || !lib.inpile.includes(name) || !["basic", "trick"].includes(get.type(name))) {
+				return false;
+			}
+			const used = player.storage.yigui_used || [];
+			return (player.storage.yigui || []).length > 0 && !used.includes(name);
+		},
+		chooseButton: {
+			dialog(event, player) {
+				const dialog = ui.create.dialog("役鬼", "hidden");
+				dialog.add([player.storage.yigui, "character"]);
+				const used = player.storage.yigui_used || [];
+				const list = get.inpileVCardList(info => ["basic", "trick"].includes(get.type(info[2])) && !used.includes(info[2]));
+				dialog.add([list, "vcard"]);
+				return dialog;
+			},
+			filter(button, player) {
+				const evt = _status.event.getParent("chooseToUse");
+				const matchGroup = lib.skill.yigui.matchGroup;
+				if (!ui.selected.buttons.length) {
+					if (typeof button.link != "string") {
+						return false;
+					}
+					if (evt.type == "dying") {
+						return matchGroup(button.link, evt.dying);
+					}
+					return true;
+				}
+				if (typeof ui.selected.buttons[0].link != "string" || typeof button.link != "object") {
+					return false;
+				}
+				const character = ui.selected.buttons[0].link;
+				const name = button.link[2];
+				const used = player.storage.yigui_used || [];
+				if (used.includes(name)) {
+					return false;
+				}
+				const card = { name };
+				if (button.link[3]) {
+					card.nature = button.link[3];
+				}
+				if (evt.type == "dying") {
+					return evt.filterCard(card, player, evt);
+				}
+				if (!lib.filter.filterCard(card, player, evt)) {
+					return false;
+				}
+				if (evt.filterCard && !evt.filterCard(card, player, evt)) {
+					return false;
+				}
+				const info = get.info(card);
+				if (info.changeTarget) {
+					const list = game.filterPlayer(current => player.canUse(card, current));
+					return list.some(target0 => {
+						const targets = [target0];
+						info.changeTarget(player, targets);
+						return targets.length > 0 && targets.every(t => matchGroup(character, t));
+					});
+				}
+				return game.hasPlayer(current => evt.filterTarget(card, player, current) && matchGroup(character, current));
+			},
+			check(button) {
+				if (ui.selected.buttons.length) {
+					const evt = _status.event.getParent("chooseToUse");
+					const name = button.link[2];
+					const character = ui.selected.buttons[0].link;
+					const player = get.player();
+					const matchGroup = lib.skill.yigui.matchGroup;
+					if (evt.type == "dying") {
+						if (evt.dying != player && get.effect(evt.dying, { name }, player, player) <= 0) {
+							return 0;
+						}
+						return name == "jiu" ? 2.1 : 2;
+					}
+					if (!["tao", "juedou", "guohe", "shunshou", "wuzhong", "xietianzi", "yuanjiao", "taoyuan", "wugu", "wanjian", "nanman", "huoshaolianying"].includes(name)) {
+						return 0;
+					}
+					if (["taoyuan", "wugu", "wanjian", "nanman", "huoshaolianying"].includes(name)) {
+						const list = game.filterPlayer(current => matchGroup(character, current) && player.canUse({ name }, current));
+						const num = list.reduce((sum, current) => sum + get.effect(current, { name }, player, player), 0);
+						if (num <= 0) {
+							return 0;
+						}
+						if (list.length > 1) {
+							return (1.7 + Math.random()) * Math.max(num, 1);
+						}
+					}
+				}
+				return 1 + Math.random();
+			},
+			backup(links, player) {
+				const character = links[0];
+				const name = links[1][2];
+				const nature = links[1][3] || null;
+				return {
+					character,
+					filterCard: () => false,
+					selectCard: -1,
+					popname: true,
+					audio: "yigui",
+					viewAs: { name, nature, isCard: true },
+					filterTarget(card, player, target) {
+						const matchGroup = lib.skill.yigui.matchGroup;
+						const info = get.info(card);
+						if (!(info.singleCard && ui.selected.targets.length) && !matchGroup(character, target)) {
+							return false;
+						}
+						if (info.changeTarget) {
+							const targets = [target];
+							info.changeTarget(player, targets);
+							if (!targets.every(t => matchGroup(character, t))) {
+								return false;
+							}
+						}
+						return lib.filter.filterTarget.apply(this, arguments);
+					},
+					onuse(result, player) {
+						player.storage.yigui.remove(character);
+						player.storage.yigui_used = (player.storage.yigui_used || []).concat(name);
+						player.markAuto("yigui", []);
+						_status.characterlist.add(character);
+						game.log(player, "移去了一张", "#g“魂（" + get.translation(character) + "）”");
+					},
+				};
+			},
+			prompt(links) {
+				const name = links[1][2];
+				const character = links[0];
+				const nature = links[1][3];
+				return "移除「" + get.translation(character) + "」并视为使用" + (get.translation(nature) || "") + get.translation(name);
+			},
 		},
 		intro: {
 			content: "存有#张“魂”",
 		},
 		ai: {
+			order: () => 1 + 10 * Math.random(),
+			result: { player: 1 },
 			threaten: 1.5,
 		},
 		subSkill: {
-			use: {
+			init: {
+				skillAnimation: true,
+				animationColor: "qun",
 				audio: "yigui",
-				enable: "chooseToUse",
+				trigger: { player: "showCharacterAfter" },
+				forced: true,
+				preHidden: true,
 				filter(event, player) {
-					if (event.type == "wuxie" || event.type == "respondShan") {
-						return false;
-					}
-					return (player.storage.yigui || []).length > 0;
+					return !player.storage.yigui_inited;
 				},
-				hiddenCard(player, name) {
-					if (!lib.inpile.includes(name) || !["basic", "trick"].includes(get.type(name))) {
-						return false;
+				// 若左慈是作为第三个武将(3将模式)获得的，一开始就是明置状态，没有showCharacterAfter这个环节。
+				init(player) {
+					if (!player.storage.yigui_inited && isCharacterShown(player, "yigui")) {
+						lib.skill.yigui.grant(player);
 					}
-					return (player.storage.yigui || []).length > 0 && !player.storage["yigui_used_" + name];
 				},
-				chooseButton: {
-					dialog(event, player) {
-						const dialog = ui.create.dialog("役鬼", "hidden");
-						dialog.add([player.storage.yigui, "character"]);
-						const list = get.inpileVCardList(info => ["basic", "trick"].includes(get.type(info[2])) && !player.storage["yigui_used_" + info[2]]);
-						dialog.add([list, "vcard"]);
-						return dialog;
-					},
-					filter(button, player) {
-						if (!ui.selected.buttons.length) {
-							return typeof button.link == "string";
-						}
-						return typeof button.link == "object";
-					},
-					check() {
-						return 1 + Math.random();
-					},
-					backup(links, player) {
-						const character = links[0];
-						const name = links[1][2];
-						const nature = links[1][3] || null;
-						const group = get.character(character, 1);
-						return {
-							character,
-							group,
-							filterCard: () => false,
-							selectCard: -1,
-							popname: true,
-							audio: "yigui",
-							viewAs: { name, nature, isCard: true },
-							filterTarget(card, player, target) {
-								if (group != "unknown" && target.group != group && target.group != "unknown") {
-									return false;
-								}
-								return lib.filter.filterTarget.apply(this, arguments);
-							},
-							onuse(result, player) {
-								player.storage.yigui.remove(character);
-								player.storage["yigui_used_" + name] = true;
-								player.when({ global: "phaseAfter" }).step(() => delete player.storage["yigui_used_" + name]);
-								player.markAuto("yigui", []);
-							},
-						};
-					},
+				async content(event, trigger, player) {
+					lib.skill.yigui.grant(player);
+				},
+			},
+			// 每种牌名每回合限一次的"次数"重置：每回合开始时清空已使用记录。
+			reset: {
+				charlotte: true,
+				trigger: { global: "roundStart" },
+				forced: true,
+				popup: false,
+				content() {
+					delete player.storage.yigui_used;
 				},
 			},
 		},
 	},
 
-	// 汲魂：当你受到伤害后，或与你势力相同的角色进入濒死状态被救回后，你可以将一张未加入游戏的武将牌扣置加入"魂"牌。 参考fake_jihun(guozhan，简化改写)
+	// 汲魂：当你受到伤害后，或与你势力相同的角色进入濒死状态被救回后，你可以将一张未加入游戏的武将牌扣置加入"魂"牌。 参考fake_jihun(guozhan bian.js，其trigger/filter继承自官方guozhan的jihun；
+	// 这里的"势力相同"按我们自己文本沿用官方identity-mode版本的isFriendOf写法，
+	// 而不是guozhan rest.js里那份jihun写反的!isFriendOf——那份明显是给敌方用的变体，与我们文本矛盾，不采用)
 	jihun: {
 		audio: "jihun",
 		trigger: { player: "damageEnd", global: "dyingAfter" },
@@ -23039,6 +23193,7 @@ export default {
 				}
 				player.storage.yigui.push(c);
 				player.markAuto("yigui", []);
+				game.log(player, "获得了一张", "#g“魂（" + get.translation(c) + "）”");
 			}
 		},
 	},
