@@ -14071,39 +14071,16 @@ export default {
 		trigger: {
 			player: "damageEnd",
 		},
+		// 描述是"摸一张牌然后令一名角色获得...牌"——是两步都做的"然后"，不是二选一的"或"。
+		// 之前写成chooseControl(["摸牌","拿牌","cancel2"])变成了三选一，摸牌和拿牌牌互斥，
+		// 跟"然后"的语义完全对不上，改成单纯的是否发动，发动就两步都做
 		async cost(event, trigger, player) {
-			let list = ["摸牌"];
-			if (get.itemtype(trigger.cards) == "cards" && trigger.cards.filterInD().length) {
-				list.push("拿牌");
-			}
-			list.push("cancel2");
-			const { control } = await player
-				.chooseControl(list)
-				.set("prompt", get.prompt2("jianxiong"))
-				.set("ai", () => {
-					const player = get.event().player,
-						trigger = get.event().getTrigger();
-					const cards = trigger.cards ? trigger.cards.filterInD() : [];
-					if (get.event().controls.includes("拿牌")) {
-						if (
-							cards.reduce((sum, card) => {
-								return sum + (card.name == "du" ? -1 : 1);
-							}, 0) > 1 ||
-							player.getUseValue(cards[0]) > 6
-						) {
-							return "拿牌";
-						}
-					}
-					return "摸牌";
-				})
-				.forResult();
-			event.result = { bool: control != "cancel2", cost_data: { result: control } };
+			event.result = await player.chooseBool(get.prompt2("jianxiong")).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
-			if (event.cost_data.result == "摸牌") {
-				await player.draw();
-			} else {
-				const cards = trigger.cards.filterInD();
+			await player.draw();
+			const cards = get.itemtype(trigger.cards) == "cards" ? trigger.cards.filterInD() : [];
+			if (cards.length) {
 				const result = await player
 					.chooseTarget(get.prompt("jianxiong"), "令一名角色获得" + get.translation(cards))
 					.set("ai", target => {
@@ -14135,40 +14112,34 @@ export default {
 		enable: "phaseUse",
 		audio: 2,
 		usable: 1,
-		filter(event, player) {
-			return (
-				game.countPlayer(function (current) {
-					return sameGroup(current, player);
-				}) > 1 &&
-				game.hasPlayer(function (current) {
-					return current.isDamaged();
-				})
-			);
-		},
+		// 描述是"对一名角色造成1点伤害，然后令一名与其同势力且已受伤的角色回复1点体力"——
+		// 是先造成伤害，之后再看谁满足"同势力且已受伤"，这个人完全可以就是刚挨了这1点伤害的
+		// 目标本人（伤害结算后他自然就是"已受伤"了）。之前写成selectTarget:2+multitarget一次性
+		// 同时选两个目标，UI层面选不了同一个人两次，而且回血目标的判定在伤害结算前就定死了，
+		// 跟"然后"的顺序不符。改成先选伤害目标、造成伤害，伤害结算完之后再单独问一次回血目标
 		filterTarget(card, player, target) {
-			if (ui.selected.targets.length) {
-				return target.isDamaged() && sameGroup(target, ui.selected.targets[0]);
-			}
 			return true;
 		},
-		selectTarget: 2,
-		multitarget: true,
-		targetprompt: ["受到伤害", "回复体力"],
 		async content(event, trigger, player) {
-			const {
-				targets: [target1, target2],
-			} = event;
+			const target1 = event.target;
 			await target1.damage(player);
-			await target2.recover();
+			const candidates = game.filterPlayer(current => current.isIn() && current.isDamaged() && sameGroup(current, target1));
+			if (!candidates.length) {
+				return;
+			}
+			const result = await player
+				.chooseTarget("挥鞭：选择一名与" + get.translation(target1) + "同势力且已受伤的角色，令其回复1点体力", (card, player, target) => candidates.includes(target))
+				.set("ai", target => get.recoverEffect(target, get.player(), target))
+				.forResult();
+			if (result.bool && result.targets && result.targets.length) {
+				await result.targets[0].recover();
+			}
 		},
 		ai: {
 			threaten: 1.2,
 			order: 9,
 			result: {
 				target(player, target) {
-					if (ui.selected.targets.length) {
-						return 1;
-					}
 					if (get.damageEffect(target, player, player) > 0) {
 						return 2;
 					}
