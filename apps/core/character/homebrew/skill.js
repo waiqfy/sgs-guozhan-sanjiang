@@ -11625,6 +11625,10 @@ export default {
 
 // ========== chengyu 程昱 ==========
 	// 设伏：出牌阶段结束时，你可以将一张手牌扣置于武将牌上；当一名角色使用牌时，你可以移去你武将牌上的一张同名牌令之无效。 参考shefu(sp)
+	// 官方sp版本机制本质不同：结束阶段先选一个牌名，再另选一张手牌作为该牌名的伏兵，可以同时
+	// 囤积多个不同牌名的埋伏。而我们自己的卡面文本只说扣置一张手牌，没有另外声明牌名这一步，
+	// 直接以这张手牌自身的名字为准，且只维护一张埋伏——之前的实现整个照搬了官方先选牌名再选牌
+	// 的复杂结构，跟自己文本完全对不上(不只是扣置位置的问题)，改成简单直接的实现
 	shefu: {
 		skillAnimation: true,
 		animationColor: "water",
@@ -11632,142 +11636,39 @@ export default {
 		direct: true,
 		audio: 2,
 		group: ["shefu_nullify"],
-		init(player) {
-			if (!player.storage.shefu) {
-				player.storage.shefu = [];
-			}
-			if (!player.storage.shefu2) {
-				player.storage.shefu2 = [];
-			}
-		},
 		filter(event, player) {
-			return player.countCards("he") > 0;
+			return player.countCards("h") > 0;
 		},
+		async cost(event, trigger, player) {
+			event.result = await player
+				.chooseCard("h", true, get.prompt2("shefu"))
+				.set("ai", card => 5 - get.value(card))
+				.forResult();
+		},
+		async content(event, trigger, player) {
+			const card = event.cards[0];
+			const next = player.addToExpansion(card, player, "give");
+			next.gaintag.add("shefu");
+			await next;
+			// 扣置：除程昱自己外，其他所有客户端都把这张牌的牌面盖住，只显示牌背
+			game.broadcastAll(
+				(card, owner) => {
+					if (game.me !== owner) {
+						card.classList.add("infohidden");
+					}
+				},
+				card,
+				player
+			);
+		},
+		intro: { content: "expansion", markcount: "expansion" },
 		onremove(player, skill) {
-			var cards = player.getExpansions(skill);
+			const cards = player.getExpansions(skill);
 			if (cards.length) {
 				game.broadcastAll(cards => {
 					cards.forEach(card => card.classList.remove("infohidden"));
 				}, cards);
 				player.loseToDiscardpile(cards);
-			}
-		},
-		intro: {
-			content: "cards",
-			onunmark(storage, player) {
-				player.storage.shefu = [];
-				player.storage.shefu2 = [];
-			},
-			mark(dialog, content, player) {
-				if (content && content.length) {
-					dialog.addAuto(content);
-					if (player.isUnderControl(true)) {
-						var str = "";
-						for (var i = 0; i < player.storage.shefu2.length; i++) {
-							str += get.translation(player.storage.shefu2[i]);
-							if (i < player.storage.shefu2.length - 1) {
-								str += "、";
-							}
-						}
-						dialog.add('<div class="text center">' + str + "</div>");
-					}
-				}
-			},
-		},
-		async content(event, trigger, player) {
-			const list1 = [],
-				list2 = [],
-				list3 = [];
-			for (let i = 0; i < lib.inpile.length; i++) {
-				const type = get.type(lib.inpile[i]);
-				if (type == "basic") {
-					list1.push(["基本", "", lib.inpile[i]]);
-				} else if (type == "trick") {
-					list2.push(["锦囊", "", lib.inpile[i]]);
-				} else if (type == "delay") {
-					list3.push(["锦囊", "", lib.inpile[i]]);
-				}
-			}
-			const result = await player
-				.chooseButton([get.prompt("shefu"), [list1.concat(list2).concat(list3), "vcard"]])
-				.set("filterButton", function (button) {
-					var player = _status.event.player;
-					if (player.storage.shefu2 && player.storage.shefu2.includes(button.link[2])) {
-						return false;
-					}
-					return true;
-				})
-				.set("ai", function (button) {
-					var rand = _status.event.rand;
-					var name = button.link[2];
-					// 猜中才有意义——基本牌(杀/闪/桃等)出现频率远高于锦囊，应该整体优先于锦囊，
-					// 而不是按具体牌名各自随便定权重(会导致个别没单独列出的基本牌反而权重
-					// 低于列出的锦囊牌)。先按类别定一个基准分，再按牌名微调
-					var base = get.type(name) == "basic" ? 5 : 2;
-					switch (name) {
-						case "sha":
-							return base + 1 + rand[1];
-						case "tao":
-							return base + rand[2];
-						case "lebu":
-							return base + 1 + rand[3];
-						case "shan":
-							return base + 0.5 + rand[4];
-						case "wuzhong":
-							return base + 1 + rand[5];
-						case "shunshou":
-							return base + rand[6];
-						case "nanman":
-							return base + rand[7];
-						case "wanjian":
-							return base + rand[8];
-						default:
-							return base + rand[0];
-					}
-				})
-				.set("rand", [Math.random(), Math.random(), Math.random(), Math.random(), Math.random(), Math.random(), Math.random(), Math.random(), Math.random()])
-				.forResult();
-			if (result.bool) {
-				event.cardname = result.links[0][2];
-				player.logSkill("shefu");
-				// 我们自己的shefu_info写的明确是"一张手牌"，不是"he"——参考sp原版虽然用的是
-				// "he"，但按项目一贯原则，自己文本和官方机制冲突时以自己文本为准，应该是"h"。
-				// 之前改回"he"是判断错了。"总是拿装备"那次反馈的真正原因是这里一直没有ai打分，
-				// 已经在下面补上；装备既然不在候选范围内，也就不用再单独压低它的权重
-				const result2 = await player
-					.chooseCard("h", "选择一张手牌作为伏兵", true)
-					.set("ai", card => 5 - get.value(card))
-					.forResult();
-				if (result2.bool) {
-					const card = result2.cards[0];
-					event.card = card;
-					const next = player.addToExpansion(card, player, "give");
-					next.gaintag.add("shefu");
-					await next;
-					// "扣置"：除程昱自己外，其他所有客户端都把这张牌的牌面盖住，只显示牌背。
-					game.broadcastAll(
-						(card, owner) => {
-							if (game.me !== owner) {
-								card.classList.add("infohidden");
-							}
-						},
-						card,
-						player
-					);
-				}
-				if (player.getExpansions("shefu").includes(event.card)) {
-					player.storage.shefu.push(event.card);
-					player.storage.shefu2.push(event.cardname);
-					if (player.isOnline2()) {
-						player.send(function (storage) {
-							game.me.storage.shefu2 = storage;
-						}, player.storage.shefu2);
-					}
-					player.syncStorage("shefu");
-					player.markSkill("shefu");
-				}
-			} else {
-				event.finish();
 			}
 		},
 		ai: {
@@ -11779,34 +11680,22 @@ export default {
 		sourceSkill: "shefu",
 		trigger: { global: "useCard" },
 		filter(event, player) {
-			return (player.storage.shefu2 || []).includes(get.name(event.card, event.player));
+			return player.countExpansions("shefu") > 0 && player.getExpansions("shefu").some(card => get.name(card) == event.card.name);
 		},
 		async cost(event, trigger, player) {
 			event.result = await player
-				.chooseBool(`设伏：是否移去一张同名的“伏兵”，令${get.translation(trigger.card)}无效？`)
+				.chooseBool(`设伏：是否移去武将牌上的一张【${get.translation(trigger.card.name)}】，令${get.translation(trigger.player)}使用的【${get.translation(trigger.card)}】无效？`)
 				.set("ai", () => get.attitude(player, trigger.player) <= 0)
 				.forResult();
 		},
 		async content(event, trigger, player) {
-			const name = get.name(trigger.card, trigger.player);
-			const index = player.storage.shefu2.indexOf(name);
-			if (index === -1) {
-				return;
+			const cards = player.getExpansions("shefu").filter(card => get.name(card) == trigger.card.name);
+			if (cards.length) {
+				game.broadcastAll(card => {
+					card.classList.remove("infohidden");
+				}, cards[0]);
+				await player.loseToDiscardpile([cards[0]]);
 			}
-			const card = player.storage.shefu[index];
-			player.storage.shefu.splice(index, 1);
-			player.storage.shefu2.splice(index, 1);
-			if (player.isOnline2()) {
-				player.send(function (storage) {
-					game.me.storage.shefu2 = storage;
-				}, player.storage.shefu2);
-			}
-			game.broadcastAll(card => {
-				card.classList.remove("infohidden");
-			}, card);
-			await player.loseToDiscardpile([card]);
-			player.syncStorage("shefu");
-			player.markSkill("shefu");
 			trigger.untrigger();
 		},
 		ai: {
