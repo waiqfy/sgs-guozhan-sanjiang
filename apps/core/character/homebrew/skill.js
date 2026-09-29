@@ -24193,33 +24193,28 @@ export default {
 	},
 
 	// 扬威：限定技，当你首次明置此武将牌时，你可以摸两张牌、体力上限+2并回复2点体力，然后其他角色依次可对你使用一张无距离限制的【杀】。 参考skill_old.js
+	// 时机修复：明置选择环节(开局选择是否明置主将，以及3将模式一开始就明置)都发生在所有玩家
+	// 选完武将、摸初始4张手牌之前，此时game.phaseNumber仍为0。若在这个阶段就直接结算摸牌/
+	// 加体力上限/回复/求杀，会抢在"都选完人、发完初始手牌"之前生效，时机不对。正确时机应为
+	// 一号位（本局第一个行动的玩家）的准备阶段开始，即game.phaseNumber刚变为1的那一刻——引擎
+	// 保证到这个时间点时全员已经选完武将并摸好初始手牌。开局前的明置(无论是否触发到
+	// showCharacterAfter)统一推迟到这里结算；游戏正式开始后(phaseNumber>=1)中途才明置的，
+	// 则沿用showCharacterAfter立即结算，不需要也不应该再推迟。
 	yangwei: {
 		skillAnimation: true,
 		animationColor: "qun",
 		aiShowTag: "response",
 		limited: true,
 		audio: 2,
-		trigger: { player: "showCharacterAfter" },
+		trigger: { player: "showCharacterAfter", global: "phaseZhunbeiBegin" },
 		filter(event, player) {
-			// 修复：同jugu(糜竺)的问题，用player.name1判断华雄若被摆在副将位就永远不会触发，
-			// 改用固定角色key"huaxiong"。
-			return !!(event.toShow && event.toShow.includes("huaxiong"));
-		},
-		// 若华雄是作为第三个武将(3将模式)获得的，一开始就是明置状态，没有showCharacterAfter这个环节。
-		// 之前想用挂一个gameStart触发的子技能来处理，但group声明的子技能一直存在，"gameStart"
-		// 这个触发点本身也不一定能可靠命中这个时机；同文件里jugu/guixiu/xianfu/xiaolian等一
-		// 大批"3将模式已明置"的场景，统一用的都是init()里起一个游离async IIFE直接await
-		// chooseBool的写法，是本项目里验证过能正常工作的通用方案，改成跟它们一致
-		init(player, skill) {
-			if (!player.storage.yangwei_init && isCharacterShown(player, skill)) {
-				player.storage.yangwei_init = true;
-				(async () => {
-					const result = await player.chooseBool(get.prompt2("yangwei")).set("ai", () => true).forResult();
-					if (result.bool) {
-						await lib.skill.yangwei.grant(player);
-					}
-				})();
+			if (event.toShow) {
+				// 修复：同jugu(糜竺)的问题，用player.name1判断华雄若被摆在副将位就永远不会触发，
+				// 改用固定角色key"huaxiong"。
+				if (!event.toShow.includes("huaxiong")) return false;
+				return game.phaseNumber !== 0;
 			}
+			return game.phaseNumber === 1 && isCharacterShown(player, "yangwei");
 		},
 		async grant(player) {
 			player.awakenSkill("yangwei");
