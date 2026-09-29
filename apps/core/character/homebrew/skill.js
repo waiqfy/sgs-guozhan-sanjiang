@@ -20094,7 +20094,10 @@ export default {
 	kuanshi: {
 		aiShowTag: "support",
 		audio: 2,
-		enable: "phaseUse",
+		// 描述是"你的回合内，你可以在相应时机使用"——不是只能在出牌阶段用，只要是自己回合内、
+		// 每个阶段开始的时机都该能拿出来重置一次别的技能。之前用enable:"phaseUse"把窗口锁死
+		// 在出牌阶段一个点上，跟文本不符
+		trigger: { player: ["phaseZhunbeiBegin", "phaseJudgeBegin", "phaseDrawBegin1", "phaseUseBegin", "phaseDiscardBegin", "phaseJieshuBegin"] },
 		usable: 1,
 		filter(event, player) {
 			return lib.skill.kuanshi.getCandidates(player).length > 0;
