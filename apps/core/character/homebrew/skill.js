@@ -7237,7 +7237,8 @@ export default {
 			});
 			num = Math.min(3, num);
 			event.num = num;
-			var next = trigger.player.chooseBool("是否发动【统度】摸" + get.cnNumber(num) + "张牌？");
+			// 纯白摸牌没有任何代价，没有ai提示时默认拒绝会导致这张牌从来摸不到，补上ai:true
+			var next = trigger.player.chooseBool("是否发动【统度】摸" + get.cnNumber(num) + "张牌？").set("ai", () => true);
 			if (player == trigger.player) {
 				next.setHiddenSkill("tongdu");
 			}
@@ -7638,12 +7639,25 @@ export default {
 		filterTarget(card, player, target) {
 			return target != player;
 		},
+		// 只有filterTarget没有ai.result时AI不会主动选目标发动这个技能，补上优先选敌方角色；
+		// 牌名选择原来是Math.random()纯随机，改成挑一个对方依赖更重、自己几乎用不到的牌名
+		ai: {
+			order: 5,
+			result: {
+				target(player, target) {
+					return -get.attitude(player, target);
+				},
+			},
+		},
 		async content(event, trigger, player) {
 			const target = event.target;
 			const name = await player
 				.chooseButton(["请选择一个基本牌或普通锦囊牌的牌名", [get.inpileVCardList(info => info[1] == "basic" || info[1] == "trick").filter(card => card[2] != "wuxie"), "vcard"]])
 				.set("ai", button => {
-					return Math.random();
+					const cardname = button[2];
+					const targetCount = target.countCards("he", c => get.name(c) == cardname);
+					const selfCount = player.countCards("he", c => get.name(c) == cardname);
+					return targetCount - selfCount;
 				})
 				.forResultBool();
 			if (!name) {
@@ -8490,9 +8504,12 @@ export default {
 		async content(event, trigger, player) {
 			const source = trigger.source;
 			const victim = trigger.player;
+			// 没有ai时chooseControl默认选中cancel2(什么都不发生)，这张牌就从来不会摸牌/弃牌了；
+			// 补上ai——把摸牌给交情更好的一方，弃牌落在交情更差的一方身上
 			const result = await player
 				.chooseControl(["伤害来源摸一张牌", "受伤角色摸一张牌"], "cancel2")
 				.set("prompt", get.prompt2("jianhui"))
+				.set("ai", () => (get.attitude(player, source) >= get.attitude(player, victim) ? "伤害来源摸一张牌" : "受伤角色摸一张牌"))
 				.forResult();
 			if (result.control == "cancel2") {
 				return;
@@ -8744,7 +8761,8 @@ export default {
 			return event.getlx !== false && !!event.hs && event.hs.length > 0 && player.countCards("h") === 0;
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("shenfu")).forResult();
+			// 手牌已经清空，发动"洛神"纯获利没有代价，没有ai时会被默认拒绝，补上ai:true
+			event.result = await player.chooseBool(get.prompt2("shenfu")).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			await lib.skill.luoshen.content(event, trigger, player);
@@ -9141,7 +9159,8 @@ export default {
 			return event.card && get.type(event.card) == "trick" && event.target == player;
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool("严整：是否解除叠置状态？").forResult();
+			// 解除叠置状态纯粹是摆脱负面状态，没有ai时默认拒绝会导致技能形同虚设，补上ai:true
+			event.result = await player.chooseBool("严整：是否解除叠置状态？").set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			await player.turnOver(false);
@@ -9855,6 +9874,8 @@ export default {
 			return player.countCards("he") > 0 && game.hasPlayer(target => target != player);
 		},
 		async cost(event, trigger, player) {
+			// chooseCardTarget没有ai1/ai2时默认选不中任何牌/目标，这张牌从来发动不出来；
+			// 补上ai1(倾向给出手里不需要的牌)/ai2(优先给交情好的角色)
 			event.result = await player
 				.chooseCardTarget({
 					filterCard: true,
@@ -9864,6 +9885,12 @@ export default {
 						return target != player;
 					},
 					prompt: get.prompt2("huyuan"),
+					ai1(card) {
+						return 8 - get.value(card);
+					},
+					ai2(target) {
+						return get.attitude(get.player(), target);
+					},
 				})
 				.forResult();
 		},
@@ -11903,8 +11930,17 @@ export default {
 		},
 		limited: true,
 		juexingji: true,
+		// 摸牌数不超过5张时不会附带"崩坏"，直接摸；超过5张时若自己已是全场体力最小(崩坏对
+		// 体力最小者不生效)也不怕；否则才需要权衡。没有check时限定技默认被拒绝，永远摸不到该摸的牌
+		check(event, player) {
+			const num = player.maxHp - player.countCards("h");
+			if (num <= 5) {
+				return true;
+			}
+			return !game.hasPlayer(current => current.hp < player.hp);
+		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt(event.name)).forResult();
+			event.result = await player.chooseBool(get.prompt(event.name)).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			player.awakenSkill(event.name);
@@ -12254,15 +12290,16 @@ export default {
 			if (!player.storage.xiaolian_init && isCharacterShown(player, skill) && game.hasPlayer(current => current.countCards("e") > 0)) {
 				player.storage.xiaolian_init = true;
 				(async () => {
-					const result = await player.chooseBool(get.prompt2("xiaolian")).forResult();
+					const result = await player.chooseBool(get.prompt2("xiaolian")).set("ai", () => true).forResult();
 					if (result.bool) {
 						await lib.skill.xiaolian.grant(player);
 					}
 				})();
 			}
 		},
+		// 没有ai时这几步chooseBool/chooseTarget会被默认拒绝或选不中任何目标，技能从来发动不出来
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("xiaolian")).forResult();
+			event.result = await player.chooseBool(get.prompt2("xiaolian")).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			await lib.skill.xiaolian.grant(player);
@@ -12270,6 +12307,7 @@ export default {
 		async grant(player) {
 			const sourceResult = await player
 				.chooseTarget("孝廉：选择装备区里有牌的一名角色", (card, plyr, target) => target.countCards("e") > 0, true)
+				.set("ai", target => -get.attitude(get.player(), target))
 				.forResult();
 			const from = sourceResult.targets && sourceResult.targets[0];
 			if (!from) {
@@ -12280,7 +12318,10 @@ export default {
 			if (!card) {
 				return;
 			}
-			const destResult = await player.chooseTarget("孝廉：选择移动到的一名角色", true).forResult();
+			const destResult = await player
+				.chooseTarget("孝廉：选择移动到的一名角色", true)
+				.set("ai", target => get.attitude(get.player(), target))
+				.forResult();
 			const to = destResult.targets && destResult.targets[0];
 			if (!to) {
 				return;
@@ -12298,8 +12339,9 @@ export default {
 		filter(event, player) {
 			return player.canUse("zhibi", event.player, false, true);
 		},
+		// 视为使用知己知彼没有实际代价，没有ai时会被默认拒绝，补上ai:true
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("zhongjian", trigger.player)).forResult();
+			event.result = await player.chooseBool(get.prompt2("zhongjian", trigger.player)).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			const source = trigger.player;
@@ -12311,7 +12353,8 @@ export default {
 			delete player.storage.zhibi_lastViewed;
 			const slot = viewed === "主将" ? 0 : viewed === "副将" ? 1 : null;
 			if (slot != null && source.isUnseen(slot)) {
-				const result = await player.chooseBool(`忠鉴：是否明置${get.translation(source)}的${viewed}？`).forResult();
+				// 明置的是对方的武将牌，对自己纯获利，没有ai时会被默认拒绝
+				const result = await player.chooseBool(`忠鉴：是否明置${get.translation(source)}的${viewed}？`).set("ai", () => true).forResult();
 				if (result.bool) {
 					await source.showCharacter(slot);
 				}
@@ -12349,7 +12392,8 @@ export default {
 			player.storage.caishi_used = true;
 			player.awakenSkill?.("caishi");
 			// 才识可能挂在主将、副将，也可能挂在第三将(3将/sanjiang模式)，提示语不能写死"主将"
-			const change = await player.chooseBool(get.prompt("caishi"), "是否变更此武将牌？").forResult();
+			// 已经决定发动才识了，顺带变更武将牌没有额外代价，没有ai时会被默认拒绝
+			const change = await player.chooseBool(get.prompt("caishi"), "是否变更此武将牌？").set("ai", () => true).forResult();
 			if (!change.bool) {
 				return;
 			}
@@ -13578,8 +13622,9 @@ export default {
 		filter(event, player) {
 			return event.card.name == "sha";
 		},
+		// 取消指向自己的【杀】纯粹是防御收益，没有ai时会被默认拒绝，导致技能从来不生效
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("juetao", trigger.player)).forResult();
+			event.result = await player.chooseBool(get.prompt2("juetao", trigger.player)).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			trigger.directHit.add(player);
@@ -16090,8 +16135,11 @@ export default {
 			return game.hasPlayer(current => current.countCards("j", card => get.name(card, current) == "lebu") > 0);
 		},
 		async cost(event, trigger, player) {
+			// chooseTarget没有ai时默认选不中任何目标，这张牌从来发动不出来；补上ai——优先把
+			// 队友身上的乐不思蜀移走(holder选交情好的)，转移到敌方身上(dest选交情差的)
 			const holderResult = await player
 				.chooseTarget(get.prompt("guose2"), "将一名角色判定区里的一张【乐不思蜀】移动至另一名角色的判定区", (card, player, target) => target.countCards("j", card => get.name(card, target) == "lebu") > 0)
+				.set("ai", target => get.attitude(get.player(), target))
 				.forResult();
 			if (!holderResult.bool) {
 				event.result = { bool: false };
@@ -16106,7 +16154,10 @@ export default {
 				event.result = { bool: false };
 				return;
 			}
-			const destResult = await player.chooseTarget((card, player, target) => target != holder, "选择要移动至的判定区").forResult();
+			const destResult = await player
+				.chooseTarget((card, player, target) => target != holder, "选择要移动至的判定区")
+				.set("ai", target => -get.attitude(get.player(), target))
+				.forResult();
 			if (!destResult.bool) {
 				event.result = { bool: false };
 				return;
@@ -16340,20 +16391,29 @@ export default {
 		filter(event, player) {
 			return player.hp == 1 && game.hasPlayer(current => current != player);
 		},
+		// 体力已经是1、濒死边缘发动的限定技，没有额外代价，没有ai时全链路都会被默认拒绝/选不中
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt(event.skill), "是否发动一次〖英魂〗？").forResult();
+			event.result = await player.chooseBool(get.prompt(event.skill), "是否发动一次〖英魂〗？").set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			player.awakenSkill(event.name);
 			const num = player.getDamagedHp();
-			const targetResult = await player.chooseTarget(get.prompt2("yinghun"), (card, player, target) => player != target).forResult();
+			const targetResult = await player
+				.chooseTarget(get.prompt2("yinghun"), (card, player, target) => player != target)
+				.set("ai", target => Math.abs(get.attitude(get.player(), target)))
+				.forResult();
 			if (!targetResult.bool) {
 				return;
 			}
 			const [target] = targetResult.targets;
 			const str1 = "摸" + get.cnNumber(num, true) + "弃一";
 			const str2 = "摸一弃" + get.cnNumber(num, true);
-			const { control } = await player.chooseControl(str1, str2).set("prompt", "英魂").forResult();
+			// 对交情好的角色选净摸牌的一档(帮队友)，对交情差的角色选净弃牌的一档(削敌方)
+			const { control } = await player
+				.chooseControl(str1, str2)
+				.set("prompt", "英魂")
+				.set("ai", () => (get.attitude(get.player(), target) >= 0 ? str1 : str2))
+				.forResult();
 			if (control == str1) {
 				await target.draw(num);
 				await target.chooseToDiscard(true, "he");
@@ -16488,8 +16548,12 @@ export default {
 		filter(event, player) {
 			return game.hasPlayer(current => current != player);
 		},
+		// chooseTarget没有ai时默认选不中任何目标，这张牌从来发动不出来；优先挑一名敌方角色拼点
 		async cost(event, trigger, player) {
-			event.result = await player.chooseTarget(get.prompt(event.skill), "你可以与一名其他角色拼点", (card, player, target) => target != player).forResult();
+			event.result = await player
+				.chooseTarget(get.prompt(event.skill), "你可以与一名其他角色拼点", (card, player, target) => target != player)
+				.set("ai", target => -get.attitude(get.player(), target))
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			const target = event.targets[0];
@@ -18560,7 +18624,8 @@ export default {
 			game.countPlayer2(current => {
 				num += current.getHistory("useCard").filter(evt => ["basic", "trick"].includes(get.type2(evt.card)) && evt.targets?.includes(player)).length;
 			});
-			const result = await player.chooseBool(get.prompt2("danshou")).forResult();
+			// 摸牌纯获利没有任何代价，没有ai时会被默认拒绝，补上ai:true
+			const result = await player.chooseBool(get.prompt2("danshou")).set("ai", () => true).forResult();
 			event.result = { bool: result.bool, cost_data: num };
 		},
 		async content(event, trigger, player) {
@@ -18606,8 +18671,10 @@ export default {
 			return !!cardEvt && (cardEvt.name == "sha" || get.type2(cardEvt.name) == "trick");
 		},
 		async cost(event, trigger, player) {
+			// chooseTarget没有ai时默认选不中任何目标，技能从来发动不出来；优先嫁祸给敌方角色
 			event.result = await player
 				.chooseTarget(get.prompt2("chanhui"), (card, plyr, target) => target != player && target != trigger.player)
+				.set("ai", target => -get.attitude(get.player(), target))
 				.forResult();
 		},
 		logTarget: "targets",
@@ -20640,9 +20707,18 @@ export default {
 		audio: 2,
 		trigger: { player: "phaseDrawBegin1" },
 		async content(event, trigger, player) {
+			// chooseControl没有ai时默认选中"不发动"，技能从来不会生效；补上ai——手牌紧张的
+			// 回合选流失体力更安全，否则少摸一张牌代价更小
 			const result = await player
 				.chooseControl(["少摸一张牌", "流失一点体力", "不发动"])
 				.set("prompt", "遗礼：是否少摸一张牌或流失一点体力，获得2枚“阴阳鱼”标记？")
+				.set("ai", () => {
+					const player = get.player();
+					if (player.hp <= 2) {
+						return "少摸一张牌";
+					}
+					return "流失一点体力";
+				})
 				.forResult();
 			const choice = result.control;
 			if (choice == "不发动") {
@@ -20661,8 +20737,10 @@ export default {
 			if (!others.length) {
 				return;
 			}
+			// [0,N]的多选chooseTarget没有ai时默认选不中任何人，标记分不出去；补上ai优先给交情好的角色
 			const giveResult = await player
 				.chooseTarget("遗礼：你可以令任意名其他角色各获得你的1枚“阴阳鱼”标记", [0, others.length], (card, player, target) => target != player)
+				.set("ai", target => get.attitude(get.player(), target))
 				.forResult();
 			if (giveResult.bool && giveResult.targets && giveResult.targets.length) {
 				for (const target of giveResult.targets) {
@@ -21151,7 +21229,8 @@ export default {
 			return event.card?.name === "diaohulishan" && event.target.isIn() && (event.target === player || event.target.isFriendOf(player));
 		},
 		async cost(event, trigger, player) {
-			event.result = await trigger.target.chooseBool(`调归：是否摸一张牌，取消你成为【调虎离山】的目标？`).forResult();
+			// 摸牌+取消自己成为目标，纯获利没有代价，没有ai时会被默认拒绝
+			event.result = await trigger.target.chooseBool(`调归：是否摸一张牌，取消你成为【调虎离山】的目标？`).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			await trigger.target.draw();
@@ -21227,8 +21306,21 @@ export default {
 		filter(event, player) {
 			return player.countCards("h") > 0 && !player.hasCard(card => !lib.filter.cardDiscardable(card, player, "duannian"), "h");
 		},
+		// 弃光手牌再摸满是有真实代价的(会打出低价值以外的牌)，没有check时会被默认拒绝而从来
+		// 用不上；补一个门槛：手牌数明显少于体力上限(净赚牌)，或手牌普遍是低价值牌时才发动
+		check(event, player) {
+			const cards = player.getCards("h", card => lib.filter.cardDiscardable(card, player, "duannian"));
+			if (!cards.length) {
+				return false;
+			}
+			if (cards.length < player.maxHp) {
+				return true;
+			}
+			const avg = cards.reduce((sum, card) => sum + get.value(card, player), 0) / cards.length;
+			return avg <= 5;
+		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2(event.skill)).forResult();
+			event.result = await player.chooseBool(get.prompt2(event.skill)).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			await player.discard(player.getCards("h", card => lib.filter.cardDiscardable(card, player, "duannian")));
@@ -21242,8 +21334,12 @@ export default {
 		audio: 2,
 		trigger: { player: "die" },
 		forceDie: true,
+		// 赠送的是进攻增益技能，chooseTarget没有ai时默认选不中任何人；补上优先给交情好的角色
 		async cost(event, trigger, player) {
-			event.result = await player.chooseTarget(get.prompt2(event.skill), lib.filter.notMe).forResult();
+			event.result = await player
+				.chooseTarget(get.prompt2(event.skill), lib.filter.notMe)
+				.set("ai", target => get.attitude(get.player(), target))
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			const target = event.targets[0];
@@ -21347,13 +21443,20 @@ export default {
 		filterTarget(card, player, target) {
 			return target !== player;
 		},
+		// ai里只有threaten，不影响AI要不要主动用它；封锁本回合手牌是压制敌方的技能，选敌方角色
+		ai: {
+			order: 8,
+			result: {
+				target(player, target) {
+					return -get.attitude(player, target);
+				},
+			},
+			threaten: 1.2,
+		},
 		async content(event, trigger, player) {
 			const target = event.target;
 			await target.drawTo(Math.min(5, target.maxHp));
 			target.addTempSkill("boyan_block", { player: "phaseAfter" });
-		},
-		ai: {
-			threaten: 1.2,
 		},
 	},
 	boyan_block: {
@@ -23103,11 +23206,16 @@ export default {
 				game.hasPlayer(current => current != event.player)
 			);
 		},
+		// 最坏情况什么都不发生，最好情况能对目标造成雷电伤害或让自己回血，没有ai时默认拒绝
+		// 会导致技能从来不用；补上ai:true，并让目标选择优先指向敌方角色
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("huangtian_leiji", trigger.player)).forResult();
+			event.result = await player.chooseBool(get.prompt2("huangtian_leiji", trigger.player)).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
-			const targetResult = await player.chooseTarget(get.prompt2("leiji"), (card, player, target) => target != player, true).forResult();
+			const targetResult = await player
+				.chooseTarget(get.prompt2("leiji"), (card, player, target) => target != player, true)
+				.set("ai", target => -get.attitude(get.player(), target))
+				.forResult();
 			const target = targetResult.targets && targetResult.targets[0];
 			if (!target || !target.isIn()) {
 				return;
@@ -24223,8 +24331,9 @@ export default {
 		filter(event, player) {
 			return game.hasPlayer(current => current != player && current.isFriendOf(player) && current.countCards("he") > 0);
 		},
+		// 白得队友的牌对发动者纯获利，没有ai时会被默认拒绝，补上ai:true
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("weidi")).forResult();
+			event.result = await player.chooseBool(get.prompt2("weidi")).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			const targets = game.filterPlayer(current => current != player && current.isFriendOf(player));
@@ -24232,7 +24341,8 @@ export default {
 				if (!target.isIn() || !target.countCards("he")) {
 					continue;
 				}
-				const result = await target.chooseCard("he", true, get.prompt2("weidi")).forResult();
+				// 没有ai时这一步默认选不中任何牌，队友什么都交不出去；补上ai——倾向交出价值最低的牌
+				const result = await target.chooseCard("he", true, get.prompt2("weidi")).set("ai", card => 8 - get.value(card)).forResult();
 				if (result.bool && result.cards && result.cards.length) {
 					await target.give(result.cards, player);
 				}
@@ -25218,8 +25328,9 @@ export default {
 			const evt = event.getl && event.getl(event.player);
 			return !!(evt && evt.hs && evt.hs.length);
 		},
+		// chooseBool没有ai时会被默认拒绝；这是纯粹的骚扰技能，对敌方角色发动即可
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("liru_mieji", trigger.player)).forResult();
+			event.result = await player.chooseBool(get.prompt2("liru_mieji", trigger.player)).set("ai", () => get.attitude(player, trigger.player) <= 0).forResult();
 		},
 		async content(event, trigger, player) {
 			const target = trigger.player;
@@ -25243,6 +25354,17 @@ export default {
 		animationColor: "fire",
 		filterTarget(card, player, target) {
 			return target != player;
+		},
+		// ai里只有threaten(影响敌方对这张牌威胁度的观感)，不影响AI要不要主动用它；这是限定技，
+		// 从敌方角色开始传导弃牌/伤害的连锁效果最有利，所以起始目标优先选交情差的角色
+		ai: {
+			order: 9,
+			result: {
+				target(player, target) {
+					return -get.attitude(player, target);
+				},
+			},
+			threaten: 1.6,
 		},
 		async content(event, trigger, player) {
 			player.awakenSkill(event.name);
@@ -25279,7 +25401,6 @@ export default {
 				}
 			}
 		},
-		ai: { threaten: 1.6 },
 	},
 
 // ========== caifuren 蔡夫人 ==========
@@ -25400,6 +25521,15 @@ export default {
 			return player != target;
 		},
 		delay: false,
+		// enable:"phaseUse"的技能只有filterTarget、没有ai.result时，AI不会主动选目标发动这个
+		// 限定技；把全部装备送给target后由target自己选择回血或输出，所以target选交情好的角色更安全
+		ai: {
+			result: {
+				target(player, target) {
+					return get.attitude(player, target);
+				},
+			},
+		},
 		async content(event, trigger, player) {
 			const cards = player.getCards("e");
 			const target = event.target;
@@ -25556,6 +25686,15 @@ export default {
 		filter(event, player) {
 			return game.countPlayer(current => current != player) >= 2;
 		},
+		// 只有filterTarget没有ai.result时AI不会主动选carrier发动这个技能；把全部手牌交给
+		// target很信任的话才安全，所以carrier优先选交情好的角色；拼点对手则优先选敌方角色
+		ai: {
+			result: {
+				target(player, target) {
+					return get.attitude(player, target);
+				},
+			},
+		},
 		async content(event, trigger, player) {
 			const carrier = event.target;
 			const cards = player.getCards("h");
@@ -25564,6 +25703,7 @@ export default {
 			}
 			const result = await player
 				.chooseTarget(true, `密詔：请选择一名角色与${get.translation(carrier)}拼点`, (card, plyr, target) => target != player && target != carrier)
+				.set("ai", target => -get.attitude(get.player(), target))
 				.forResult();
 			if (!result.bool || !result.targets || !result.targets.length) {
 				return;
@@ -26497,11 +26637,17 @@ export default {
 		filter(event, player) {
 			return !!(event.targets && event.targets.length == 1 && player.countCards("h") > 0);
 		},
+		// 弃光手牌是真实代价，没有check时会被默认拒绝——只有手牌本来就少、或对方是敌方角色
+		// 值得反制时才划算；二选一没有ai默认选不中，优先选伤害(收益通常比等量弃牌更大)
+		check(event, player) {
+			return player.countCards("h") <= 2 || get.attitude(player, trigger.player) < 0;
+		},
 		async content(event, trigger, player) {
 			const target = trigger.player;
 			const result = await player
 				.chooseToDiscard("h", player.countCards("h"), false)
 				.set("prompt2", "舌剑：是否弃置所有手牌（至少一张）？")
+				.set("ai", () => true)
 				.forResult();
 			if (!result?.bool || !result.cards?.length || !target?.isIn()) {
 				return;
@@ -26510,7 +26656,11 @@ export default {
 			const canDamage = !game.hasPlayer(current => current.isDying());
 			let useDamage = false;
 			if (canDamage) {
-				const choice = await player.chooseControl("弃置其等量的牌", "对其造成1点伤害").set("prompt", "舌剑：请选择一项").forResult();
+				const choice = await player
+					.chooseControl("弃置其等量的牌", "对其造成1点伤害")
+					.set("prompt", "舌剑：请选择一项")
+					.set("ai", () => "对其造成1点伤害")
+					.forResult();
 				useDamage = choice.control == "对其造成1点伤害";
 			}
 			if (useDamage) {
@@ -26538,8 +26688,10 @@ export default {
 		async content(event, trigger, player) {
 			const target = player.storage.ruzong_targets[0];
 			if (target == player) {
+				// [0,Infinity]的多选chooseTarget没有ai时默认选不中任何人；这是纯粹的送牌，优先给队友
 				const result = await player
 					.chooseTarget("儒宗：是否令任意名其他角色将手牌数摸至与你相同？", [0, Infinity], (card, pl, ta) => ta != player)
+					.set("ai", ta => get.attitude(get.player(), ta))
 					.forResult();
 				if (result?.bool && result.targets?.length) {
 					for (const other of result.targets) {
@@ -26555,7 +26707,8 @@ export default {
 			} else {
 				const diff = Math.min(5, target.countCards("h") - player.countCards("h"));
 				if (diff > 0) {
-					const result = await player.chooseBool(get.prompt("ruzong"), "是否将手牌摸至与" + get.translation(target) + "相同（摸" + diff + "张）？").forResult();
+					// 纯粹摸牌追平对方，没有任何代价，没有ai时会被默认拒绝
+					const result = await player.chooseBool(get.prompt("ruzong"), "是否将手牌摸至与" + get.translation(target) + "相同（摸" + diff + "张）？").set("ai", () => true).forResult();
 					if (result.bool) {
 						await player.draw(diff);
 					}
@@ -26699,6 +26852,18 @@ export default {
 		},
 		filterTarget(card, player, target) {
 			return target != player;
+		},
+		// 只有filterTarget没有ai.result时AI不会主动选目标发动这个技能；优先挑装备区/判定区
+		// 有牌可拿、且是敌方的角色拼点(赢了净赚，输了代价也很小)
+		ai: {
+			result: {
+				target(player, target) {
+					if (!target.countCards("ej")) {
+						return 0;
+					}
+					return 1 - get.attitude(player, target);
+				},
+			},
 		},
 		async content(event, trigger, player) {
 			const target = event.target;
@@ -26955,8 +27120,10 @@ export default {
 		filter(event, player) {
 			return player.countCards("h") > 0;
 		},
+		// 展示手牌虽有信息泄露的代价，但换来的是必得的摸杀/额外增益，收益明显更大，没有ai时
+		// 默认拒绝会导致这个技能几乎从来不用
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt("guowu"), "是否展示全部手牌？").forResult();
+			event.result = await player.chooseBool(get.prompt("guowu"), "是否展示全部手牌？").set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			const hs = player.getCards("h");
@@ -27086,6 +27253,16 @@ export default {
 		filterTarget(card, player, target) {
 			return target !== player;
 		},
+		// ai里只有threaten，不影响AI要不要主动用它；target要被迫交牌+被迫用杀攻击一人，选敌方角色
+		ai: {
+			order: 7,
+			result: {
+				target(player, target) {
+					return -get.attitude(player, target);
+				},
+			},
+			threaten: 1.0,
+		},
 		async content(event, trigger, player) {
 			const target = event.target;
 			const num = Math.min(2, target.countCards("h"));
@@ -27099,9 +27276,12 @@ export default {
 			if (!candidates.length) {
 				return;
 			}
+			// 没有ai和forced时target这一步经常选不中任何人、白白交了牌却没有后续效果；补上forced
+			// 和ai——被逼着选一个人挨杀时，target自己会优先选自己最讨厌的那个
 			const result = await target
-				.chooseTarget(`引戈：选择一名角色，视为对其使用一张【杀】`, (card, plyr, to) => get.event().candidates.includes(to))
+				.chooseTarget(`引戈：选择一名角色，视为对其使用一张【杀】`, (card, plyr, to) => get.event().candidates.includes(to), true)
 				.set("candidates", candidates)
+				.set("ai", to => -get.attitude(get.player(), to))
 				.forResult();
 			if (result && result.bool && result.targets && result.targets.length) {
 				const victim = result.targets[0];
@@ -27110,7 +27290,6 @@ export default {
 				}
 			}
 		},
-		ai: { threaten: 1.0 },
 	},
 	// 施仁：每回合限一次，当你成为其他角色使用【杀】的目标后，你可以摸两张牌，然后交给该角色一张牌。 参考lz_shiren(原创，未见对应官方技能)
 	shiren: {
@@ -27123,8 +27302,9 @@ export default {
 		filter(event, player) {
 			return event.card.name === "sha" && event.player && event.player !== player;
 		},
+		// 摸两张交一张，对自己是净赚一张牌，没有ai时会被默认拒绝
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(`施仁：是否摸两张牌，然后交给${get.translation(trigger.player)}一张牌？`).forResult();
+			event.result = await player.chooseBool(`施仁：是否摸两张牌，然后交给${get.translation(trigger.player)}一张牌？`).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			await player.draw(2);
@@ -27145,8 +27325,10 @@ export default {
 		filter(event, player) {
 			return event.source && event.source !== player && event.source.isIn() && event.source.isFriendOf(player) && event.source.storage.juyi2_round !== game.phaseNumber;
 		},
+		// 对trigger.source(友方攻击者)而言，取消自己造成的伤害还能白得一张牌，双赢没有代价，
+		// 没有ai时会被默认拒绝
 		async cost(event, trigger, player) {
-			event.result = await trigger.source.chooseBool(`据益：是否防止你对${get.translation(player)}造成的伤害，然后获得其一张牌？`).forResult();
+			event.result = await trigger.source.chooseBool(`据益：是否防止你对${get.translation(player)}造成的伤害，然后获得其一张牌？`).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			trigger.source.storage.juyi2_round = game.phaseNumber;
@@ -27173,8 +27355,12 @@ export default {
 			}
 			return event.name === "loseHp";
 		},
+		// 弃两张牌是真实代价，没有ai时默认拒绝也不算离谱，但体力告急或手牌明显富余时应该舍牌保命
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(`据益：是否弃置两张牌，防止你${trigger.name === "damage" ? "受到的伤害" : "失去的体力"}？`).forResult();
+			event.result = await player
+				.chooseBool(`据益：是否弃置两张牌，防止你${trigger.name === "damage" ? "受到的伤害" : "失去的体力"}？`)
+				.set("ai", () => player.hp <= 2 || player.countCards("he") > player.hp + 2)
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			player.storage.juyi2_self_round = game.phaseNumber;
@@ -27245,6 +27431,16 @@ export default {
 		filterTarget(card, player, target) {
 			return target !== player && player.inRange(target);
 		},
+		// ai里只有threaten，不影响AI要不要主动用它；议事结果对target要么弃牌要么受伤，选敌方角色更有利
+		ai: {
+			order: 6,
+			result: {
+				target(player, target) {
+					return -get.attitude(player, target);
+				},
+			},
+			threaten: 1.3,
+		},
 		async content(event, trigger, player) {
 			const target = event.target;
 			const voters = game.filterPlayer(current => current !== target && current.countCards("h") <= player.countCards("h"));
@@ -27267,7 +27463,6 @@ export default {
 					}
 				});
 		},
-		ai: { threaten: 1.3 },
 	},
 	// 伐异：当你参与议事结束后，你可以对一名意见与你不同的角色造成1点伤害。
 	// 参考jsrg包jsrgfayi(王允)——之前误标"原创无参考"，机制一致，本地限定只能选一名目标而官方允许多选，与本地翻译文本("一名角色")相符，未改动。
@@ -27289,9 +27484,11 @@ export default {
 		async cost(event, trigger, player) {
 			const mine = trigger.red.some(i => i[0] === player) ? "red" : "black";
 			const opposite = (mine === "red" ? trigger.black : trigger.red).filter(i => i[0].isIn());
+			// chooseTarget没有ai时默认选不中任何目标，这张牌从来发动不出来；优先打敌方角色
 			event.result = await player
 				.chooseTarget("伐异：是否对一名意见与你不同的角色造成1点伤害？", (card, plyr, to) => get.event().opposite.some(i => i[0] === to))
 				.set("opposite", opposite)
+				.set("ai", to => -get.attitude(get.player(), to))
 				.forResult();
 		},
 		async content(event, trigger, player) {
@@ -27354,8 +27551,9 @@ export default {
 		filter(event, player) {
 			return event.list && event.list.includes(player) && player.countCards("h") > 1;
 		},
+		// 操纵议事结果对自己有利，没有ai时会被默认拒绝，补上ai:true
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool("凶暴：是否额外展示一张手牌，令其余参与者改为随机展示手牌？").forResult();
+			event.result = await player.chooseBool("凶暴：是否额外展示一张手牌，令其余参与者改为随机展示手牌？").set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			const hs = player.getCards("h");
@@ -27415,8 +27613,9 @@ export default {
 		filter(event, player) {
 			return game.hasPlayer(current => current !== player);
 		},
+		// 参与议事没有额外代价(自己的立场可以自主选择)，没有ai时会被默认拒绝，补上ai:true
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool("朝争：是否与所有其他角色议事？").forResult();
+			event.result = await player.chooseBool("朝争：是否与所有其他角色议事？").set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			const all = game.filterPlayer();
@@ -27470,6 +27669,16 @@ export default {
 		enable: "phaseUse",
 		filterTarget: lib.filter.notMe,
 		derivation: ["feiyang", "bahu"],
+		// ai里只有threaten，不影响AI要不要主动用它；赠予的是强力技能，选交情好的角色才安全
+		ai: {
+			order: 9,
+			result: {
+				target(player, target) {
+					return get.attitude(player, target);
+				},
+			},
+			threaten: 1.6,
+		},
 		async content(event, trigger, player) {
 			const { target, name: skillName } = event;
 			player.awakenSkill(skillName);
@@ -27477,7 +27686,6 @@ export default {
 			player.addSkill(skillName + "_die");
 			player.markAuto(skillName + "_die", [target]);
 		},
-		ai: { threaten: 1.6 },
 		subSkill: {
 			die: {
 				audio: "jsrgshenchong",
@@ -27594,9 +27802,10 @@ export default {
 			const branch = event.player.hp > player.hp ? "gt" : "le";
 			return !player.getHistory("gain", evt => evt.getParent("shiyuan")?.branch === branch).length;
 		},
+		// 纯摸牌没有任何代价，没有ai时会被默认拒绝
 		async cost(event, trigger, player) {
 			const branch = trigger.player.hp > player.hp ? "gt" : "le";
-			event.result = await player.chooseBool(`诗怨：是否摸${branch === "gt" ? "两" : "一"}张牌？`).forResult();
+			event.result = await player.chooseBool(`诗怨：是否摸${branch === "gt" ? "两" : "一"}张牌？`).set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
 			const branch = trigger.player.hp > player.hp ? "gt" : "le";
