@@ -3199,6 +3199,21 @@ export default {
 					.chooseControl(choiceList)
 					.set("choiceList", choiceList)
 					.set("prompt", get.prompt2(event.skill))
+					// 优先级：判定区最优先(代价最低)；其次是弃自己手牌，但手牌数超过3张就
+					// 不划算了；装备区优先级最低，只有手牌太多舍不得弃、又没有判定区可选时
+					// 才退而求其次去拆装备
+					.set("ai", () => {
+						if (areas.includes("j")) {
+							return choiceList[0];
+						}
+						if (canHand && player.countCards("h") <= 3) {
+							return choiceList[1];
+						}
+						if (canArea) {
+							return choiceList[0];
+						}
+						return choiceList[1];
+					})
 					.forResult();
 				if (result.control == choiceList[0] && canArea) {
 					// areas按["j","e"]顺序过滤，取第一个(优先判定区)而不是最后一个——
