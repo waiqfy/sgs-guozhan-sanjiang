@@ -11691,7 +11691,14 @@ export default {
 			if (result.bool) {
 				event.cardname = result.links[0][2];
 				player.logSkill("shefu");
-				const result2 = await player.chooseCard("h", "选择一张手牌作为伏兵", true).forResult();
+				// 参考sp原版shefu这里用的就是"he"(手牌+装备)，不是"h"——之前按翻译文本"一张手牌"
+			// 改成了"h"，但机制其实和官方一样允许扣装备牌，是翻译文本表述宽松，不是机制错误；
+			// 之前反馈"总是拿装备"其实是这里一直没有ai打分、纯默认弃牌AI偏好高价值牌(装备
+			// 通常get.value更高)导致的，不是位置错——补上ai明确压低装备优先级
+			const result2 = await player
+				.chooseCard("he", "选择一张牌作为伏兵", true)
+				.set("ai", card => (get.type(card) == "equip" ? 1 : 5) - get.value(card))
+				.forResult();
 				if (result2.bool) {
 					const card = result2.cards[0];
 					event.card = card;
@@ -14402,6 +14409,7 @@ export default {
 				if (x > 0 && game.hasPlayer(current => current != player)) {
 					const targetResult = await player
 						.chooseTarget("治严：交给一名其他角色" + get.cnNumber(x) + "张手牌", (card, player, target) => target != player)
+						.set("ai", target => get.attitude(get.player(), target))
 						.forResult();
 					if (targetResult && targetResult.bool && targetResult.targets && targetResult.targets.length) {
 						const num = Math.min(x, player.countCards("h"));
@@ -14418,6 +14426,12 @@ export default {
 		},
 		ai: {
 			threaten: 0.8,
+			// 没有filterTarget/顶层目标，选项和交牌目标都是content()内部自选的phaseUse主动技，
+			// 跟chuwen/zhuanzheng同一个坑：没有order+result.player的话引擎默认几乎不会主动用
+			order: 6,
+			result: {
+				player: 1,
+			},
 		},
 	},
 
@@ -26722,7 +26736,22 @@ export default {
 			);
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("anyong", trigger.player)).forResult();
+			event.result = await player
+				.chooseBool(get.prompt2("anyong", trigger.player))
+				// 只明置一将/完全暗置时代价很低(顶多弃两张牌)，尽量用；双亮的代价是自己掉1血，
+				// 只有能借此把对方打到濒死、或者自己桃很多能扛得起这1血时才值得
+				.set("ai", () => {
+					const target = trigger.player;
+					const seen0 = !(target.isUnseen && target.isUnseen(0));
+					const seen1 = !(target.isUnseen && target.isUnseen(1));
+					if (seen0 && seen1) {
+						const lethal = target.hp <= trigger.num * 2;
+						const canAfford = player.hp > 1 && player.countCards("h", { name: "tao" }) >= 2;
+						return lethal || canAfford;
+					}
+					return true;
+				})
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			player.storage.anyong_round = game.phaseNumber;
