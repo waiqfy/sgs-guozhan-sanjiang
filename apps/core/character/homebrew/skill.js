@@ -934,7 +934,12 @@ export default {
 			if (result.control == "不可被响应") {
 				trigger.norespond = true;
 			} else {
-				trigger.getParent().baseDamage = (trigger.getParent().baseDamage || 1) + 1;
+				// 同wusheng那处的坑：trigger到useCard事件之间隔着arrangeTrigger，getParent()
+				// 默认只往上1层找不对，改成按事件名找
+				var useCardEvent = trigger.getParent("useCard");
+				if (useCardEvent) {
+					useCardEvent.baseDamage = (useCardEvent.baseDamage || 1) + 1;
+				}
 			}
 			player.storage.fengshi_card = trigger.card;
 			player.addTempSkill("fengshi_track");
@@ -1239,7 +1244,14 @@ export default {
 		forced: true,
 		popup: false,
 		content() {
-			trigger.getParent().baseDamage = (trigger.getParent().baseDamage || 1) + 1;
+			// trigger是useCardToTargeted本身触发的事件，它到真正的useCard事件之间隔了
+			// arrangeTrigger这层派发事件，getParent()(默认只往上找1层)找到的是arrangeTrigger
+			// 不是useCard，在错误的事件上加baseDamage完全没有效果——跟lxdushi/fenxun_check
+			// 踩过的"硬编层数"是同一类坑，改成按事件名往上找，不管中间隔几层都能找对
+			const useCardEvent = trigger.getParent("useCard");
+			if (useCardEvent) {
+				useCardEvent.baseDamage = (useCardEvent.baseDamage || 1) + 1;
+			}
 		},
 		ai: {
 			respondSha: true,
