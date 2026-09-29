@@ -15007,7 +15007,12 @@ export default {
 		},
 		subSkill: {
 			check: {
-				trigger: { player: "phaseAfter" },
+				// fenxun_check这个临时技能本身是靠addTempSkill(..., "phaseAfter")在"phaseAfter"
+				// 时失效清除的，如果它自己的功能触发也写成trigger:{player:"phaseAfter"}，就会
+				// 跟失效清除撞在同一个事件上——谁先谁后不确定，一旦"先失效再派发触发"，这个技能
+				// 就已经不在玩家身上了，弃牌效果根本不会跑。改成phaseEnd(回合结束前、phase事件
+				// 还没走到失效清除那一步)就不会跟自己的过期撞车
+				trigger: { player: "phaseEnd" },
 				forced: true,
 				filter(event, player) {
 					return player.storage.fenxun2?.length && !player.getHistory("damage", evt => evt.player == player && player.storage.fenxun2.includes(evt.target)).length;
@@ -25758,10 +25763,13 @@ export default {
 					return false;
 				}
 			},
-			globalFrom(from, to) {
+			// "距离视为1"应该是绝对覆盖成1，不是-Infinity——参考同文件里其他"距离视为1"的实现
+			// (比如wusi_effect那处globalFrom直接return 1)，这里写的是负无穷，跟描述对不上
+			globalFrom(from, to, distance) {
 				if (to == from.storage.zhidao_target) {
-					return -Infinity;
+					return 1;
 				}
+				return distance;
 			},
 		},
 	},
