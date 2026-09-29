@@ -3201,7 +3201,9 @@ export default {
 					.set("prompt", get.prompt2(event.skill))
 					.forResult();
 				if (result.control == choiceList[0] && canArea) {
-					const pos = areas[areas.length - 1];
+					// areas按["j","e"]顺序过滤，取第一个(优先判定区)而不是最后一个——
+					// 之前用areas.length-1取到的其实是"e"(装备区)排在判定区前面，顺序反了
+					const pos = areas[0];
 					const cards = target.getCards(pos);
 					await target.discard(cards[cards.length - 1]);
 				} else if (canHand) {
@@ -20918,7 +20920,17 @@ export default {
 			const result = await source
 				.chooseControl(choice1, choice2)
 				.set("prompt", get.prompt2("zhente"))
-				.set("ai", () => (Math.random() > 0.5 ? get.event().choice1 : get.event().choice2))
+				// 这里做选择的是source(出牌被限制的一方)，不该纯随机——本回合还有没有别的
+				// 同色牌想打是关键：如果没有其他同色牌了，选项1基本没有代价，直接选；否则再看
+				// 这张被废掉的牌本身对目标值不值得，值得就认了选项1让它继续生效，不值得就选
+				// 选项2省下这张牌，留着同色牌的自由
+				.set("ai", () => {
+					const otherSameColor = source.countCards("h", cardx => cardx !== trigger.card && get.color(cardx, source) === color);
+					if (!otherSameColor || get.effect(player, trigger.card, source, source) > 0) {
+						return get.event().choice1;
+					}
+					return get.event().choice2;
+				})
 				.set("choice1", choice1)
 				.set("choice2", choice2)
 				.forResult();
@@ -20956,6 +20968,18 @@ export default {
 		trigger: { global: "phaseZhunbeiBegin" },
 		filter(event, player) {
 			return event.player !== player;
+		},
+		// 限定技只能用一次，绑定对象是"谁的准备阶段先到"就是谁，不该逮谁绑谁——只在对方是
+		// 关系很好的队友、或者当前全场威胁最高的敌人时才愿意发动，否则宁可等下一个候选人
+		check(event, player) {
+			const target = event.player;
+			if (player.isFriendOf(target)) {
+				return get.attitude(player, target) > 3;
+			}
+			const strongest = game
+				.filterPlayer(current => current !== player && !player.isFriendOf(current))
+				.sort((a, b) => get.threaten(b) - get.threaten(a))[0];
+			return target === strongest;
 		},
 		async cost(event, trigger, player) {
 			await player
