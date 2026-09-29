@@ -11730,14 +11730,14 @@ export default {
 			if (result.bool) {
 				event.cardname = result.links[0][2];
 				player.logSkill("shefu");
-				// 参考sp原版shefu这里用的就是"he"(手牌+装备)，不是"h"——之前按翻译文本"一张手牌"
-			// 改成了"h"，但机制其实和官方一样允许扣装备牌，是翻译文本表述宽松，不是机制错误；
-			// 之前反馈"总是拿装备"其实是这里一直没有ai打分、纯默认弃牌AI偏好高价值牌(装备
-			// 通常get.value更高)导致的，不是位置错——补上ai明确压低装备优先级
-			const result2 = await player
-				.chooseCard("he", "选择一张牌作为伏兵", true)
-				.set("ai", card => (get.type(card) == "equip" ? 1 : 5) - get.value(card))
-				.forResult();
+				// 我们自己的shefu_info写的明确是"一张手牌"，不是"he"——参考sp原版虽然用的是
+				// "he"，但按项目一贯原则，自己文本和官方机制冲突时以自己文本为准，应该是"h"。
+				// 之前改回"he"是判断错了。"总是拿装备"那次反馈的真正原因是这里一直没有ai打分，
+				// 已经在下面补上；装备既然不在候选范围内，也就不用再单独压低它的权重
+				const result2 = await player
+					.chooseCard("h", "选择一张手牌作为伏兵", true)
+					.set("ai", card => 5 - get.value(card))
+					.forResult();
 				if (result2.bool) {
 					const card = result2.cards[0];
 					event.card = card;
