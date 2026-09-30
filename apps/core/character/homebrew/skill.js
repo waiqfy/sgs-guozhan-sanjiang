@@ -7600,28 +7600,39 @@ export default {
 	},
 
 	// 共损：出牌阶段开始时，你可以弃置两张牌并选择一名其他角色，然后你选择一个基本牌或普通锦囊牌的牌名，直至你的下个回合开始前或你死亡时，你与其均无法使用、打出或弃置该牌名的手牌。 参考gongsun(mobile)
+	// 修复：卡面写的是"出牌阶段开始时"，应为trigger:phaseUseBegin只在阶段开始那一刻问一次，
+	// 之前却用enable:"phaseUse"做成整个出牌阶段随时可点的主动技，时机不对；而且选2张弃牌
+	// 和选1名目标这种"牌+目标同时选"的组合，官方参考统一用专门的chooseCardTarget一次性
+	// 处理，我们之前拆成顶层filterCard+selectCard+filterTarget硬塞进enable:"phaseUse"，
+	// 导致弃完牌以后选目标这一步接不上。改成和官方一样的trigger+direct+chooseCardTarget
 	gongsun: {
 		audio: 2,
-		enable: "phaseUse",
-		usable: 1,
-		filterCard: true,
-		selectCard: 2,
-		position: "he",
-		filterTarget(card, player, target) {
-			return target != player;
-		},
-		// 只有filterTarget没有ai.result时AI不会主动选目标发动这个技能，补上优先选敌方角色；
-		// 牌名选择原来是Math.random()纯随机，改成挑一个对方依赖更重、自己几乎用不到的牌名
-		ai: {
-			order: 5,
-			result: {
-				target(player, target) {
-					return -get.attitude(player, target);
-				},
-			},
+		trigger: { player: "phaseUseBegin" },
+		direct: true,
+		filter(event, player) {
+			return player.countCards("he") > 1;
 		},
 		async content(event, trigger, player) {
-			const target = event.target;
+			const result1 = await player
+				.chooseCardTarget({
+					prompt: get.prompt2("gongsun"),
+					selectCard: 2,
+					filterCard: lib.filter.cardDiscardable,
+					filterTarget: (card, player, target) => target != player,
+					position: "he",
+					ai1(card) {
+						return 5 - get.value(card);
+					},
+					ai2(target) {
+						return -get.attitude(player, target);
+					},
+				})
+				.forResult();
+			if (!result1.bool) {
+				return;
+			}
+			const target = result1.targets[0];
+			await player.discard(result1.cards);
 			const name = await player
 				.chooseButton(["请选择一个基本牌或普通锦囊牌的牌名", [get.inpileVCardList(info => info[1] == "basic" || info[1] == "trick").filter(card => card[2] != "wuxie"), "vcard"]])
 				.set("ai", button => {
