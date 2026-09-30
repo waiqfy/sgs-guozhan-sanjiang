@@ -27078,7 +27078,8 @@ export default {
 	},
 	xionghuo_punish: {
 		charlotte: true,
-		trigger: { player: "phaseZhunbeiBegin" },
+		// 卡面是"其出牌阶段开始时"，之前误用了phaseZhunbeiBegin(准备阶段)
+		trigger: { player: "phaseUseBegin" },
 		forced: true,
 		filter(event, player) {
 			return !!player.storage.xionghuo_holder;
