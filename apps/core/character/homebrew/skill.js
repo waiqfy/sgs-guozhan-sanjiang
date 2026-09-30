@@ -9596,11 +9596,14 @@ export default {
 			return evt && evt.cards2 && evt.cards2.length > 0;
 		},
 		async content(event, trigger, player) {
+			// 引擎里judge回调返回值>0记为result.bool=true、<0记为false；卡面是"结果为♥则
+			// 获得之，否则可以变田"，之前红桃返回-1、非红桃返回1，导致result.bool对红桃反而
+			// 是false，content()里判断反了——红桃走的是变田分支，非红桃才拿到手上，跟卡面完全相反
 			const judge = player.judge(function (card) {
 				if (get.suit(card) == "heart") {
-					return -1;
+					return 1;
 				}
-				return 1;
+				return -1;
 			});
 			judge.judge2 = function (result) {
 				return result.bool;
@@ -16702,6 +16705,20 @@ export default {
 		forced: true,
 		preHidden: true,
 		group: ["buqu_reset"],
+		// gz3: "手牌上限=创的数量"这条mod原来直接写在本技能的mod里，但checkMod(game/index.js)
+		// 靠player.getModableSkills()取技能列表，getModableSkills()又是不带参数调用
+		// player.getSkills()——不传参数时hiddenSkills不会被并进来(见player.js getSkills:
+		// `if(skillMode) skills.addArray(this.hiddenSkills)`)。而暗置的武将牌技能在明置
+		// (showCharacter)前只存在player.hiddenSkills里，要明置时引擎才会this.addSkill把它
+		// 从hiddenSkills挪进skills(见guozhan/src/patch/player.js)。结果周泰暗置当副将、被
+		// 不屈摁在1点体力、"创"攒到2张以上时，这条mod根本没进checkMod的技能列表，手牌上限
+		// 就纹丝不动地停在体力值而不是"创"的数量——明置之后才会突然生效。
+		// 改用引擎自带的"全局技能"写法(global+globalSilent)把这条mod单独拆成子技能：
+		// globalSilent会让addSkillTrigger在玩家一开局(还暗置)时就把这个子技能注册进
+		// lib.skill.global，使其从暗置阶段起就照常参与checkMod运算，不必等明置
+		// (见player.js addSkillTrigger: `info.global && (!hidden || info.globalSilent)`)。
+		global: "buqu_handcard",
+		globalSilent: true,
 		filter(event, player) {
 			return event.type == "dying" && player.isDying() && event.dying == player && !event.getParent()._buqu;
 		},
@@ -16725,14 +16742,6 @@ export default {
 			if (player.hp <= 0) {
 				await player.recover(1 - player.hp);
 			}
-		},
-		mod: {
-			maxHandcard(player, num) {
-				const cards = player.getExpansions("buqu");
-				if (cards.length) {
-					return cards.length;
-				}
-			},
 		},
 		onremove(player, skill) {
 			const cards = player.getExpansions(skill);
@@ -16765,6 +16774,18 @@ export default {
 						const num = target.getExpansions("buqu").length || target.getHp();
 						return (num + 1) / 5;
 					}
+				},
+			},
+		},
+		subSkill: {
+			handcard: {
+				mod: {
+					maxHandcard(player, num) {
+						const cards = player.getExpansions("buqu");
+						if (cards.length) {
+							return cards.length;
+						}
+					},
 				},
 			},
 		},
