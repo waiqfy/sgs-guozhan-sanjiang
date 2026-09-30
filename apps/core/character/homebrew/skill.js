@@ -27117,6 +27117,9 @@ export default {
 			player.storage.xionghuo_supply = (player.storage.xionghuo_supply || 0) - 1;
 			target.storage.xionghuo_holder = player;
 			target.addSkill("xionghuo_punish");
+			// addSkill只挂功能(trigger)，不会自动画出标记，之前"暴戾"只有代码效果、角色
+			// 头像上完全看不出谁持有——补上markSkill，让持有者头像上出现"戾"图标+数字1
+			target.markSkill("xionghuo_punish");
 			player.popup("暴戾");
 		},
 		ai: {
@@ -27154,6 +27157,13 @@ export default {
 	},
 	xionghuo_punish: {
 		charlotte: true,
+		// 之前只有target.addSkill、没有配套的marktext/intro，"暴戾"持有状态只在代码里
+		// 存在，角色头像上完全看不到图标和数量——补上后markSkill才有东西可画
+		marktext: "戾",
+		intro: {
+			content: "拥有一枚“暴戾”，其出牌阶段开始时弃置并随机执行一项惩罚",
+			markcount: () => 1,
+		},
 		// 卡面是"其出牌阶段开始时"，之前误用了phaseZhunbeiBegin(准备阶段)
 		trigger: { player: "phaseUseBegin" },
 		forced: true,
