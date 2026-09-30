@@ -27114,9 +27114,14 @@ export default {
 		forced: true,
 		popup: false,
 		filter(event, player) {
+			// 卡面是"你对有暴戾的其他角色造成的伤害+1"——只有徐荣自己造成的伤害才加成，
+			// 之前没检查event.source(伤害来源)是不是徐荣自己，导致任何人对暴戾持有者
+			// 造成的伤害都会加成(方向错了)，还会抢占每回合每名角色限一次的名额，搞得
+			// 徐荣自己真正打出的伤害反而因为名额被占用而加不上，看起来像技能完全无效
 			return !!(
 				event.player &&
 				event.player != player &&
+				event.source === player &&
 				event.player.storage.xionghuo_holder === player &&
 				event.player.storage.xionghuo_hit !== game.phaseNumber
 			);
