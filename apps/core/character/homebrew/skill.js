@@ -14345,7 +14345,7 @@ export default {
 		ai: {
 			threaten: 0.8,
 			// 没有filterTarget/顶层目标，选项和交牌目标都是content()内部自选的phaseUse主动技，
-			// 跟chuwen/zhuanzheng同一个坑：没有order+result.player的话引擎默认几乎不会主动用
+			// 跟chuli/zhuanzheng同一个坑：没有order+result.player的话引擎默认几乎不会主动用
 			order: 6,
 			result: {
 				player: 1,
@@ -21952,12 +21952,12 @@ export default {
 	// 判断的缓存bug(缓存key不含已选目标，导致同势力的其他人选完一个后仍然一直可选)。
 	// 既然两个分支本来就是互斥的"选择一项"，不如干脆拆成两个独立的phaseUse技能，分支1直接
 	// 照抄官方new_chuli的原生filterTarget+selectTarget顶层写法(天然带event.skill，缓存问题
-	// 根本不存在)，分支2保留原来content()自选流程；两者用一个共享的chuwen_used标记
+	// 根本不存在)，分支2保留原来content()自选流程；两者用一个共享的chuli_used标记
 	// (game.roundNumber+"_"+game.phaseNumber，参考同文件yizhong_used等写法)互斥，同一出牌
 	// 阶段只能选一个。
-	chuwen: {
+	chuli: {
 		audio: "chulao",
-		group: ["chuwen1", "chuwen2"],
+		group: ["chuli1", "chuli2"],
 		ai: {
 			order: 6,
 			result: {
@@ -21965,13 +21965,13 @@ export default {
 			},
 		},
 	},
-	chuwen1: {
+	chuli1: {
 		audio: "chulao",
-		sourceSkill: "chuwen",
+		sourceSkill: "chuli",
 		enable: "phaseUse",
 		usable: 1,
 		filter(event, player) {
-			return player.storage.chuwen_used !== game.roundNumber + "_" + game.phaseNumber && player.countCards("he") > 0;
+			return player.storage.chuli_used !== game.roundNumber + "_" + game.phaseNumber && player.countCards("he") > 0;
 		},
 		filterTarget(card, player, target) {
 			if (player == target || target.countCards("he") <= 0) {
@@ -21997,7 +21997,7 @@ export default {
 			const { cards } = event;
 			const evt = event.getParent();
 			evt.draw = [];
-			player.storage.chuwen_used = game.roundNumber + "_" + game.phaseNumber;
+			player.storage.chuli_used = game.roundNumber + "_" + game.phaseNumber;
 			if (get.suit(cards[0]) == "spade") {
 				evt.draw.push(player);
 			}
@@ -22032,16 +22032,16 @@ export default {
 			order: 3,
 		},
 	},
-	chuwen2: {
+	chuli2: {
 		audio: "chulao",
-		sourceSkill: "chuwen",
+		sourceSkill: "chuli",
 		enable: "phaseUse",
 		usable: 1,
 		filter(event, player) {
-			return player.storage.chuwen_used !== game.roundNumber + "_" + game.phaseNumber && player.countCards("he") > 0 && game.hasPlayer(current => current.isDamaged());
+			return player.storage.chuli_used !== game.roundNumber + "_" + game.phaseNumber && player.countCards("he") > 0 && game.hasPlayer(current => current.isDamaged());
 		},
 		async content(event, trigger, player) {
-			player.storage.chuwen_used = game.roundNumber + "_" + game.phaseNumber;
+			player.storage.chuli_used = game.roundNumber + "_" + game.phaseNumber;
 			const result = await player.chooseToDiscard("he", true).forResult();
 			if (result.bool) {
 				const target = await player
@@ -27294,7 +27294,7 @@ export default {
 		aiShowCost: true,
 		audio: "zhuangrong",
 		// "出牌阶段限一次"不是"出牌阶段开始时"，不应该只能在阶段刚开始那一刻发动，
-		// 而是整个出牌阶段内随时可以主动使用，改成跟jushou/chuwen同款的enable:"phaseUse"
+		// 而是整个出牌阶段内随时可以主动使用，改成跟jushou/chuli同款的enable:"phaseUse"
 		enable: "phaseUse",
 		usable: 1,
 		filter(event, player) {

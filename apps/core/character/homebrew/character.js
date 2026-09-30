@@ -1216,7 +1216,7 @@ xugong: {
 		sex: "male",
 		group: "qun",
 		hp: 3,
-		skills: ["jijiu", "chuwen"],
+		skills: ["jijiu", "chuli"],
 	},
 	// 国战UI.QUN002 太虚幻魇 吕布（原型：standard 包 lvbu。技能"无双"与本地一致沿用其id并沿用官方
 	// 实现；卡面额外的"决斗/空杀可指定至多三目标"效果新增为 wushuang_ext）
