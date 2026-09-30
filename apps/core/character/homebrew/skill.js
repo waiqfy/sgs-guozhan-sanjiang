@@ -21945,111 +21945,99 @@ export default {
 	},
 
 	// 除疠：出牌阶段限一次，你可以选择一项：1.选择至多三名势力各不相同或未确定势力的其他角色，然后弃置你与这些角色各一张牌，被弃置牌的角色各摸一张牌。2.弃置一张手牌，然后令一名角色回复1点体力。 参考new_chuli(guozhan)
-	// 说明：两个分支要选的东西形状完全不同(分支1要选1~3个目标+弃对应牌，分支2只弃1张牌+
-	// 选1个回血目标)，没法共用同一顶层filterCard/filterTarget/selectTarget，之前只能放弃
-	// 顶层筛选，全靠content()内部手写chooseCard/chooseTarget——分支1的多目标选择因此变成
-	// content()里另起的裸chooseTarget()，没有event.skill，撞上了game.check()对target可选性
-	// 判断的缓存bug(缓存key不含已选目标，导致同势力的其他人选完一个后仍然一直可选)。
-	// 既然两个分支本来就是互斥的"选择一项"，不如干脆拆成两个独立的phaseUse技能，分支1直接
-	// 照抄官方new_chuli的原生filterTarget+selectTarget顶层写法(天然带event.skill，缓存问题
-	// 根本不存在)，分支2保留原来content()自选流程；两者用一个共享的chuli_used标记
-	// (game.roundNumber+"_"+game.phaseNumber，参考同文件yizhong_used等写法)互斥，同一出牌
-	// 阶段只能选一个。
+	// 之前用的是filterCard——在没有viewAs的enable:"phaseUse"技能上，filterCard会让
+	// 引擎走"选牌confirm"的通用流程,等于发动这个技能之前先强制选一张牌，然后content()
+	// 里才轮到"选择一项"。但描述是"你可以选择一项：1.../2..."——应该先选分支，各分支
+	// 弃什么牌是分支自己内部决定的，不该在发动前就先弃一次。改成单纯判断"能不能发动"
+	// 的filter，不再触发提前选牌；保留"点除疠弹出二选一"这个原有交互，不拆成两个技能
 	chuli: {
 		audio: "chulao",
-		group: ["chuli1", "chuli2"],
+		enable: "phaseUse",
+		usable: 1,
+		filter(event, player) {
+			return player.countCards("he") > 0;
+		},
+		// 没有filterCard/viewAs，纯content()内部自选分支的phaseUse主动技，官方参考同样没写ai，
+		// 引擎默认的兜底热情度评估基本不会主动发动这类技能，补一个合理的默认值（参考zhuanzheng的处理）
 		ai: {
 			order: 6,
 			result: {
 				player: 1,
 			},
 		},
-	},
-	chuli1: {
-		audio: "chulao",
-		sourceSkill: "chuli",
-		enable: "phaseUse",
-		usable: 1,
-		filter(event, player) {
-			return player.storage.chuli_used !== game.roundNumber + "_" + game.phaseNumber && player.countCards("he") > 0;
-		},
-		filterTarget(card, player, target) {
-			if (player == target || target.countCards("he") <= 0) {
-				return false;
-			}
-			for (let i = 0; i < ui.selected.targets.length; i++) {
-				if (ui.selected.targets[i].isFriendOf(target)) {
-					return false;
-				}
-			}
-			return true;
-		},
-		filterCard: true,
-		position: "he",
-		selectTarget: [1, 3],
-		check(card) {
-			if (get.suit(card) == "spade") {
-				return 8 - get.value(card);
-			}
-			return 5 - get.value(card);
-		},
-		async contentBefore(event, trigger, player) {
-			const { cards } = event;
-			const evt = event.getParent();
-			evt.draw = [];
-			player.storage.chuli_used = game.roundNumber + "_" + game.phaseNumber;
-			if (get.suit(cards[0]) == "spade") {
-				evt.draw.push(player);
-			}
-		},
 		async content(event, trigger, player) {
-			const { target } = event;
-			const result = await player.discardPlayerCard(target, "he", true).forResult();
-			if (result.bool) {
-				if (get.suit(result.cards[0]) == "spade") {
-					event.getParent().draw.push(target);
-				}
-			}
-		},
-		async contentAfter(event, trigger, player) {
-			const list = event.getParent().draw;
-			if (!list.length) {
-				return;
-			}
-			await game.asyncDraw(list);
-			await game.delay();
-		},
-		ai: {
-			result: {
-				target: -1,
-			},
-			tag: {
-				discard: 1,
-				lose: 1,
-				loseCard: 1,
-			},
-			threaten: 1.2,
-			order: 3,
-		},
-	},
-	chuli2: {
-		audio: "chulao",
-		sourceSkill: "chuli",
-		enable: "phaseUse",
-		usable: 1,
-		filter(event, player) {
-			return player.storage.chuli_used !== game.roundNumber + "_" + game.phaseNumber && player.countCards("he") > 0 && game.hasPlayer(current => current.isDamaged());
-		},
-		async content(event, trigger, player) {
-			player.storage.chuli_used = game.roundNumber + "_" + game.phaseNumber;
-			const result = await player.chooseToDiscard("he", true).forResult();
-			if (result.bool) {
-				const target = await player
-					.chooseTarget("除疠：令一名角色回复1点体力", (card, player, target) => target.isDamaged())
-					.set("ai", target => get.attitude(get.player(), target))
+			const choice = await player
+				.chooseControl("弃牌摸牌", "弃牌回血")
+				.set("prompt", "除疠：请选择一项")
+				.set("ai", () => {
+					return player.countCards("he") > 1 ? "弃牌摸牌" : "弃牌回血";
+				})
+				.forResult();
+			if (choice.control == "弃牌摸牌") {
+				const cardResult = await player
+					.chooseCard("he", true, "除疠：选择一张牌弃置")
+					.set("ai", card => (get.suit(card) == "spade" ? 8 : 5) - get.value(card))
 					.forResult();
-				if (target.bool && target.targets && target.targets.length) {
-					await target.targets[0].recover();
+				if (!cardResult.bool || !cardResult.cards?.length) {
+					return;
+				}
+				const targets = await player
+					.chooseTarget([1, 3], "除疠：选择至多三名势力各不相同或未确定势力的其他角色", (card, player, target) => {
+						if (player == target || target.countCards("he") <= 0) {
+							return false;
+						}
+						for (let i = 0; i < ui.selected.targets.length; i++) {
+							if (ui.selected.targets[i].isFriendOf(target)) {
+								return false;
+							}
+						}
+						return true;
+					})
+					// 这个filterTarget依赖ui.selected.targets(已选目标)做互斥判断，但game.check()对
+					// "target"类型的可选性判断默认会缓存(useCache=!event.skill&&!event.multitarget)，
+					// 缓存key只由ui.selected.buttons/cards决定，不含targets本身——导致选完第一个目标后，
+					// 缓存的仍是"一个都没选时"算出来的可选集合，同势力的其他人一直保持selectable，
+					// 能被继续选中。显式设置skill关掉这个缓存
+					.set("skill", "chuli")
+					.set("ai", target => {
+						const attitude = get.attitude(get.player(), target);
+						// 队友被弃置的牌不一定是黑桃，摸不到牌纯粹让队友掉一张牌，不划算；
+						// 敌人则无所谓有没有黑桃，弃牌本身就是干扰，正常按好感度选
+						if (attitude > 0 && !target.getCards("e", card => get.suit(card) == "spade").length) {
+							return -1;
+						}
+						return attitude;
+					})
+					.forResult();
+				if (!targets.bool || !targets.targets || !targets.targets.length) {
+					return;
+				}
+				const drawList = [];
+				if (get.suit(cardResult.cards[0]) == "spade") {
+					drawList.push(player);
+				}
+				await player.discard(cardResult.cards);
+				for (const target of targets.targets) {
+					if (target.countCards("he") > 0) {
+						const result = await player.discardPlayerCard(target, "he", true).forResult();
+						if (result.bool && result.cards?.length && get.suit(result.cards[0]) == "spade") {
+							drawList.push(target);
+						}
+					}
+				}
+				if (drawList.length) {
+					await game.asyncDraw(drawList);
+				}
+			} else {
+				const result = await player.chooseToDiscard("he", true).forResult();
+				if (result.bool) {
+					const target = await player
+						.chooseTarget("除疠：令一名角色回复1点体力", (card, player, target) => target.isDamaged())
+						.set("ai", target => get.attitude(get.player(), target))
+						.forResult();
+					if (target.bool && target.targets && target.targets.length) {
+						await target.targets[0].recover();
+					}
 				}
 			}
 		},
