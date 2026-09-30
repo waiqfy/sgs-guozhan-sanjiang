@@ -1435,57 +1435,16 @@ export default {
 		usable: 1,
 		prompt2: "观看牌堆顶的牌，以任意顺序置于牌堆顶或牌堆底",
 		group: "wentian_viewas",
+		// 之前自己写了一套chooseToMove+processAI手动控判定牌的逻辑，但只要第一张判定牌找不到
+		// "结果非负"的候选牌就直接整体放弃(不再处理后面的判定牌，连埋高价值牌这一步都跳过)，
+		// 导致实战里经常看起来完全不控判定牌。官方观星(guanxing)技能直接调用引擎自带的
+		// player.chooseToGuanxing(num)——它的默认processAI(content.ts的chooseToGuanxing里)
+		// 才是真正写好的版本：按attitude区分敌我控判定方向、扣除会被无懈可击抵消的判定、
+		// 某张判定实在没好牌就先跳过继续处理别的判定而不是整体放弃。直接换成这个官方同款
+		// 实现，问天自然获得和观星一样的AI表现，不用自己维护一份更差的版本
 		async content(event, trigger, player) {
 			const num = Math.min(5, game.countPlayer());
-			const cards = get.cards(num);
-			await game.cardsGotoOrdering(cards);
-			const next = player.chooseToMove("allowChooseAll");
-			next.set("list", [["牌堆顶", cards.filterInD()], ["牌堆底"]]);
-			next.set("prompt", "问天：点击或拖动将牌移动到牌堆顶或牌堆底");
-			next.processAI = list => {
-				const cards = list[0][1],
-					player = _status.event.player;
-				const top = [];
-				const judges = player.getCards("j");
-				let stopped = false;
-				if (!player.hasWuxie()) {
-					for (let i = 0; i < judges.length; i++) {
-						const judge = get.judge(judges[i]);
-						cards.sort((a, b) => judge(b) - judge(a));
-						if (judge(cards[0]) < 0) {
-							stopped = true;
-							break;
-						} else {
-							top.unshift(cards.shift());
-						}
-					}
-				}
-				let bottom;
-				if (!stopped) {
-					cards.sort((a, b) => get.value(b, player) - get.value(a, player));
-					while (cards.length) {
-						if (get.value(cards[0], player) <= 5) {
-							break;
-						}
-						top.unshift(cards.shift());
-					}
-				}
-				bottom = cards;
-				return [top, bottom];
-			};
-			const { moved } = await next.forResult();
-			const top = moved[0];
-			const bottom = moved[1];
-			top.reverse();
-			game.cardsGotoPile(top.concat(bottom), ["top_cards", top], (event, card) => {
-				if (event.top_cards.includes(card)) {
-					return ui.cardPile.firstChild;
-				}
-				return null;
-			});
-			player.popup(get.cnNumber(top.length) + "上" + get.cnNumber(bottom.length) + "下");
-			game.log(player, "将" + get.cnNumber(top.length) + "张牌置于牌堆顶");
-			await game.delayx();
+			await player.chooseToGuanxing(num).set("prompt", "问天：点击或拖动将牌移动到牌堆顶或牌堆底").forResult();
 		},
 		subSkill: {
 			viewas: {
