@@ -21683,22 +21683,29 @@ export default {
 	},
 
 // ========== chengong 陈宫 ==========
-	// 引叛：出牌阶段限一次，你可以选择一名角色，令所有与其势力不同的角色依次选择是否对其使用一张无距离次数限制的【杀】，结算完成后，该角色于其下个回合使用【杀】的次数+X，若其进入过濒死状态，其回复1点体力（X为其以损失的体力值）。 未找到，需另写（卡面注释标明为全新技能，_trans_merge.md/_merged_skill_all.md均无对应代码，按描述原创实现）
+	// 引叛：出牌阶段限一次，你可以选择一名角色，令所有与其势力不同的角色依次选择是否对其使用一张无距离次数限制的【杀】，结算完成后，该角色于其下个回合使用【杀】的次数+X，若其进入过濒死状态，其回复1点体力（X为其以损失的体力值）。 参考guozhan包gz_yinpan(rest.js)——之前误标"未找到/原创实现"，实际存在，只是X的计算方式不同(官方按受到几次杀伤害算，我们按丢了几点体力算，按咱们自己文本保留丢体力值这条，其余机制对齐)
+	// 修复：官方gz_yinpan本身就是enable:"phaseUse"(整阶段随时可发动)，不是trigger:
+	// phaseUseBegin(只在阶段开始那一刻问一次)——之前误用了后者，时机不对
 	yinpan: {
 		skillAnimation: true,
 		animationColor: "qun",
 		aiShowTag: "defense",
 		audio: 2,
-		trigger: { player: "phaseUseBegin" },
+		enable: "phaseUse",
 		usable: 1,
-		async cost(event, trigger, player) {
-			event.result = await player
-				.chooseTarget(get.prompt2("yinpan"), (card, player, target) => true)
-				.set("ai", target => -get.attitude(player, target))
-				.forResult();
+		filterTarget(card, player, target) {
+			return true;
+		},
+		ai: {
+			order: 5,
+			result: {
+				target(player, target) {
+					return -get.attitude(player, target);
+				},
+			},
 		},
 		async content(event, trigger, player) {
-			const victim = event.targets[0];
+			const victim = event.target;
 			if (!victim.isIn()) {
 				return;
 			}
@@ -25772,12 +25779,18 @@ export default {
 
 // ========== zhanglu 张鲁 ==========
 	// 義舍：每名同势力角色出牌阶段限一次，若你没有“米”，其可以摸两张牌，然后将等量张牌置于你的武将牌上，称为“米”。当你移去最后一张“米”后，你回复1点体力。 参考yishe(sp)
+	// 修复两处：①"每名同势力角色出牌阶段限一次"，"其"才是可以发动的一方，之前trigger写成
+	// player:phaseUseBegin相当于只听自己的阶段，filter里event.player.isFriendOf(player)在
+	// 这种写法下恒为true(isFriendOf(自己)必然true)，形同虚设——改成global，真正匹配任意
+	// 同势力角色的阶段；②"限一次"没有"开始时"，不该在阶段一开始就问一次，改成跟kuangfu同款
+	// 的思路：先在阶段开始时把授权记到对方身上，再给对方发一个整个阶段随时可点的临时技能
 	yishe: {
 		skillAnimation: true,
 		animationColor: "qun",
 		aiShowTag: "draw",
 		audio: 2,
-		trigger: { player: "phaseUseBegin" },
+		trigger: { global: "phaseUseBegin" },
+		forced: true,
 		filter(event, player) {
 			return event.player.isFriendOf(player) && !player.getExpansions("yishe").length;
 		},
@@ -25785,19 +25798,9 @@ export default {
 			content: "expansion",
 			markcount: "expansion",
 		},
-		async cost(event, trigger, player) {
-			event.result = await trigger.player.chooseBool(get.prompt2("yishe")).forResult();
-		},
 		async content(event, trigger, player) {
-			const target = trigger.player;
-			await target.draw(2);
-			const num = Math.min(2, target.countCards("h"));
-			if (num > 0) {
-				const result = await target.chooseCard(num, "h", true, `义舍：选择${get.cnNumber(num)}张手牌作为“米”`).forResult();
-				if (result.bool && result.cards && result.cards.length) {
-					await player.addToExpansion({ cards: result.cards, source: target, gaintag: ["yishe"], animate: "gain2" });
-				}
-			}
+			trigger.player.storage.yishe_from = player;
+			trigger.player.addTempSkill("yishe_active", "phaseUseAfter");
 		},
 		group: "yishe_recover",
 		ai: { threaten: 0.7 },
@@ -25841,6 +25844,30 @@ export default {
 					await player.recover();
 				},
 			},
+		},
+	},
+	yishe_active: {
+		charlotte: true,
+		audio: "yishe",
+		enable: "phaseUse",
+		usable: 1,
+		filter(event, player) {
+			return !!(player.storage.yishe_from && player.storage.yishe_from.isIn() && !player.storage.yishe_from.getExpansions("yishe").length);
+		},
+		check() {
+			return true;
+		},
+		async content(event, trigger, player) {
+			const source = player.storage.yishe_from;
+			delete player.storage.yishe_from;
+			await player.draw(2);
+			const num = Math.min(2, player.countCards("h"));
+			if (num > 0) {
+				const result = await player.chooseCard(num, "h", true, `义舍：选择${get.cnNumber(num)}张手牌作为“米”`).forResult();
+				if (result.bool && result.cards && result.cards.length) {
+					await source.addToExpansion({ cards: result.cards, source: player, gaintag: ["yishe"], animate: "gain2" });
+				}
+			}
 		},
 	},
 

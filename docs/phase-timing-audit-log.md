@@ -70,24 +70,31 @@
 - `zhuangrong` 妆戎：**之前的排查已经修过**（代码里留了注释："出牌阶段限一次"不是"出牌阶段
   开始时"...），现状是 `enable:"phaseUse"`，判定**正确（历史已修）**。
 
-### 存疑、未改动，需要人工确认（原创技能，无参考代码可比对）
+### 追加排查：yinpan / kuangfu / yishe 三处"限一次没说开始时"的疑点
 
-以下三个技能文本是"出牌阶段限一次，你可以..."（没有"开始时"），按本轮总结的规律**应该**
-是 `enable:"phaseUse"`，但实际代码是固定在 `phaseUseBegin`（或 `phaseZhunbeiBegin`触发
-后立即问）只问一次，属于"卡面写的次数限制，代码却做成了限定时机"的可疑模式——**但**它们
-都标注为"原创实现"或引用的参考包里找不到对应源码，无法像 qiaoshui 那样逐字核对，所以没有
-擅自改动，列在这里供你确认是否要改成 `enable:"phaseUse"`：
+用户确认规则："限一次"没说"开始时"就是随时可用，且指出 yinpan(引叛) 是有 guozhan 参考的，
+不是原创——之前 comment 里"未找到/原创实现"的标注是错的，重新找到了真实来源，逐一处理：
 
-| 技能 | 角色 | 现状 | 疑点 |
-|---|---|---|---|
-| yinpan 引叛 | 陈宫 | `trigger:{player:"phaseUseBegin"}`+`usable:1`，comment 标注"未找到，按描述原创实现" | 文本只说"限一次"，没说"开始时"；效果是"选一人+众敌可选择用杀"，逻辑上不一定非要卡在阶段开始那一刻 |
-| kuangfu 狂斧 | 潘凤 | `trigger:{global:"phaseUseBegin"}`，参考"gz_kuangfu(guozhan，改写)" | 同上；虽标了参考包，但"改写"意味着不能保证时机也照搬 |
-| yishe 義舍 | 张鲁 | `trigger:{player:"phaseUseBegin"}`，参考"yishe(sp)" | 同上 |
-
-如果确认这三个确实应该改成随时可发动，我可以照 gongsun 的方式（`enable:"phaseUse"` +
-`usable:1`，cost() 的选人逻辑挪进 filter/content）重构，但目前没有实锤证据，先不动。
+- **yinpan 引叛（陈宫）**：重新搜索 `apps/core/mode/guozhan/src/skill/character/rest.js`，
+  找到 `gzyinpan`（之前只查了 `_merged_skill_all.md` 没查全guozhan源码目录，漏检）。官方
+  `gzyinpan` 本身就是 `enable:"phaseUse"`（整阶段随时可发动），印证了"限一次没说开始时=
+  随时用"这条规则。**已修复**：改成 `enable:"phaseUse"` + `filterTarget`，选目标的
+  ai 沿用原来 cost() 里的 `-get.attitude(player, target)`。X 的计算方式官方是"受到几次
+  杀伤害"，咱们文本写的是"损失的体力值"，按标准做法保留咱们自己文本的口径，只对齐激活
+  时机这一处机制。
+- **yishe 義舍（张鲁）**：**追加发现一个更严重的范围bug**——"每名同势力角色出牌阶段限
+  一次"里能发动的是"其"（同势力的任意一个角色），但原代码 `trigger:{player:
+  "phaseUseBegin"}` 只监听技能拥有者自己的阶段；`filter` 里的
+  `event.player.isFriendOf(player)` 在这种写法下恒为 true（`isFriendOf` 判断自己和自己
+  必然是队友），检查形同虚设，实际效果是只有张鲁自己的出牌阶段才会触发，其他同势力角色
+  的阶段完全没反应。**已修复**：trigger 改成 `global`，并照搬 `kuangfu`（潘凤·狂斧）已经
+  验证过的写法——阶段开始时先把"谁批准的"记到对方身上，再给对方发一个整阶段随时可点的
+  临时技能 `yishe_active`，摸牌选米的逻辑原样搬过去。
+- **kuangfu 狂斧（潘凤）**：重新细看后发现**其实已经修过**，之前判断有误。主 `kuangfu`
+  技能在 `phaseUseBegin` 只是把"谁批准的"记到目标身上并授予临时技能
+  `kuangfu_active`（`enable:"phaseUse"`，整阶段随时可点），代码里本来就留着注释解释这个
+  改动。不需要再动，是我第一遍扫描时看错了（只看了外层trigger，没往下看子技能）。
 
 ### 校验方式
 
-未涉及代码修改的部分不需要跑 `node --check`；`xionghuo_punish` 的修复已经过
-`node --check apps/core/character/homebrew/skill.js` 验证并 commit（本节写完后一并提交）。
+`node --check apps/core/character/homebrew/skill.js` 在 yinpan/yishe 两处修复后均已通过。
