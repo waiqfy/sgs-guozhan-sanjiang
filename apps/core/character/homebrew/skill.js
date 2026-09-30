@@ -8439,7 +8439,12 @@ export default {
 			const useEvent = trigger.getParent();
 			if (trigger.player == player) {
 				await player.draw();
-				const result = await player.chooseTarget("凶竖：选择一名其他角色代替你成为此牌的伤害来源", (card, plyr, target) => target != player).forResult();
+				// 裸chooseTarget()默认ai是get.attitude2（偏好友方），但代人成为伤害来源应嫁祸给敌方，
+				// 不给ai会导致AI要么把敌意伤害"栽赃"给自己友方（方向反了），要么在全是敌方时直接判定为负分而放弃嫁祸
+				const result = await player
+					.chooseTarget("凶竖：选择一名其他角色代替你成为此牌的伤害来源", (card, plyr, target) => target != player)
+					.set("ai", target => -get.attitude(player, target))
+					.forResult();
 				const target = result && result.targets && result.targets[0];
 				if (!target) {
 					return;
@@ -9882,8 +9887,11 @@ export default {
 					}
 				}
 				if (game.hasPlayer(p => p.countCards("ej") > 0)) {
+					// 弃对方装备/判定牌是纯打击性的选择，裸chooseTarget()默认ai=get.attitude2偏好友方，
+					// 不给ai会导致AI优先弃自己友方的牌（方向反了），甚至在场上都是友方时直接放弃弃牌
 					const discardTarget = await player
 						.chooseTarget("护援：你可以弃置一名角色装备区或判定区里的一张牌", (card, player, target) => target.countCards("ej") > 0)
+						.set("ai", target => -get.attitude(player, target))
 						.forResult();
 					if (discardTarget.bool && discardTarget.targets && discardTarget.targets.length) {
 						await player.discardPlayerCard(discardTarget.targets[0], "ej", true);
@@ -10514,7 +10522,12 @@ export default {
 				player.popup("废除判定区");
 				game.log(player, "废除了判定区");
 			} else {
-				const result = await player.chooseTarget("挫锐：对一名其他角色造成1点伤害", (card, player, target) => target != player, true).forResult();
+				// forced=true保证一定会选人，但裸chooseTarget()默认ai=get.attitude2偏好友方，
+				// 不给ai会导致造成伤害的这一下选中的是最friendly的队友而不是敌人
+				const result = await player
+					.chooseTarget("挫锐：对一名其他角色造成1点伤害", (card, player, target) => target != player, true)
+					.set("ai", target => -get.attitude(player, target))
+					.forResult();
 				if (result.targets && result.targets.length) {
 					await result.targets[0].damage(1);
 				}
@@ -15927,7 +15940,15 @@ export default {
 					const lost = player.storage.yanhui_lost || [];
 					const targets = player.storage.yanhui_targets || [];
 					if (event.cost_data == "burn" && lost.length) {
-						const result = await player.chooseTarget(true, (card, player, target) => lost.includes(target)).forResult();
+						// forced=true一定会选人，但裸chooseTarget()默认ai=get.attitude2偏好友方，
+						// 不给ai会导致火焰伤害优先烧到关系最好的队友而不是敌人
+						const result = await player
+							.chooseTarget(
+								true,
+								(card, player, target) => lost.includes(target)
+							)
+							.set("ai", target => -get.attitude(player, target))
+							.forResult();
 						if (result.bool && result.targets && result.targets.length) {
 							await result.targets[0].damage(1, player, "fire");
 						}
@@ -20023,7 +20044,14 @@ export default {
 		usable: 3,
 		direct: true,
 		async content(event, trigger, player) {
-			await player.chooseUseTarget({ name: "sha", isCard: true }, get.prompt("qinguo"), "你可以视为使用一张无距离限制且不计入次数限制的【杀】", false, "nodistance").set("logSkill", "qinguo");
+			// 底层chooseUseTarget->裸chooseTarget()默认ai为get.effect_use，它靠_status.event.skill/_status.event._get_card等隐式上下文推断card/player，
+			// 链路较脆弱（该文件已有先例：裸chooseTarget()因不带.skill导致game.check()缓存异常，见"除疠"的历史bug）。
+			// 这里显式提供ai回调，直接用get.effect(target,{name:"sha"},player,player)算分，和文件中其他"视为使用杀"技能的AI写法保持一致，
+			// 避免因隐式推断链路失效而导致AI永远评分为0/负从而不发动。
+			await player
+				.chooseUseTarget({ name: "sha", isCard: true }, get.prompt("qinguo"), "你可以视为使用一张无距离限制且不计入次数限制的【杀】", false, "nodistance")
+				.set("logSkill", "qinguo")
+				.set("ai", target => get.effect(target, { name: "sha" }, player, player));
 		},
 		subSkill: {
 			recover: {
@@ -21452,8 +21480,11 @@ export default {
 			const x = Math.max(1, player.countCards("e"));
 			const h = player.countCards("h");
 			if (h > x) {
+				// 强制弃置目标手牌/装备是打击性效果，裸chooseTarget()默认ai=get.attitude2偏好友方，
+				// 不给ai会导致AI优先弃自己友方的牌，甚至在没有正分（friendly）目标时直接放弃发动
 				const result = await player
 					.chooseTarget(get.prompt2("zuowei"), (card, player, target) => target != player && target.countCards("he") > 0)
+					.set("ai", target => -get.attitude(player, target))
 					.forResult();
 				if (result.bool) {
 					player.addTempSkill("zuowei_gt", { player: "phaseAfter" });
@@ -21568,9 +21599,12 @@ export default {
 					} else {
 						const candidates = joined.filter(current => current.isIn());
 						if (candidates.length) {
+							// 造成伤害是打击性效果，裸chooseTarget()默认ai=get.attitude2偏好友方，
+							// 不给ai会导致AI优先伤害参与议事的队友，甚至在全是队友时直接放弃发动
 							const result2 = await player
 								.chooseTarget("邀宴：对一名参与议事的角色造成2点伤害", (card, player, target) => get.event().candidates.includes(target))
 								.set("candidates", candidates)
+								.set("ai", target => -get.attitude(player, target))
 								.forResult();
 							if (result2.bool) {
 								await result2.targets[0].damage(2);
@@ -27559,9 +27593,12 @@ export default {
 					if (opinion === "red") {
 						const candidates = game.filterPlayer(current => !joined.includes(current));
 						if (candidates.length) {
+							// 造成伤害是打击性效果，裸chooseTarget()默认ai=get.attitude2偏好友方，
+							// 不给ai会导致AI优先伤害未参与议事的队友，甚至在全是队友时直接放弃发动
 							const result2 = await player
 								.chooseTarget("擅政：对一名未参与议事的角色造成1点伤害", (card, plyr, to) => get.event().candidates.includes(to))
 								.set("candidates", candidates)
+								.set("ai", target => -get.attitude(player, target))
 								.forResult();
 							if (result2 && result2.bool && result2.targets.length) {
 								await result2.targets[0].damage();
