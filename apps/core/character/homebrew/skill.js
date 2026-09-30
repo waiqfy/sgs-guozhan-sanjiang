@@ -14466,12 +14466,16 @@ export default {
 	},
 
 	// 约俭：锁定技，同势力角色的基础手牌上限改为X（X为其体力上限）。 参考gz_yuejian
+	// 修复：filter原来没检查卞夫人自己是否已明置——锁定技理应在武将牌暗置时不生效，但这里
+	// 只要game知道真实势力就会立刻给队友加手牌上限，等于卞夫人还暗置着就能让队友提前吃到
+	// "明置后"才该有的增益，还会暴露"这些人跟卞夫人同势力"这个本该保密的信息，相当于变相
+	// 抢先明置。补上isCharacterShown(player,"yuejian")门槛。
 	yuejian: {
 		audio: "yuejian",
 		trigger: { global: "phaseZhunbeiBegin" },
 		forced: true,
 		filter(event, player) {
-			return game.hasPlayer(current => current.isFriendOf(player) && !current.hasSkill("yuejian_num"));
+			return isCharacterShown(player, "yuejian") && game.hasPlayer(current => current.isFriendOf(player) && !current.hasSkill("yuejian_num"));
 		},
 		async content(event, trigger, player) {
 			game.filterPlayer(current => current.isFriendOf(player)).forEach(current => {
@@ -21989,6 +21993,14 @@ export default {
 						}
 						return true;
 					})
+					// 这个filterTarget依赖ui.selected.targets(已选目标)做互斥判断，但game.check()对
+					// "target"类型的可选性判断默认会缓存(useCache=!event.skill&&!event.multitarget)，
+					// 缓存key只由ui.selected.buttons/cards决定，不含targets本身——导致选完第一个目标后，
+					// 缓存的仍是"一个都没选时"算出来的可选集合，同势力的其他人一直保持selectable，
+					// 能被继续选中。官方new_chuli走的是skill自身filterTarget的原生激活流程，
+					// event.skill会被设成"new_chuli"从而useCache=false，不会踩到这个缓存bug；我们
+					// 这里是content()内部另起的裸chooseTarget()，不带skill，需要显式设置skill来关掉缓存
+					.set("skill", "chuwen")
 					.set("ai", target => {
 						const attitude = get.attitude(get.player(), target);
 						// 队友被弃置的牌不一定是黑桃，摸不到牌纯粹让队友掉一张牌，不划算；
