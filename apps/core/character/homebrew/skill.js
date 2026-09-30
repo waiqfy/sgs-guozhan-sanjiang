@@ -16692,12 +16692,16 @@ export default {
 
 // ========== zhoutai 周泰 ==========
 	// 不屈：锁定技，当你处于濒死状态时，你将牌堆顶的一张牌置于你的武将牌上，称为“创”，若此牌的点数与已有的“创”点数均不同，则你将体力回复至1点，若出现相同点数则将此牌置入弃牌堆。若你的武将牌上有“创”，则你可以令你的手牌上限与“创”的数量相等。 参考buqu(shenhua，非guozhan版本；guozhan版gzbuqu机制不符，改用此版本并去掉其mod里的非guozhan限制)
+	// 补充：周泰被暗置后，"创"这个扩展区跟着武将牌走没有意义(暗置期间技能本来就不生效，
+	// 下次明置也不该继续沿用之前攒的次数)，加一个hideCharacterBegin监听，暗置时弃置所有
+	// "创"、相当于重置
 	buqu: {
 		audio: 2,
 		audioname: ["key_yuri"],
 		trigger: { player: "chooseToUseBefore" },
 		forced: true,
 		preHidden: true,
+		group: ["buqu_reset"],
 		filter(event, player) {
 			return event.type == "dying" && player.isDying() && event.dying == player && !event.getParent()._buqu;
 		},
@@ -16763,6 +16767,19 @@ export default {
 					}
 				},
 			},
+		},
+	},
+	buqu_reset: {
+		charlotte: true,
+		sourceSkill: "buqu",
+		trigger: { player: "hideCharacterBegin" },
+		forced: true,
+		popup: false,
+		filter(event, player) {
+			return event.toHide == "zhoutai" && player.getExpansions("buqu").length > 0;
+		},
+		async content(event, trigger, player) {
+			await player.loseToDiscardpile(player.getExpansions("buqu"));
 		},
 	},
 
