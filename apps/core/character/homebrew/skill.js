@@ -3646,7 +3646,9 @@ export default {
 			}
 			let count = player.getHistory("useCard").length + player.getHistory("respond").length;
 			player.addTip("jili2", "蒺藜 " + count, true);
-			return count == player.getAttackRange();
+			// 官方gzjili_draw的filter是count>0 && count==getAttackRange()，漏了count>0
+			// 会导致攻击范围被降到0时count也是0，凭空判定条件成立
+			return count > 0 && count == player.getAttackRange();
 		},
 		audio: 2,
 		async content(event, trigger, player) {
@@ -3660,7 +3662,11 @@ export default {
 				}
 				return;
 			}
-			await player.draw(player.getHistory("useCard").length + player.getHistory("respond").length);
+			// 文本X就是"你的攻击范围"，摸牌数应该直接取getAttackRange()，而不是借用触发
+			// 时刚好相等的count——官方gzjili_draw.content同样是player.draw(getAttackRange())，
+			// 用count只是巧合下数值相同，一旦攻击范围在filter判断之后、content执行之前发生
+			// 变化(比如别的技能同时响应同一事件改了攻击范围)，两者就会对不上
+			await player.draw(player.getAttackRange());
 		},
 		ai: {
 			threaten: 1.8,
