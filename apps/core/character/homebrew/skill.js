@@ -26325,12 +26325,21 @@ export default {
 		},
 		ai: {
 			threaten: 0.7,
-			// 让其他角色的攻击AI在决定要不要打卑弥呼之前，能查到"如果我打她时她不在我的攻击
-			// 范围内，这次伤害会被减1"，从而正确压低进攻意愿，参考同文件已有的filterDamage
-			// +skillTagFilter用法(王异zhenlie/贾诩jiaxu等)
-			filterDamage: true,
-			skillTagFilter(player, tag, arg) {
-				return !!(arg && arg.player && !player.inRangeOf(arg.player));
+			// filterDamage+skillTagFilter只有其他技能显式查询hasSkillTag("filterDamage",...)时
+			// 才会生效(王异zhenlie/贾诩等用于"要不要帮忙"这类旁观判断)，普通杀选目标的AI根本
+			// 不会去查这个tag，所以敌人依旧会不管距离照样打卑弥呼。get.effect()给杀选目标打分
+			// 时，会自动遍历目标自身技能的ai.effect.target(card,player,target)做为乘数，这才是
+			// 真正影响"值不值得打这个目标"的钩子，改用这个
+			effect: {
+				target(card, player, target) {
+					if (target.inRangeOf(player) || !get.tag(card, "damage")) {
+						return;
+					}
+					if (card.name == "sha") {
+						return 0;
+					}
+					return 0.5;
+				},
 			},
 		},
 	},
