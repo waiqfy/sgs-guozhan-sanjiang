@@ -26974,15 +26974,38 @@ export default {
 	},
 
 // ========== xurong 徐荣 ==========
-	// 凶镶：当你首次明置此武将牌后，你获得3枚“暴戾”。出牌阶段，你可以交给一名没有“暴戾”且与你势力不同的其他角色1枚“暴戾”。你对有“暴戾”的其他角色造成的伤害+1（每回合每名角色限一次），且其出牌阶段开始时，弃其“暴戾”并随机执行一项：1.受到你造成的1点火焰伤害且本回合不能对你使用【杀】；2.失去1点体力且本回合手牌上限-1；3.你获得其一张装备区里的牌和一张手牌。 参考xinfu_xionghuo(xinfu，沿用暴戾机制并按卡面重做数值)
+	// 凶镶：当你首次明置此武将牌后，你获得3枚“暴戾”。出牌阶段，你可以交给一名没有“暴戾”且与你势力不同的其他角色1枚“暴戾”。你对有“暴戾”的其他角色造成的伤害+1（每回合每名角色限一次），且其出牌阶段开始时，弃其“暴戾”并随机执行一项：1.受到你造成的1点火焰伤害且本回合不能对你使用【杀】；2.失去1点体力且本回合手牌上限-1；3.你获得其一张装备区里的牌和一张手牌。 参考skill_old.js的xinfu_xionghuo(xinfu，沿用暴戾机制并按卡面重做数值)
+	// 修复：3枚"暴戾"供应量原来用init(player)在角色进入游戏时无条件直接发放，不受"首次明置"
+	// 限制。若徐荣是暗置的副将登场，供应量会在未明置前就提前拿到，且明置之后init()不会重新
+	// 执行，反而永远不会真正按"首次明置"这个条件补发——参考文件里xinfu_xionghuo早就修复过
+	// 一模一样的bug(comment原话)。改成同文件guixiu/jugu/xianfu等一大批"首次明置"技能统一用
+	// 的trigger:showCharacterAfter+3将模式isCharacterShown双保险写法，真正在明置时才发放。
 	xionghuo: {
 		skillAnimation: true,
 		animationColor: "qun",
 		aiShowTag: "support",
-		init(player) {
-			player.storage.xionghuo_supply = 3;
-			player.addSkill("xionghuo_dmg");
+		audio: "xionghuo",
+		trigger: { player: "showCharacterAfter" },
+		forced: true,
+		popup: false,
+		filter(event, player) {
+			return !!(event.toShow && event.toShow.includes("xurong")) && player.storage.xionghuo_supply == null;
 		},
+		// 若徐荣是作为第三个武将(3将模式)获得的，一开始就是明置状态，没有showCharacterAfter这个环节。
+		init(player, skill) {
+			player.addSkill("xionghuo_dmg");
+			if (player.storage.xionghuo_supply == null && isCharacterShown(player, skill)) {
+				player.storage.xionghuo_supply = 3;
+			}
+		},
+		async content(event, trigger, player) {
+			player.storage.xionghuo_supply = 3;
+		},
+		group: ["xionghuo_give"],
+	},
+	xionghuo_give: {
+		charlotte: true,
+		sourceSkill: "xionghuo",
 		audio: "xionghuo",
 		enable: "phaseUse",
 		filter(event, player) {
