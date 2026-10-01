@@ -1135,36 +1135,32 @@ export default {
 
 // ========== guanyu 关羽 ==========
 	// 武魂：锁定技，游戏开始时，你可以明置此武将。杀死你的角色本局游戏无法通过【桃】和【桃园结义】回复体力。 参考wuhun(extra)
+	// 之前把"gameStart问是否明置"和"dieAfter给凶手加禁桃"两段互不相关的效果硬塞进同一个
+	// content里用if(trigger.name==...)分支，跟wusheng那次一样属于没必要的耦合——拆成
+	// wuhun(只管gameStart)+wuhun_dieafter(只管dieAfter)两个技能，用group关联，效果不变。
 	wuhun: {
 		audio: "wuhun2",
-		trigger: { player: "gameStart", global: "dieAfter" },
-		filter(event, player) {
-			if (event.name == "gameStart") {
-				return true;
-			}
-			return event.player == player && event.source && event.source.isIn();
+		trigger: { player: "gameStart" },
+		filter() {
+			return true;
 		},
 		direct: true,
+		group: ["wuhun_dieafter"],
 		content() {
 			"step 0";
-			if (trigger.name == "gameStart") {
-				// gz3: 三将模式下，关羽如果是被抽到当"第三个武将"，武魂会跟着 addSkill 一起
-				// 正常挂到玩家身上——但第三个武将从一开始就是明置状态（不走 isUnseen/
-				// showCharacter 那套流程），"是否明置此武将牌"这个问题对它来说没有意义，
-				// 下面 step 1 算 index 的公式也是照搬两将制主/副二选一那套、完全没考虑
-				// 第三个武将这个情况，真问出来、真去 showCharacter(index)，就会把这名玩家
-				// 真正的主将或副将也一起误亮出去。这里先排除关羽是第三个武将的情况。
-				if (player.name3 && get.character(player.name3, 3).includes("wuhun")) {
-					event.finish();
-				} else {
-					// gz3: 武魂就是设计给"开局主动亮"用的（明置后杀死你的角色不能用桃回血，
-					// 是关羽这张牌的核心机制），不是"要不要冒险组队"的判断，AI 应该无条件执行，
-					// 不用像 bumingzhi/_mingzhi2/chiling 那样按势力名额/安全与否衡量。
-					player.chooseBool(get.prompt("wuhun"), "是否明置此武将牌？").set("ai", () => true);
-				}
-			} else {
-				trigger.source.addTempSkill("wuhun_ban");
+			// gz3: 三将模式下，关羽如果是被抽到当"第三个武将"，武魂会跟着 addSkill 一起
+			// 正常挂到玩家身上——但第三个武将从一开始就是明置状态（不走 isUnseen/
+			// showCharacter 那套流程），"是否明置此武将牌"这个问题对它来说没有意义，
+			// 下面 step 1 算 index 的公式也是照搬两将制主/副二选一那套、完全没考虑
+			// 第三个武将这个情况，真问出来、真去 showCharacter(index)，就会把这名玩家
+			// 真正的主将或副将也一起误亮出去。这里先排除关羽是第三个武将的情况。
+			if (player.name3 && get.character(player.name3, 3).includes("wuhun")) {
 				event.finish();
+			} else {
+				// gz3: 武魂就是设计给"开局主动亮"用的（明置后杀死你的角色不能用桃回血，
+				// 是关羽这张牌的核心机制），不是"要不要冒险组队"的判断，AI 应该无条件执行，
+				// 不用像 bumingzhi/_mingzhi2/chiling 那样按势力名额/安全与否衡量。
+				player.chooseBool(get.prompt("wuhun"), "是否明置此武将牌？").set("ai", () => true);
 			}
 			"step 1";
 			if (result?.bool) {
@@ -1192,6 +1188,18 @@ export default {
 					},
 				},
 			},
+		},
+	},
+	wuhun_dieafter: {
+		charlotte: true,
+		trigger: { global: "dieAfter" },
+		filter(event, player) {
+			return event.player == player && event.source && event.source.isIn();
+		},
+		forced: true,
+		popup: false,
+		content(event, trigger, player) {
+			trigger.source.addTempSkill("wuhun_ban");
 		},
 	},
 
