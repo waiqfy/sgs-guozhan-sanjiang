@@ -1827,7 +1827,13 @@ export default {
 		},
 		direct: true,
 		async content(event, trigger, player) {
+			// direct:true技能的content()可能被引擎checkSkipped()的speculative探测直接调用，
+			// 这时trigger可能是缺字段的裸事件，trigger.target不一定存在，没有判空直接调用
+			// isUnseen会crash(参考设伏shefu的同类crash，commit 1afba10e)
 			let target = trigger.target;
+			if (!target) {
+				return;
+			}
 			const targetMainShowing = !target.isUnseen(0);
 			const targetViceShowing = !target.isUnseen(1);
 			const controls = [];
@@ -14438,6 +14444,11 @@ export default {
 		},
 		audio: 2,
 		async content(event, trigger, player) {
+			// direct:true技能的content()可能被speculative探测直接调用，trigger.result在
+			// 这种情况下可能不存在(同shefu那次crash，commit 1afba10e)
+			if (!trigger.result?.cards) {
+				return;
+			}
 			const prompt = "即将失去" + get.translation(trigger.result.cards) + "，是否发动【挽危】？";
 			const next = player.choosePlayerCard(player, prompt, trigger.position);
 			next.set("ai", function (button) {
@@ -17575,7 +17586,12 @@ export default {
 		},
 		preHidden: true,
 		async content(event, trigger, player) {
+			// direct:true技能的content()可能被speculative探测直接调用，trigger.target在
+			// 这种情况下可能不存在(同shefu那次crash，commit 1afba10e)
 			const target = trigger.target;
+			if (!target) {
+				return;
+			}
 			const next = player.choosePlayerCard(target, "he", [1, Math.min(target.hp, target.countCards("he"))], get.prompt("pojun", target), "allowChooseAll");
 			next.set("ai", function (button) {
 				var val = get.value(button.link);
@@ -27347,6 +27363,12 @@ export default {
 			return game.hasPlayer(current => !event.targets.includes(current) && lib.filter.targetEnabled2(event.card, player, current) && lib.filter.targetInRange(event.card, player, current));
 		},
 		async content(event, trigger, player) {
+			// direct:true技能的content()可能被speculative探测直接调用，trigger.targets在
+			// 这种情况下可能不存在(同shefu那次crash，commit 1afba10e)——filter()里已经判断过
+			// !event.targets，但探测流程可能根本不走filter()直接调content()，这里需要再判一次
+			if (!trigger.targets || !trigger.card) {
+				return;
+			}
 			const num = game.countPlayer(current => !trigger.targets.includes(current) && lib.filter.targetEnabled2(trigger.card, player, current) && lib.filter.targetInRange(trigger.card, player, current));
 			const result = await player
 				.chooseTarget("帼武：是否为" + get.translation(trigger.card) + "增加" + (num > 1 ? "至多两个" : "一个") + "目标？", [1, Math.min(2, num)], (card, player, target) => {
