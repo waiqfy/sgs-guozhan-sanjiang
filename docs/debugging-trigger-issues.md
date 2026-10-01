@@ -45,6 +45,22 @@
 
 `content()` / `check()` / `prompt()` 写成无参数的老式写法时，引擎会通过 `ArrayCompiler` 重建执行作用域，这个作用域**只**注入 `player`/`event`/`trigger`，模块级别的 helper 函数（比如本文件里自定义的 `sameGroup()`）不在作用域内，会报 `ReferenceError`。解决办法是把逻辑内联展开，不要指望能调用文件顶部定义的函数。
 
+## 第五步：trigger 里 role 用错（`player:` vs `global:`），技能完全无反应且不报错
+
+来源：关羽"武魂"(wuhun) 开局"是否明置"提示完全不弹、console 无任何报错的排查。这类 bug 的特征是**连 `filter()` 都从未被调用**（用临时 `console.log` 在 `filter()` 开头打点也打不出来），但技能的 trigger 钩子确实已经正常注册（用 `init(player, skill)` 打点能确认 `addSkillTrigger` 真的处理过这个技能）——说明问题卡在 `filter()` 之前的候选筛选阶段，不是技能自身逻辑的问题。
+
+根因：`library/index.js` 的 `filterTrigger(event, player, triggerName, skill, ...)` 里有这条判断：
+```js
+if (role !== "global" && player !== event[role]) {
+    return false;
+}
+```
+写 `trigger:{player:"某事件"}` 时，要求这个事件自己的 `.player` 字段必须等于技能拥有者。这对"谁的出牌阶段"这种天然绑定到某个玩家的事件没问题，但对**不属于任何特定玩家的全局性事件**（最典型的是 `gameStart`，其他类似的还有纯里程碑性质、不是"谁的回合/谁的阶段"的事件）来说，`.player` 根本不会按玩家轮流赋值，这条判断永远为真，技能在 `filterTrigger` 这一步就被拦下，连自己的 `filter()` 都进不去——表现为"完全没反应"，没有任何报错（因为根本没执行到会抛异常的代码）。
+
+验证方法：全项目 grep 搜同一个事件名的其他 `trigger:` 用法，看官方/引擎自带代码是统一用 `player:` 还是 `global:`。例如 `"gameStart"` 全项目搜索（`boss.js`/`chess.js`/引擎自带 `library/skill.js`）无一例外全部用 `trigger:{global:"gameStart"}`，没有一处用 `player:`——这种"全项目统一用一种写法，没有反例"的情况，就是真实约定，不要被某个旧参考文件（哪怕带着"已确认可用"的注释）带偏，那条注释很可能只验证了"事件确实会 trigger"，没有验证"用 player role 真的能收到"。
+
+排查这类"完全无反应、无报错"的 bug 时，比起一上来就怀疑技能自身 filter/content 逻辑，更快的路径是：先用 `init(player, skill)` 打点确认技能注册没问题，再用 `filter()` 开头打点确认候选筛选有没有把它刷掉；如果连 `filter()` 都进不去，直接去翻 `filterTrigger()` 本身的判断逻辑，而不是死磕技能代码。
+
 ## 排查流程总结（按性价比从低到高排序，先做便宜的）
 
 1. 看最新几份 `apps/core/log/error/*.txt`，按事件链时间点找可疑项，不要只看技能名字面匹配。
