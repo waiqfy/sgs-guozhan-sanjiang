@@ -21138,20 +21138,15 @@ export default {
 		// 文本是"将一张牌当【调虎离山】使用"，是要真的选1张牌当成本，不是无中生有的免费转化——
 		// filterCard写死false、又没配selectCard:-1兜底，导致选牌步骤永远凑不出合法结果，
 		// 一直没有确认按钮，技能等于从来发动不了
+		// 文本是"出牌阶段限一次"，顶层usable:1已经由引擎按阶段自动重置，之前还另外加了一个
+		// player.storage.diaogui_used永久标记并在viewAsFilter里卡死，这个标记从来没被清空过，
+		// 结果变成"一辈子只能用一次"——第一次用完以后，以后每个回合都没有技能按钮。去掉这个
+		// 多余的永久标记，只依赖usable
 		filterCard: true,
-		viewAsFilter(player) {
-			return !player.storage.diaogui_used;
-		},
 		viewAs: { name: "diaohulishan" },
-		onuse(result, player) {
-			player.storage.diaogui_used = true;
-		},
 		ai: {
 			threaten: 1.1,
 			order: 6,
-			skillTagFilter(player) {
-				return !player.storage.diaogui_used;
-			},
 		},
 	},
 	diaogui_draw: {
@@ -25479,11 +25474,13 @@ export default {
 		filterTarget(card, player, target) {
 			return target != player;
 		},
-		// ai里只有threaten(影响敌方对这张牌威胁度的观感)，不影响AI要不要主动用它；这是限定技，
-		// 从敌方角色开始传导弃牌/伤害的连锁效果最有利，所以起始目标优先选交情差的角色
+		// 只给了result.target(选起始目标的评分)，没给result.player——跟文件里其他同类限定技
+		// 反复踩过的坑一样，缺了result.player，引擎默认的发动热情评估就是0，AI从来不会主动
+		// 发动这个限定技。起始目标从敌方角色开始传导弃牌/伤害链最有利，优先选交情差的角色
 		ai: {
 			order: 9,
 			result: {
+				player: 1,
 				target(player, target) {
 					return -get.attitude(player, target);
 				},
