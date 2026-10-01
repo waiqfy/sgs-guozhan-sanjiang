@@ -1141,6 +1141,12 @@ export default {
 	wuhun: {
 		audio: "wuhun2",
 		trigger: { player: "gameStart" },
+		// gz3临时调试：init只要addSkillTrigger真的处理过这个技能就一定会跑一次，不管
+		// 暗置与否——用来确认"wuhun"到底有没有被选将阶段的addSkillTrigger(hiddenSkills,true)
+		// 注册过。确认根因后删掉。
+		init(player, skill) {
+			console.log("[wuhun debug] init() called, skill registered for", player.playerid, player.name1, player.name2, "hiddenSkills=", player.hiddenSkills?.slice?.());
+		},
 		filter(event, player) {
 			console.log("[wuhun debug] filter called for", player.name1, player.name2);
 			return true;
