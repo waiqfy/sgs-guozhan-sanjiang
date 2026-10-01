@@ -1141,13 +1141,17 @@ export default {
 	wuhun: {
 		audio: "wuhun2",
 		trigger: { player: "gameStart" },
-		filter() {
+		filter(event, player) {
+			console.log("[wuhun debug] filter called for", player.name1, player.name2);
 			return true;
 		},
 		direct: true,
 		group: ["wuhun_dieafter"],
 		content() {
 			"step 0";
+			// gz3临时调试：定位"武魂开局没反应"到底是content没被调用，还是调用了但走错分支/
+			// 界面没弹出——下次复现时看控制台这几条日志打到哪一步为止。确认问题后记得删掉。
+			console.log("[wuhun debug] step0 start", player.name1, "name3=", player.name3, "isUnseen(2)=", player.isUnseen(2));
 			// gz3: 三将模式下，关羽如果是被抽到当"第三个武将"，武魂会跟着 addSkill 一起
 			// 正常挂到玩家身上——但第三个武将从一开始就是明置状态（不走 isUnseen/
 			// showCharacter 那套流程），"是否明置此武将牌"这个问题对它来说没有意义，
@@ -1155,14 +1159,17 @@ export default {
 			// 第三个武将这个情况，真问出来、真去 showCharacter(index)，就会把这名玩家
 			// 真正的主将或副将也一起误亮出去。这里先排除关羽是第三个武将的情况。
 			if (player.name3 && get.character(player.name3, 3).includes("wuhun")) {
+				console.log("[wuhun debug] 判定为第三将，跳过询问");
 				event.finish();
 			} else {
+				console.log("[wuhun debug] 即将弹出chooseBool");
 				// gz3: 武魂就是设计给"开局主动亮"用的（明置后杀死你的角色不能用桃回血，
 				// 是关羽这张牌的核心机制），不是"要不要冒险组队"的判断，AI 应该无条件执行，
 				// 不用像 bumingzhi/_mingzhi2/chiling 那样按势力名额/安全与否衡量。
 				player.chooseBool(get.prompt("wuhun"), "是否明置此武将牌？").set("ai", () => true);
 			}
 			"step 1";
+			console.log("[wuhun debug] step1, result=", result);
 			if (result?.bool) {
 				var index = get.character(player.name2, 3).includes("wuhun") && !get.character(player.name, 3).includes("wuhun") ? 1 : 0;
 				player.showCharacter(index);
