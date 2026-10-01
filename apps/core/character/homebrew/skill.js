@@ -7097,6 +7097,7 @@ export default {
 				gain: 1,
 			},
 			result: {
+				player: 1,
 				target(player, target) {
 					return -Math.pow(Math.min(player.hp, target.countCards("he")), 2) / 4;
 				},
@@ -10244,6 +10245,7 @@ export default {
 		ai: {
 			order: 7,
 			result: {
+				player: 1,
 				target(player, target) {
 					if (target.isUnseen()) {
 						return 1;
@@ -10574,6 +10576,10 @@ export default {
 			},
 		},
 		ai: {
+			order: 10,
+			result: {
+				player: 1,
+			},
 			threaten: 1.3,
 		},
 	},
@@ -12158,6 +12164,9 @@ export default {
 		},
 		ai: {
 			order: 7,
+			result: {
+				player: 1,
+			},
 			threaten: 0.9,
 		},
 	},
@@ -12842,6 +12851,7 @@ export default {
 			order: 1,
 			threaten: 1.0,
 			result: {
+				player: 1,
 				target: -1,
 			},
 		},
@@ -13490,7 +13500,7 @@ export default {
 		ai: {
 			order: 1,
 			threaten: 1.1,
-			result: { target: -1 },
+			result: { player: 1, target: -1 },
 		},
 		group: "mingfa_effect",
 		subSkill: {
@@ -16072,6 +16082,12 @@ export default {
 			await game.delay();
 			await dest.addJudge(moveCard);
 		},
+		ai: {
+			order: 6,
+			result: {
+				player: 1,
+			},
+		},
 	},
 
 	// 流离：当你成为【杀】的目标时，你可以弃置一张牌并将此【杀】转移给你攻击范围内的一名其他角色（不能是此【杀】的使用者）。 参考liuli(standard)
@@ -17254,6 +17270,7 @@ export default {
 		ai: {
 			order: 11,
 			result: {
+				player: 1,
 				target(player, target) {
 					return -target.countCards("h");
 				},
@@ -17799,6 +17816,12 @@ export default {
 				await game.delay();
 			}
 		},
+		ai: {
+			order: 6,
+			result: {
+				player: 1,
+			},
+		},
 	},
 
 // ========== chendong 陈武&董袭 ==========
@@ -17994,6 +18017,9 @@ export default {
 		},
 		ai: {
 			order: 10,
+			result: {
+				player: 1,
+			},
 			threaten(player, target) {
 				return 0.8 * Math.max(1 + target.maxHp - target.hp);
 			},
@@ -20859,6 +20885,12 @@ export default {
 				target.addTempSkill("biaozhao_mark", "phaseUseAfter");
 				target.storage.biaozhao_mark = player;
 			}
+		},
+		ai: {
+			order: 7,
+			result: {
+				player: 1,
+			},
 		},
 		subSkill: {
 			buff: {
@@ -27417,7 +27449,13 @@ export default {
 			}
 			player.addTempSkill("wushuang", "phaseUseAfter");
 		},
-		ai: { threaten: 1.4 },
+		ai: {
+			order: 7,
+			result: {
+				player: 1,
+			},
+			threaten: 1.4,
+		},
 	},
 	// 神威：锁定技，摸牌阶段，你额外摸两张牌；你的手牌上限+2。 参考llqshenwei(huicui，之前误标"原创无参考"，实际存在且完全一致)
 	shenwei2: {
@@ -27738,7 +27776,13 @@ export default {
 					}
 				});
 		},
-		ai: { threaten: 1.5 },
+		ai: {
+			order: 6,
+			result: {
+				player: 1,
+			},
+			threaten: 1.5,
+		},
 	},
 	// 凶暴：当你参与议事时，你可以额外展示一张手牌，若如此做，其他角色改为随机展示手牌。
 	// 参考jsrg包jsrgxiongbao(贾南风)——之前那张"额外展示"的牌只是走了player.showCards()做视觉展示，从没真正塞进trigger.fixedResult，等于对议事结果毫无影响，是个功能性bug；官方版本会把玩家自己选的两张牌都算进议事意见里。改为把两张牌都push进fixedResult，同时把filter的手牌数门槛从>0改成>1(至少要有两张牌才谈得上"额外")。

@@ -68,3 +68,64 @@ grep 全部 `.chooseCard(` `.choosePlayerCard(` `.chooseToDiscard(` `.chooseCont
 
 每处改动后及全部改完后都跑过 `node --check apps/core/character/homebrew/skill.js`，
 全部通过；未涉及 translate.js。commit: `15107ce8`。
+
+## 2026-09-30 第二轮：顶层 ai.result.player 缺失排查
+
+### 起因
+
+李儒"焚城"(liru_fencheng)限定技 AI 从不主动发动，查出是 `ai.result` 只给了 `target`
+评分、没给 `player`——这跟第一轮排查的"内部选择缺 ai 回调"是完全不同的另一类 bug：
+这里缺的是技能顶层"要不要点这个按钮"的热情度信号，不是某次内部选人/选牌的评分。
+第一轮排查范围没覆盖这类，所以漏掉了。本轮专门排查全部 `enable:"phaseUse"` /
+`limited:true` 的技能。
+
+### 排查方法
+
+脚本遍历 `skill.js` 找出所有顶层 `enable:"phaseUse"` 或 `limited:true` 的技能，提取
+其**顶层**（排除 subSkill 内部）`ai:` 块，检查 `result` 里是否存在 `player` 这个键
+（而不是仅仅文本包含"player"字符串——很多 `result.target(player, target)` 的参数名
+就叫 player，直接文本匹配会把这类函数签名误判为"有 result.player"，排查时踩了这个坑，
+后来改成只认 `result: { player: ... }` 这种真正的键）。
+
+**排除以下两类，不算这个 bug**（它们的 AI 意愿走不同的评估路径，没有 result.player
+也不受影响）：
+- `viewAs:`/`chooseButton:` 驱动的"将一张牌当 XX 使用"类技能（jixi/邓艾急袭、
+  caishi、guanhuo/皇甫嵩觀火等）——这类技能是否发动由"这张虚拟牌值不值得打"的常规
+  选牌评分决定，不走 `result.player` 这条线。
+- 顶层直接声明了 `check(event, player)` 函数的技能（如 kuangfu_active、
+  yishe_active）——`check` 本身就是这类技能已验证可行的发动意愿判断方式。
+
+### 本轮修复的 13 处（统一补上 `result.player: 1`，保留原有的 target 评分/threaten 不变）
+
+| 技能 | 角色 | 原状态 |
+|---|---|---|
+| zhengbi 征辟 | 崔琰&毛玠 | 有 `order`+`result.target`，缺 `player` |
+| cuorui 挫锐(限定技) | 牛金 | 只有 `threaten`，没有 `order`/`result` |
+| gushe 鼓舌 | 王朗 | 只有 `order`+`threaten`，没有 `result` |
+| daoshu 盗书 | 蒋干 | 有 `result.target`(常量)，缺 `player` |
+| mingfa 明法 | 羊祜 | 有 `result.target`(常量)，缺 `player` |
+| guose2 国色(移动乐不思蜀分支) | 大乔 | 完全没有 `ai` |
+| shangyi 尚义 | 蒋钦 | 有 `order`+`result.target`，缺 `player` |
+| yongjin 勇进 | 凌统 | 完全没有 `ai` |
+| ganlu 甘露 | 吴国太 | 有 `threaten`+`effect`(供别人查询用)，没有 `result` |
+| biaozhao 表召 | 许贡 | 完全没有 `ai`（插在 subSkill 前） |
+| zhuangrong 妆戎 | 吕玲绮 | 只有 `threaten`，没有 `order`/`result` |
+| shanzheng 擅政 | 贾南风 | 只有 `threaten`，没有 `order`/`result` |
+| weimeng 危盟/纵横 | 邓芝 | 有 `result.target`，缺 `player` |
+| liru_fencheng 焚城(限定技，本轮起因) | 李儒 | 有 `order`+`result.target`，缺 `player`（已在上一条消息单独修复并提交） |
+
+### 本轮排除、确认不是这类 bug 的情况
+
+- `fengying`(奉迎，限定技)：`result.player(player){...}` 是个函数，已经有真正的
+  `player` 键，第一遍文本扫描漏判了（regex 把函数体里出现的其他字符串干扰了判断），
+  复查后确认它本来就是对的，没有改动。
+- `jixi`(急袭，邓艾)：`chooseButton` 驱动，按上面排除规则跳过。
+- `kuanshi`(宽释，阚泽)：这个技能顶部的注释里提到了字面字符串 `enable:"phaseUse"`
+  （描述以前的错误实现），脚本按纯文本扫描时被注释文字污染误判成"当前还是
+  enable:phaseUse"，实际代码早就改成 `trigger:[...]` 数组+`cost()` 了，是真正的
+  触发型技能，是否发动走 `cost()` 自己的 ai，不需要也不会检查 `result.player`。
+
+### 校验方式
+
+全部改完后跑过 `node --check apps/core/character/homebrew/skill.js`，通过；未涉及
+translate.js。
