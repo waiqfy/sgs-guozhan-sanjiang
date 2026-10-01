@@ -19138,9 +19138,11 @@ export default {
 			return game.hasPlayer(target => target != player && target.inRange(player) && target.countCards("h"));
 		},
 		async cost(event, trigger, player) {
+			// 从目标手上硬拿一张牌放进自己武将牌是纯打击性效果，应该挑敌人下手，之前写反了
+			// (对好感度正的队友下手、敌人反而不选)
 			event.result = await player
 				.chooseTarget(get.prompt("yinbing"), "选择任意名攻击范围包含你的角色，令其各交给你一张手牌置于你的武将牌上", [1, Infinity], (card, player, target) => target != player && target.inRange(player) && target.countCards("h"))
-				.set("ai", target => (get.attitude(get.player(), target) > 0 ? 1 : 0))
+				.set("ai", target => (get.attitude(get.player(), target) < 0 ? 1 : 0))
 				.forResult();
 		},
 		async content(event, trigger, player) {
