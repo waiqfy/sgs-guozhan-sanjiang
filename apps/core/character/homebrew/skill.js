@@ -1196,6 +1196,11 @@ export default {
 	},
 
 	// 武圣：你可以将一张红色牌当【杀】使用或打出。你使用的♦【杀】无距离限制。你对有暗置武将的角色使用♥【杀】伤害+1。 参考gz_wusheng
+	// 之前把"viewAs转化技"(enable+viewAs+filterCard)和"useCardToTargeted被动触发"
+	// (trigger+forced+content)硬塞进同一个技能对象里，官方gz_wusheng其实是拆成两个技能
+	// (wusheng+wusheng_dmg，靠group关联)——一个lib.skill条目同时又是enable又是trigger，
+	// 导致引擎对它的技能分类/按钮生成出现冲突，手牌里完全选不出"当杀使用"这个选项(没按钮/
+	// 用不了)。改成和官方一样拆成两个技能。
 	wusheng: {
 		audio: "wusheng",
 		audioname: ["re_guanyu", "jsp_guanyu", "re_guanzhang", "dc_jsp_guanyu"],
@@ -1207,6 +1212,7 @@ export default {
 			std_guanxing: "wusheng_guanzhang",
 			ty_guanxing: "wusheng_guanzhang",
 		},
+		group: ["wusheng_dmg"],
 		enable: ["chooseToRespond", "chooseToUse"],
 		filterCard(card, player) {
 			return get.color(card) == "red";
@@ -1237,6 +1243,18 @@ export default {
 				}
 			},
 		},
+		ai: {
+			respondSha: true,
+			skillTagFilter(player) {
+				if (!player.countCards("hes", { color: "red" })) {
+					return false;
+				}
+			},
+			threaten: 1.6,
+		},
+	},
+	wusheng_dmg: {
+		charlotte: true,
 		trigger: { player: "useCardToTargeted" },
 		filter(event, player) {
 			return event.card?.name == "sha" && get.suit(event.card) == "heart" && event.target?.isUnseen(2);
@@ -1252,15 +1270,6 @@ export default {
 			if (useCardEvent) {
 				useCardEvent.baseDamage = (useCardEvent.baseDamage || 1) + 1;
 			}
-		},
-		ai: {
-			respondSha: true,
-			skillTagFilter(player) {
-				if (!player.countCards("hes", { color: "red" })) {
-					return false;
-				}
-			},
-			threaten: 1.6,
 		},
 	},
 
@@ -22258,39 +22267,59 @@ export default {
 
 // ========== diaochan 貂蝉 ==========
 	// 离间：出牌阶段限一次，你可以弃置一张牌，然后令一名男性其他角色视为对另一名男性其他角色使用一张【决斗】（不能被【无懈可击】响应）。 参考lijian(standard)
+	// 之前用enable:"phaseUse"把"弃一张牌"(filterCard+position)和"选两名目标"(selectTarget+
+	// multitarget)硬塞在一起，是这个文件里早就踩过坑的"牌+目标同时选"组合(gongsun共损之前
+	// 也是这么写的，见gongsun那条注释)——弃完牌以后选目标这一步接不上，导致技能按钮点不出来/
+	// 用不了。改成和gongsun一样的trigger:phaseUseBegin+direct+chooseCardTarget一次性处理。
 	lijian: {
 		audio: 2,
 		audioname: ["re_diaochan"],
-		enable: "phaseUse",
-		usable: 1,
+		trigger: { player: "phaseUseBegin" },
+		direct: true,
 		filter(event, player) {
-			return game.countPlayer(current => current !== player && current.hasSex("male")) > 1;
+			return player.countCards("he") > 0 && game.countPlayer(current => current !== player && current.hasSex("male")) > 1;
 		},
-		check(card) {
-			return 10 - get.value(card);
-		},
-		filterCard: true,
-		position: "he",
-		filterTarget(card, player, target) {
-			if (player === target) {
-				return false;
-			}
-			if (!target.hasSex("male")) {
-				return false;
-			}
-			if (ui.selected.targets.length === 1) {
-				return target.canUse({ name: "juedou" }, ui.selected.targets[0]);
-			}
-			return true;
-		},
-		targetprompt: ["先出杀", "后出杀"],
-		selectTarget: 2,
-		multitarget: true,
 		async content(event, trigger, player) {
-			const next = event.targets[1]
+			const result = await player
+				.chooseCardTarget({
+					prompt: get.prompt2("lijian"),
+					position: "he",
+					selectCard: 1,
+					filterCard: true,
+					selectTarget: 2,
+					multitarget: true,
+					targetprompt: ["先出杀", "后出杀"],
+					filterTarget(card, player, target) {
+						if (player === target) {
+							return false;
+						}
+						if (!target.hasSex("male")) {
+							return false;
+						}
+						if (ui.selected.targets.length === 1) {
+							return target.canUse({ name: "juedou" }, ui.selected.targets[0]);
+						}
+						return true;
+					},
+					ai1(card) {
+						return 10 - get.value(card);
+					},
+					ai2(target) {
+						if (ui.selected.targets.length === 0) {
+							return -3;
+						}
+						return get.effect(target, { name: "juedou" }, ui.selected.targets[0], target);
+					},
+				})
+				.forResult();
+			if (!result.bool) {
+				return;
+			}
+			await player.discard(result.cards);
+			const next = result.targets[1]
 				.useCard({
 					card: get.autoViewAs({ name: "juedou", isCard: true }),
-					targets: [event.targets[0]],
+					targets: [result.targets[0]],
 					nowuxie: true,
 					noai: true,
 				})
@@ -22300,15 +22329,7 @@ export default {
 		},
 		ai: {
 			order: 8,
-			result: {
-				target(player, target) {
-					if (ui.selected.targets.length === 0) {
-						return -3;
-					} else {
-						return get.effect(target, { name: "juedou" }, ui.selected.targets[0], target);
-					}
-				},
-			},
+			result: { player: 1 },
 			expose: 0.4,
 			threaten: 3,
 		},
@@ -25338,6 +25359,15 @@ export default {
 			},
 			targetInRange(card, player, target) {
 				if (get.itemtype(card) == "card" && target != player) {
+					return false;
+				}
+			},
+			// 引擎lib.filter.targetInRange对没有range/outrange字段的牌（南蛮入侵/万箭齐发
+			// 等AOE牌本来就没有距离限制）会在调用任何mod之前直接return true短路掉，上面这条
+			// targetInRange mod对这类牌根本不会被引擎调用到，导致"只能指定自己"管不住AOE。
+			// 改从cardEnabled2直接禁用selectTarget:-1(自动指定全场，不经过targetInRange)的牌。
+			cardEnabled2(card, player) {
+				if (get.itemtype(card) == "card" && get.info(card).selectTarget == -1) {
 					return false;
 				}
 			},
