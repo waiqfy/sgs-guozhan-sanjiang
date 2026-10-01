@@ -1138,26 +1138,22 @@ export default {
 	// 之前把"gameStart问是否明置"和"dieAfter给凶手加禁桃"两段互不相关的效果硬塞进同一个
 	// content里用if(trigger.name==...)分支，跟wusheng那次一样属于没必要的耦合——拆成
 	// wuhun(只管gameStart)+wuhun_dieafter(只管dieAfter)两个技能，用group关联，效果不变。
+	// 真正的根因(调试定位到的)：trigger用的是{player:"gameStart"}，但gameStart是不属于
+	// 任何特定玩家的全局里程碑事件，它的event.player根本不会按玩家轮流赋值——引擎
+	// filterTrigger里"role!=='global' && player!==event[role]"这条判断因此永远为真，
+	// 技能连自己的filter都进不去，表现为"完全没反应"。全项目搜索确认：所有用到"gameStart"
+	// 的地方(boss.js/chess.js/引擎自带skill.js)无一例外全用trigger:{global:"gameStart"}，
+	// 没有一个用player。改成global即可。
 	wuhun: {
 		audio: "wuhun2",
-		trigger: { player: "gameStart" },
-		// gz3临时调试：init只要addSkillTrigger真的处理过这个技能就一定会跑一次，不管
-		// 暗置与否——用来确认"wuhun"到底有没有被选将阶段的addSkillTrigger(hiddenSkills,true)
-		// 注册过。确认根因后删掉。
-		init(player, skill) {
-			console.log("[wuhun debug] init() called, skill registered for", player.playerid, player.name1, player.name2, "hiddenSkills=", player.hiddenSkills?.slice?.());
-		},
-		filter(event, player) {
-			console.log("[wuhun debug] filter called for", player.name1, player.name2);
+		trigger: { global: "gameStart" },
+		filter() {
 			return true;
 		},
 		direct: true,
 		group: ["wuhun_dieafter"],
 		content() {
 			"step 0";
-			// gz3临时调试：定位"武魂开局没反应"到底是content没被调用，还是调用了但走错分支/
-			// 界面没弹出——下次复现时看控制台这几条日志打到哪一步为止。确认问题后记得删掉。
-			console.log("[wuhun debug] step0 start", player.name1, "name3=", player.name3, "isUnseen(2)=", player.isUnseen(2));
 			// gz3: 三将模式下，关羽如果是被抽到当"第三个武将"，武魂会跟着 addSkill 一起
 			// 正常挂到玩家身上——但第三个武将从一开始就是明置状态（不走 isUnseen/
 			// showCharacter 那套流程），"是否明置此武将牌"这个问题对它来说没有意义，
@@ -1165,17 +1161,14 @@ export default {
 			// 第三个武将这个情况，真问出来、真去 showCharacter(index)，就会把这名玩家
 			// 真正的主将或副将也一起误亮出去。这里先排除关羽是第三个武将的情况。
 			if (player.name3 && get.character(player.name3, 3).includes("wuhun")) {
-				console.log("[wuhun debug] 判定为第三将，跳过询问");
 				event.finish();
 			} else {
-				console.log("[wuhun debug] 即将弹出chooseBool");
 				// gz3: 武魂就是设计给"开局主动亮"用的（明置后杀死你的角色不能用桃回血，
 				// 是关羽这张牌的核心机制），不是"要不要冒险组队"的判断，AI 应该无条件执行，
 				// 不用像 bumingzhi/_mingzhi2/chiling 那样按势力名额/安全与否衡量。
 				player.chooseBool(get.prompt("wuhun"), "是否明置此武将牌？").set("ai", () => true);
 			}
 			"step 1";
-			console.log("[wuhun debug] step1, result=", result);
 			if (result?.bool) {
 				var index = get.character(player.name2, 3).includes("wuhun") && !get.character(player.name, 3).includes("wuhun") ? 1 : 0;
 				player.showCharacter(index);
