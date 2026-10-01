@@ -27136,6 +27136,15 @@ export default {
 		trigger: { player: "showCharacterAfter" },
 		forced: true,
 		popup: false,
+		// 之前只有storage.xionghuo_supply这个纯代码计数，徐荣自己头像上完全看不出还剩
+		// 几枚"暴戾"可交——补上marktext/intro，让供应量也能像xionghuo_punish那样显示出来
+		marktext: "戾",
+		intro: {
+			content: "还可交出#枚“暴戾”",
+			markcount(storage, player) {
+				return player.storage.xionghuo_supply || 0;
+			},
+		},
 		filter(event, player) {
 			return !!(event.toShow && event.toShow.includes("xurong")) && player.storage.xionghuo_supply == null;
 		},
@@ -27144,10 +27153,12 @@ export default {
 			player.addSkill("xionghuo_dmg");
 			if (player.storage.xionghuo_supply == null && isCharacterShown(player, skill)) {
 				player.storage.xionghuo_supply = 3;
+				player.markSkill("xionghuo");
 			}
 		},
 		async content(event, trigger, player) {
 			player.storage.xionghuo_supply = 3;
+			player.markSkill("xionghuo");
 		},
 		group: ["xionghuo_give"],
 	},
@@ -27169,6 +27180,7 @@ export default {
 		async content(event, trigger, player) {
 			const target = event.target;
 			player.storage.xionghuo_supply = (player.storage.xionghuo_supply || 0) - 1;
+			player.markSkill("xionghuo");
 			target.storage.xionghuo_holder = player;
 			target.addSkill("xionghuo_punish");
 			// addSkill只挂功能(trigger)，不会自动画出标记，之前"暴戾"只有代码效果、角色
