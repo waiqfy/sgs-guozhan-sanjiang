@@ -22275,15 +22275,19 @@ export default {
 
 // ========== diaochan 貂蝉 ==========
 	// 离间：出牌阶段限一次，你可以弃置一张牌，然后令一名男性其他角色视为对另一名男性其他角色使用一张【决斗】（不能被【无懈可击】响应）。 参考lijian(standard)
-	// 之前用enable:"phaseUse"把"弃一张牌"(filterCard+position)和"选两名目标"(selectTarget+
-	// multitarget)硬塞在一起，是这个文件里早就踩过坑的"牌+目标同时选"组合(gongsun共损之前
-	// 也是这么写的，见gongsun那条注释)——弃完牌以后选目标这一步接不上，导致技能按钮点不出来/
-	// 用不了。改成和gongsun一样的trigger:phaseUseBegin+direct+chooseCardTarget一次性处理。
+	// 之前用enable:"phaseUse"把"弃一张牌"(顶层filterCard+position)和"选两名目标"(顶层
+	// selectTarget+multitarget)硬塞在同一次按钮点击的选择流程里，是这个文件里早就踩过坑的
+	// "牌+目标同时选"组合(gongsun共损之前也是这么写的)——弃完牌以后选目标这一步接不上，
+	// 技能用不了。改成trigger:phaseUseBegin+direct以后又变成"只能在出牌阶段刚开始那一刻问，
+	// 不能阶段中途再发动"，跟卡面"出牌阶段限一次"(没说限定在开始时)的时机不符，是另一个回归。
+	// 两边都要顾到：保留enable:"phaseUse"+usable:1(整个出牌阶段内随时可点、限一次)，但不在
+	// 顶层声明filterCard/selectTarget，而是把"弃牌+选两个目标"整体放进content里用一次
+	// chooseCardTarget处理，不走容易断片的"顶层组合选择"流程。
 	lijian: {
 		audio: 2,
 		audioname: ["re_diaochan"],
-		trigger: { player: "phaseUseBegin" },
-		direct: true,
+		enable: "phaseUse",
+		usable: 1,
 		filter(event, player) {
 			return player.countCards("he") > 0 && game.countPlayer(current => current !== player && current.hasSex("male")) > 1;
 		},
