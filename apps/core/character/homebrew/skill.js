@@ -11639,7 +11639,14 @@ export default {
 				.forResult();
 		},
 		async content(event, trigger, player) {
-			const card = event.cards[0];
+			// direct:true的技能，引擎checkSkipped()的"isPrevented"探测流程会用不完整的事件
+			// 对象speculative地直接调content()(跳过cost()，event.cards不存在)来判断"这个
+			// 技能会不会拦下别的事件"，这种探测甚至会发生在跟程昱毫不相干的其他玩家(如严白虎)
+			// 回合里，没有这层防护，event.cards[0]直接崩溃会连带搞坏整批arrangeTrigger
+			const card = event.cards?.[0];
+			if (!card) {
+				return;
+			}
 			const next = player.addToExpansion(card, player, "give");
 			next.gaintag.add("shefu");
 			await next;
