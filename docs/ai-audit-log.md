@@ -134,27 +134,47 @@ translate.js。
 
 ### 起因
 
-用户反馈刘备仁德乱给人牌、孙鲁育止息对临时队友也发动。前两轮的覆盖范围其实都不含这一类：
-第一轮只查"内部选择缺ai回调→方向反了"(只修了打击性选目标的7处)，第二轮只查顶层
-`ai.result.player`缺失(AI从不主动发动)。"该不该对**这个具体的人**发动/给牌"属于第三类：
+用户反馈刘备仁德乱给人牌、孙鲁育止息对临时队友也发动。前两轮覆盖范围都不含这一类：
+第一轮只查"内部选择缺ai回调→方向反了"，第二轮只查顶层`ai.result.player`缺失。
 
-- **A类：送礼型技能的`ai.result.target`对非友方也返回正值**。例：rende(仁德)只排除了
-  "有队友时的敌人"，身份未明、临时盟友、没有队友时的敌人都被当成合适的送牌对象。
-  修法：在`result.target`里加`get.attitude(player,target)<=0 → return 0`(毒牌这种"送给敌人是好事"
-  的分支要放在这条前面，不能被一起拦掉)。
-- **B类：cost里`chooseBool(...).set("ai",()=>true)`无条件发动，但效果对某个具体角色是有利/有害的**。
-  例：zhixi(止息)令`trigger.player`弃牌，对敌人是收益、对友方(含临时队友)是自损。
-  修法：ai改成按`get.attitude(player, trigger.player)<0`判断。
+### 关键机制（get/index.js effect_use，约7086-7090行）
 
-### 排查结论
+```
+final = result1 * attitude(player, player) + result2 * attitude(player, target)
+```
 
-全文件grep出34处`set("ai",()=>true/1)`，逐个看效果是否依赖具体对象：真正依赖对象且无条件true的
-只有zhixi一处(已修)。其余要么效果只作用于自己(摸牌/明置/变更武将)，要么ai回调本身已经带了
-`attitude`判断(如huangtian_leiji选目标已是`-attitude`)，不需要改。juetao(令此杀不可响应)
-是代价/收益权衡，不是友敌方向问题，暂不动。
+`ai.result.target`返回的是"这个技能对target是好是坏的**量级和正负**"，引擎会**再乘一次**
+对target的态度。因此：
 
-A类(送礼型`result.target`)只在仁德上确认命中；没有做全文件脚本扫描，后续如果再有"乱给牌/乱给
-增益"的反馈，先grep`result.target`里没有`attitude`判断的`enable:"phaseUse"`技能。
+- 送礼/增益类：返回正数（如1），引擎自动让友方得正分、敌方得负分，不需要自己判断敌友。
+- 打击类：返回负数（如-1），引擎自动让敌方得正分、友方得负分。
+- **不能在result.target里直接返回`get.attitude(player,target)`或`-get.attitude(...)`**：
+  会被平方——送礼型`+attitude`变成`attitude²`，强敌和强友得分一样高(乱送牌给敌人)；
+  打击型`-attitude`变成`-attitude²`，敌友得分一样低(AI分不出该打谁、甚至从不发动)。
+  这个写法和chooseTarget的`.set("ai", target => ...)`回调(直接当分数用，不再乘态度)是两回事，
+  第一轮用`-get.attitude`修chooseTarget是对的，但不能照搬到result.target里。
+
+### 本轮修复
+
+result.target里直接返回attitude的13处，改成返回`1`(送礼型)或`-1`(打击型)：
+- 送礼型(+1)：hongju、jieyin、xianzhou、mizhao、shenchong、channi
+- 打击型(-1)：yijue、boyan、yinpan、liru_fencheng、xionghuo_give、yinge、shelun
+
+另有chooseBool无条件true但效果依赖具体对象的：zhixi(止息)令trigger.player弃牌，改成按
+`attitude<0`才发动。rende(仁德)的result.target本来返回的是正数量级，机制上没问题，这次顺手加的
+`attitude<=0→0`只是多一道保险，并不是乱给牌的根因(根因没查到，见下)。
+
+### 扫描结论与遗留
+
+全文件脚本扫描所有顶层技能+子技能的`ai.result.target`共51处(47处enable型)，其中函数体里没有任何
+attitude判断的24处逐个看过正负号，都和描述一致（打击型为负、增益型为正），没发现符号反的。
+**没有处理、需要人工确认的**：
+- wuyou/zhanjue/duanxie：返回值里已经乘/除了attitude或get.effect(自带态度加权)，会被二次加权，
+  方向对不对要看具体场景，没动。
+- zhengbi/jiahe：用`att>0?1:-1`这类按态度分支返回±1，乘上态度后敌友得分都为正，分不出该选谁，
+  但它们的选择本身还有其他约束，没动。
+- 刘备仁德"乱给人牌"：result.target本身没问题，真正原因可能在check(card)选牌/发动时机，没复现到具体场景，
+  暂未处理，需要具体的对局情况。
 
 ### 同一天顺手修的其他AI/方向问题
 

@@ -1360,7 +1360,7 @@ export default {
 					if (target.hasSkillTag("nogain") || !target.countCards("h")) {
 						return 0;
 					}
-					return -get.attitude(player, target);
+					return -1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 		},
@@ -12461,7 +12461,7 @@ export default {
 					return game.hasPlayer(current => current != player && current.isEnemyOf(player) && current.hp <= 2) ? 1 : 0;
 				},
 				target(player, target) {
-					return get.attitude(player, target);
+					return 1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 		},
@@ -16288,7 +16288,7 @@ export default {
 			order: 5,
 			result: {
 				target(player, target) {
-					return get.attitude(player, target);
+					return 1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 			threaten: 2,
@@ -21478,7 +21478,7 @@ export default {
 			order: 8,
 			result: {
 				target(player, target) {
-					return -get.attitude(player, target);
+					return -1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 			threaten: 1.2,
@@ -21847,7 +21847,7 @@ export default {
 			order: 5,
 			result: {
 				target(player, target) {
-					return -get.attitude(player, target);
+					return -1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 		},
@@ -25590,7 +25590,7 @@ export default {
 			result: {
 				player: 1,
 				target(player, target) {
-					return -get.attitude(player, target);
+					return -1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 			threaten: 1.6,
@@ -25755,7 +25755,7 @@ export default {
 		ai: {
 			result: {
 				target(player, target) {
-					return get.attitude(player, target);
+					return 1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 		},
@@ -25941,7 +25941,7 @@ export default {
 		ai: {
 			result: {
 				target(player, target) {
-					return get.attitude(player, target);
+					return 1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 		},
@@ -27371,7 +27371,7 @@ export default {
 			order: 9,
 			result: {
 				target(player, target) {
-					return -get.attitude(player, target);
+					return -1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 		},
@@ -27681,7 +27681,7 @@ export default {
 			order: 7,
 			result: {
 				target(player, target) {
-					return -get.attitude(player, target);
+					return -1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 			threaten: 1.0,
@@ -27859,7 +27859,7 @@ export default {
 			order: 6,
 			result: {
 				target(player, target) {
-					return -get.attitude(player, target);
+					return -1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 			threaten: 1.3,
@@ -28106,7 +28106,7 @@ export default {
 			order: 9,
 			result: {
 				target(player, target) {
-					return get.attitude(player, target);
+					return 1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 			threaten: 1.6,
@@ -28454,7 +28454,7 @@ export default {
 			threaten: 1.1,
 			result: {
 				target(player, target) {
-					return get.attitude(player, target);
+					return 1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 		},
