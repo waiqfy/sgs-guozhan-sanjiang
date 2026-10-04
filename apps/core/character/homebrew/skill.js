@@ -26888,11 +26888,9 @@ export default {
 			},
 		},
 		change(player, num) {
-			if (typeof player.storage.kuangcai_change != "number") {
-				player.storage.kuangcai_change = 0;
-			}
-			player.storage.kuangcai_change += num;
-			player.addSkill("kuangcai_change");
+			// 卡面"本回合"：手牌上限变化只在本回合有效(gz原版是永久累计，按卡面改)
+			player.storage.kuangcai_change = num;
+			player.addTempSkill("kuangcai_change");
 		},
 		subSkill: {
 			change: {
@@ -26904,6 +26902,7 @@ export default {
 					},
 				},
 				charlotte: true,
+				onremove: true,
 				mark: true,
 				intro: {
 					content: num => "手牌上限" + (num < 0 ? "" : "+") + num,
