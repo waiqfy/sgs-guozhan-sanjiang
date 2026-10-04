@@ -1070,14 +1070,16 @@ export default {
 					if (target.hasSkillTag("nogain")) {
 						return 0;
 					}
-					if (target.isEnemyOf(player) && game.hasPlayer(current => current !== player && current.isFriendOf(player))) {
-						return 0;
-					}
 					if (ui.selected.cards.length && ui.selected.cards[0].name == "du") {
 						if (target.hasSkillTag("nodu")) {
 							return 0;
 						}
 						return -10;
+					}
+					// 给牌是纯送礼，只给确认的友方(态度为正)；之前只排除"有队友时的敌人"，
+					// 身份未明/临时盟友/没有队友时的敌人都会被当成合适对象乱送牌
+					if (get.attitude(player, target) <= 0) {
+						return 0;
 					}
 					if (target.hasJudge("lebu")) {
 						return 0;
@@ -19702,9 +19704,12 @@ export default {
 			return event.player != player && event.player.inRange(player);
 		},
 		async cost(event, trigger, player) {
-			// 令对方弃一张牌纯粹是纯收益、没有代价，AI没有理由拒绝，之前没写ai默认值
-			// 偏保守导致基本不发动
-			event.result = await player.chooseBool(get.prompt2("zhixi", trigger.player)).set("ai", () => true).forResult();
+			// 令对方弃一张牌对敌人是纯收益，对队友(含临时队友)却是自损，之前无脑true会对友方
+			// 也发动；只对态度为负的角色发动
+			event.result = await player
+				.chooseBool(get.prompt2("zhixi", trigger.player))
+				.set("ai", () => get.attitude(player, trigger.player) < 0)
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			await trigger.player.chooseToDiscard(true);

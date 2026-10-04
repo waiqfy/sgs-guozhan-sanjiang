@@ -129,3 +129,33 @@ grep 全部 `.chooseCard(` `.choosePlayerCard(` `.chooseToDiscard(` `.chooseCont
 
 全部改完后跑过 `node --check apps/core/character/homebrew/skill.js`，通过；未涉及
 translate.js。
+
+## 2026-10-04 第三轮：友/敌方向（attitude）问题
+
+### 起因
+
+用户反馈刘备仁德乱给人牌、孙鲁育止息对临时队友也发动。前两轮的覆盖范围其实都不含这一类：
+第一轮只查"内部选择缺ai回调→方向反了"(只修了打击性选目标的7处)，第二轮只查顶层
+`ai.result.player`缺失(AI从不主动发动)。"该不该对**这个具体的人**发动/给牌"属于第三类：
+
+- **A类：送礼型技能的`ai.result.target`对非友方也返回正值**。例：rende(仁德)只排除了
+  "有队友时的敌人"，身份未明、临时盟友、没有队友时的敌人都被当成合适的送牌对象。
+  修法：在`result.target`里加`get.attitude(player,target)<=0 → return 0`(毒牌这种"送给敌人是好事"
+  的分支要放在这条前面，不能被一起拦掉)。
+- **B类：cost里`chooseBool(...).set("ai",()=>true)`无条件发动，但效果对某个具体角色是有利/有害的**。
+  例：zhixi(止息)令`trigger.player`弃牌，对敌人是收益、对友方(含临时队友)是自损。
+  修法：ai改成按`get.attitude(player, trigger.player)<0`判断。
+
+### 排查结论
+
+全文件grep出34处`set("ai",()=>true/1)`，逐个看效果是否依赖具体对象：真正依赖对象且无条件true的
+只有zhixi一处(已修)。其余要么效果只作用于自己(摸牌/明置/变更武将)，要么ai回调本身已经带了
+`attitude`判断(如huangtian_leiji选目标已是`-attitude`)，不需要改。juetao(令此杀不可响应)
+是代价/收益权衡，不是友敌方向问题，暂不动。
+
+A类(送礼型`result.target`)只在仁德上确认命中；没有做全文件脚本扫描，后续如果再有"乱给牌/乱给
+增益"的反馈，先grep`result.target`里没有`attitude`判断的`enable:"phaseUse"`技能。
+
+### 同一天顺手修的其他AI/方向问题
+
+- tianxiang(天香)：chooseCardTarget缺ai回调，AI会把伤害/失去体力转给队友，补ai1/ai2只选敌方。
