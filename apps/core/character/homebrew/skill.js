@@ -26856,82 +26856,164 @@ export default {
 	},
 
 // ========== miheng 祢衡 ==========
-	// 狂才：锁定技，你于回合内使用牌无距离和次数限制。若你本回合：未使用过牌，你的手牌上限+1；使用过牌且未造成过伤害，你的手牌上限-1。 参考rekuangcai(re)
+	// 狂才：锁定技，你于回合内使用牌无距离和次数限制。若你本回合：未使用过牌，你的手牌上限+1；使用过牌且未造成过伤害，你的手牌上限-1。 参考gzrekuangcai(gz，与国战原版保持一致)
+	// 之前用的是旧版rekuangcai(storage+useCard/damageSource/zhunbei三个触发记录)，既和gz原版不一致，
+	// content还读不到第4参数name(恒为undefined，每次都落到else分支)，且每次使用牌都弹技能框。
+	// 改成gz原版结构：弃牌阶段开始时按本回合出牌/造成伤害历史结算，手牌上限变化累计并显示标记。
 	kuangcai: {
 		audio: "kuangcai",
-		mod: {
-			cardUsable() {
-				return Infinity;
-			},
-			targetInRange() {
-				return true;
-			},
-			maxHandcard(player, num) {
-				if (!player.storage.kuangcai_used) {
-					return num + 1;
-				}
-				if (!player.storage.kuangcai_damaged) {
-					return num - 1;
-				}
-				return num;
-			},
-		},
-		trigger: { player: ["useCard", "phaseZhunbeiBegin"], source: "damageSource" },
 		forced: true,
 		popup: false,
-		content(event, trigger, player, name) {
-			if (name == "phaseZhunbeiBegin") {
-				player.storage.kuangcai_used = false;
-				player.storage.kuangcai_damaged = false;
-			} else if (name == "useCard") {
-				player.storage.kuangcai_used = true;
-			} else {
-				player.storage.kuangcai_damaged = true;
+		preHidden: true,
+		trigger: { player: "phaseDiscardBegin" },
+		filter(event, player) {
+			return !player.getHistory("useCard").length || !player.getHistory("sourceDamage").length;
+		},
+		check(event, player) {
+			return !player.getHistory("useCard").length;
+		},
+		async content(event, trigger, player) {
+			lib.skill.kuangcai.change(player, player.getHistory("useCard").length ? -1 : 1);
+		},
+		mod: {
+			targetInRange(card, player) {
+				if (player == _status.currentPhase) {
+					return true;
+				}
+			},
+			cardUsable(card, player) {
+				if (player == _status.currentPhase) {
+					return Infinity;
+				}
+			},
+		},
+		change(player, num) {
+			if (typeof player.storage.kuangcai_change != "number") {
+				player.storage.kuangcai_change = 0;
 			}
+			player.storage.kuangcai_change += num;
+			player.addSkill("kuangcai_change");
+		},
+		subSkill: {
+			change: {
+				mod: {
+					maxHandcard(player, num) {
+						if (typeof player.storage.kuangcai_change == "number") {
+							return num + player.storage.kuangcai_change;
+						}
+					},
+				},
+				charlotte: true,
+				mark: true,
+				intro: {
+					content: num => "手牌上限" + (num < 0 ? "" : "+") + num,
+				},
+			},
 		},
 		ai: { threaten: 1.4 },
 	},
-	// 舌剑：当你成为其他角色使用牌的唯一目标后，你可以弃置所有手牌（至少一张），然后选择一项：1.弃置其等量牌；2.若没有角色处于濒死状态，你对其造成1点伤害。 参考reshejian(re)
+	// 舌剑：当你成为其他角色使用牌的唯一目标后，你可以弃置所有手牌（至少一张），然后选择一项：1.弃置其等量牌；2.若没有角色处于濒死状态，你对其造成1点伤害。 参考gzshejian(gz，与国战原版保持一致)
+	// 之前filter漏了"其他角色使用"(player==event.player时仍会触发，即自己指定自己也能发动)，
+	// 且整个实现和gz原版出入较大，改成gz原版结构。
 	shejian: {
-		aiShowTag: "support",
-		aiShowCost: true,
 		audio: "shejian",
+		preHidden: true,
 		trigger: { target: "useCardToTargeted" },
 		filter(event, player) {
-			return !!(event.targets && event.targets.length == 1 && player.countCards("h") > 0);
+			if (player == event.player || event.targets.length != 1 || !event.player.isIn()) {
+				return false;
+			}
+			if (!event.player.countCards("he") && _status.event.dying) {
+				return false;
+			}
+			var hs = player.getCards("h");
+			if (hs.length == 0) {
+				return false;
+			}
+			return hs.every(i => lib.filter.cardDiscardable(i, player, "shejian"));
 		},
-		// 弃光手牌是真实代价，没有check时会被默认拒绝——只有手牌本来就少、或对方是敌方角色
-		// 值得反制时才划算；二选一没有ai默认选不中，优先选伤害(收益通常比等量弃牌更大)
-		check(trigger, player) {
-			return player.countCards("h") <= 2 || get.attitude(player, trigger.player) < 0;
+		check(event, player) {
+			var target = event.player;
+			if (get.damageEffect(target, player, player) <= 0) {
+				return false;
+			}
+			if (
+				target.hp <= 1 &&
+				!target.getEquip("huxinjing") &&
+				!game.hasPlayer(function (current) {
+					return current != target && !current.isFriendOf(player);
+				})
+			) {
+				return true;
+			}
+			if (player.hasSkill("lirang") && player.hasFriend()) {
+				return true;
+			}
+			if ((event.card.name == "guohe" || event.card.name == "shunshou" || event.card.name == "zhujinqiyuan") && player.countCards("h") == 1) {
+				return true;
+			}
+			if (
+				player.countCards("h") < 3 &&
+				!player.countCards("h", function (card) {
+					return get.value(card, player) > 5;
+				})
+			) {
+				return true;
+			}
+			if (player.hp <= event.getParent().baseDamage) {
+				if (get.tag(event.card, "respondSha")) {
+					if (player.countCards("h", { name: "sha" }) == 0) {
+						return true;
+					}
+				} else if (get.tag(event.card, "respondShan")) {
+					if (player.countCards("h", { name: "shan" }) == 0) {
+						return true;
+					}
+				} else if (get.tag(event.card, "damage")) {
+					if (event.card.name == "shuiyanqijunx") {
+						return player.countCards("e") == 0;
+					}
+					return true;
+				}
+			}
+			return false;
 		},
+		logTarget: "player",
 		async content(event, trigger, player) {
-			const target = trigger.player;
-			const result = await player
-				.chooseToDiscard("h", player.countCards("h"), false)
-				.set("prompt2", "舌剑：是否弃置所有手牌（至少一张）？")
-				.set("ai", () => true)
-				.forResult();
-			if (!result?.bool || !result.cards?.length || !target?.isIn()) {
+			const hs = player.getCards("h"),
+				target = trigger.player;
+			const { cards } = await player.modedDiscard(hs).forResult();
+			if (!target?.isIn()) {
 				return;
 			}
-			const num = result.cards.length;
-			const canDamage = !game.hasPlayer(current => current.isDying());
-			let useDamage = false;
-			if (canDamage) {
-				const choice = await player
-					.chooseControl("弃置其等量的牌", "对其造成1点伤害")
-					.set("prompt", "舌剑：请选择一项")
-					.set("ai", () => "对其造成1点伤害")
-					.forResult();
-				useDamage = choice.control == "对其造成1点伤害";
+			let choiceList = [`弃置${get.translation(target)}${get.cnNumber(cards.length)}张牌`, `对${get.translation(target)}造成1点伤害`],
+				choice = [0, 1];
+			if (_status.event.dying) {
+				choice.remove(1);
 			}
-			if (useDamage) {
-				await player.damage(target, 1);
-			} else if (target.countCards("he")) {
-				await player.discardPlayerCard(target, "he", Math.min(num, target.countCards("he")), true);
+			if (!cards?.length || target.countCards("he") < cards.length) {
+				choice.remove(0);
+			}
+			if (!choice.length) {
+				return;
+			}
+			const result =
+				choice.length > 1
+					? await player
+							.chooseControl()
+							.set("choiceList", choiceList)
+							.set("ai", () => 1)
+							.forResult()
+					: {
+							index: choice[0],
+						};
+			if (result.index == 0) {
+				await player.discardPlayerCard(target, cards.length, true, "he");
+			} else {
+				await target.damage();
 			}
 		},
+		ai: { threaten: 0.8 },
 	},
 
 // ========== yl_luzhi 卢植 ==========
