@@ -4690,7 +4690,7 @@ export default {
 		async content(event, trigger, player) {
 			const target = event.targets[0];
 			const result = await player.chooseToCompare(target).forResult();
-			player.addTempSkill(result.bool ? "qiaoshui3" : "qiaoshui2");
+			player.addTempSkill(result.bool ? "qiaoshui_3" : "qiaoshui_2");
 		},
 		ai: {
 			expose: 0.1,
@@ -4700,7 +4700,7 @@ export default {
 			2: {
 				charlotte: true,
 				mod: {
-					targetEnabled(card, player, target) {
+					playerEnabled(card, player, target) {
 						if (player != target) {
 							return false;
 						}
@@ -4778,7 +4778,7 @@ export default {
 							await game.delayx();
 						}
 						const target = result.targets[0];
-						player.logSkill("qiaoshui3", target);
+						player.logSkill("qiaoshui_3", target);
 						trigger.targets.add(target);
 					};
 
@@ -4805,12 +4805,12 @@ export default {
 
 						const target = result.targets[0];
 						if (event.isMine()) {
-							player.logSkill("qiaoshui3", target);
+							player.logSkill("qiaoshui_3", target);
 						}
 						trigger.targets.remove(target);
 						await game.delay();
 						if (!event.isMine()) {
-							player.logSkill("qiaoshui3", target);
+							player.logSkill("qiaoshui_3", target);
 						}
 					};
 
@@ -4824,7 +4824,7 @@ export default {
 						case 0b11: {
 							const result = await player
 								.chooseControlList({
-									prompt: get.prompt("qiaoshui3"),
+									prompt: get.prompt("qiaoshui_3"),
 									list: [`为${get.translation(trigger.card)}增加一个目标`, `为${get.translation(trigger.card)}减少一个目标`],
 									ai() {
 										return get.event().add ? 0 : 1;
@@ -16558,6 +16558,16 @@ export default {
 					position: "h",
 					prompt: get.prompt(event.skill),
 					prompt2: "弃置一张♥手牌并选择一名其他角色，防止你受到的此次伤害",
+					// 没有ai回调时默认按attitude选，会把伤害/失去体力转给队友。目标是受害者，
+					// 应优先选敌方(态度越差越优先)，队友一律不选
+					ai1(card) {
+						return 7 - get.value(card);
+					},
+					ai2(target) {
+						const player = get.player();
+						const att = get.attitude(player, target);
+						return att < 0 ? -att : 0;
+					},
 				})
 				.forResult();
 		},
@@ -16579,6 +16589,7 @@ export default {
 							.chooseControl("选项1", "选项2")
 							.set("prompt", "天香：请选择效果")
 							.set("choiceList", ["令来源对其造成1点伤害，然后其摸牌", "令其失去1点体力，然后其获得你弃置的牌"])
+							.set("ai", () => (target.isEnemyOf(player) ? "选项2" : "选项1"))
 							.forResult()
 					).control == "选项1";
 			}
