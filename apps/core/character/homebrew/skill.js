@@ -21,6 +21,18 @@ function diffGroup(a, b) {
 // 实际被摆在哪个槽位，不能想当然认定就是name3。name1/name2走正常的isUnseen(0)/isUnseen(1)
 // 暗置-明置判断，而name3从被抽到那一刻起就是直接展示的，不走isUnseen那一套(见
 // guozhan/src/patch/player.js里name3字段的注释)，因此恒定视为"已明置"。
+// 漸營取花色点数：虚拟牌(如武圣当杀)自身无花色点数，改按其唯一对应的实体牌取；
+// 多张实体牌转化的虚拟牌没有花色点数，返回无效值(suit为空、number为null)避免误判相同。
+function jianyingInfo(card, player) {
+	const real = card && Array.isArray(card.cards) && card.cards.length == 1 ? card.cards[0] : card;
+	const suit = get.suit(real, player);
+	const number = get.number(real, player);
+	return {
+		suit: lib.suits.includes(suit) ? suit : "",
+		number: typeof number == "number" ? number : null,
+	};
+}
+
 function isCharacterShown(player, skill) {
 	if (get.character(player.name1, 3).includes(skill)) {
 		return !player.isUnseen(0);
@@ -25778,6 +25790,10 @@ export default {
 
 // ========== yj_jushou 沮授 ==========
 	// 漸營：当你于出牌阶段使用牌时，若此牌与你于此阶段内使用的上一张牌花色/点数相同，你可以摸/重铸一张牌。 参考jianying(yijiang)
+	// 卡面"花色/点数""摸/重铸"里的斜杠是一一对应关系，不是二选一：花色相同→摸一张牌，
+	// 点数相同→重铸一张牌，两者都相同则两项都执行。另外虚拟牌(如武圣当杀)自身没有花色点数，
+	// 之前直接get.suit/get.number取到"none"/null，既触发不了又会让两张虚拟牌互相误判相同，
+	// 改成按其唯一对应的实体牌取花色点数(多张实体牌转化的虚拟牌无花色点数，视为不匹配)。
 	jianying: {
 		aiShowTag: "draw",
 		aiShowCost: true,
@@ -25789,17 +25805,34 @@ export default {
 			if (!last) {
 				return false;
 			}
-			return get.suit(event.card) == last.suit || get.number(event.card) == last.number;
+			const cur = jianyingInfo(event.card, player);
+			return (!!cur.suit && cur.suit == last.suit) || (cur.number != null && cur.number == last.number);
 		},
 		async cost(event, trigger, player) {
-			const { control } = await player.chooseControl("摸牌", "重铸").set("prompt", get.prompt2("jianying")).forResult();
-			event.result = { bool: true, cost_data: control };
+			const last = player.storage.jianying_last;
+			const cur = jianyingInfo(trigger.card, player);
+			const sameSuit = !!cur.suit && cur.suit == last.suit;
+			const sameNumber = cur.number != null && cur.number == last.number;
+			const tips = [];
+			if (sameSuit) {
+				tips.push("花色相同：摸一张牌");
+			}
+			if (sameNumber) {
+				tips.push("点数相同：重铸一张牌");
+			}
+			event.result = await player
+				.chooseBool(get.prompt2("jianying") + "（" + tips.join("；") + "）")
+				.set("ai", () => true)
+				.forResult();
+			event.result.cost_data = { sameSuit, sameNumber };
 		},
 		async content(event, trigger, player) {
-			if (event.cost_data == "摸牌") {
+			const { sameSuit, sameNumber } = event.cost_data;
+			if (sameSuit) {
 				await player.draw();
-			} else {
-				const result = await player.chooseCard("he", true).set("prompt2", get.prompt2("jianying")).forResult();
+			}
+			if (sameNumber && player.countCards("he")) {
+				const result = await player.chooseCard("he", true).set("prompt2", "漸營：重铸一张牌").forResult();
 				if (result.bool && result.cards && result.cards.length) {
 					await player.recast(result.cards);
 				}
@@ -25812,12 +25845,12 @@ export default {
 		trigger: { player: ["useCardAfter", "phaseUseBegin"] },
 		forced: true,
 		popup: false,
-		content(event, trigger, player) {
+		async content(event, trigger, player) {
 			if (trigger.name == "phaseUseBegin") {
 				delete player.storage.jianying_last;
 				return;
 			}
-			player.storage.jianying_last = { suit: get.suit(trigger.card), number: get.number(trigger.card) };
+			player.storage.jianying_last = jianyingInfo(trigger.card, player);
 		},
 	},
 
