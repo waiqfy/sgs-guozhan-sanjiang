@@ -12439,7 +12439,9 @@ export default {
 			if (result.index == 0) {
 				event.current.carryOutJunling(player, event.junling, event.targets);
 			} else {
-				event.current.out();
+				// 参考gzhongju：用国战自带的调虎离山临时技能移出游戏，回合结束(phaseAfter)自动移回；
+				// 之前直接调player.out()只加计数，不会随回合结束自动恢复，移回时机错乱
+				event.current.addTempSkill("diaohulishan");
 			}
 			"step 4";
 			game.delayx();
