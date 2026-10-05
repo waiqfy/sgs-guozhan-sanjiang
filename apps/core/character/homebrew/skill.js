@@ -12463,7 +12463,10 @@ export default {
 					return game.hasPlayer(current => current != player && current.isEnemyOf(player) && current.hp <= 2) ? 1 : 0;
 				},
 				target(player, target) {
-					return 1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
+					// 指定对象是唯一不用执行军令、也不会被移出游戏的人，其余角色(含敌人)要么执行军令要么被移出游戏
+					// 无法被攻击，相当于只留下这一个人给自己集火——所以应该指定想集火的敌人。返回负数，引擎再乘对其
+					// 态度(敌人为负)后得正分；不能返回attitude本身(会被平方，敌友同分)
+					return -1;
 				},
 			},
 		},

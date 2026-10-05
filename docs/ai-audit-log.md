@@ -157,8 +157,8 @@ final = result1 * attitude(player, player) + result2 * attitude(player, target)
 ### 本轮修复
 
 result.target里直接返回attitude的13处，改成返回`1`(送礼型)或`-1`(打击型)：
-- 送礼型(+1)：hongju、jieyin、xianzhou、mizhao、shenchong、channi
-- 打击型(-1)：yijue、boyan、yinpan、liru_fencheng、xionghuo_give、yinge、shelun
+- 送礼型(+1)：jieyin、xianzhou、mizhao、shenchong、channi
+- 打击型(-1)：hongju(鸿举的指定对象是唯一不被移出游戏、可被集火的人，应指定想集火的敌人，起初误归为送礼型改反了)、yijue、boyan、yinpan、liru_fencheng、xionghuo_give、yinge、shelun
 
 另有chooseBool无条件true但效果依赖具体对象的：zhixi(止息)令trigger.player弃牌，改成按
 `attitude<0`才发动。rende(仁德)的result.target本来返回的是正数量级，机制上没问题，这次顺手加的
