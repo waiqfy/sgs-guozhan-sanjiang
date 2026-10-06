@@ -1516,7 +1516,7 @@ xugong: {
 	xurong: {
 		sex: "male",
 		group: "qun",
-		hp: 3,
+		hp: 4,
 		skills: ["xionghuo"],
 	},
 	// 黄祖（原型：xianding 包 huangzu，仅名字沿用，原技能"精攻/骁眷"与卡面不同，视为全新技能）

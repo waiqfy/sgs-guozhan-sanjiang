@@ -16085,7 +16085,9 @@ export default {
 		filter(event, player) {
 			return game.hasPlayer(current => current.countCards("j", card => get.name(card, current) == "lebu") > 0);
 		},
-		async cost(event, trigger, player) {
+		// enable型技能不走cost(只有trigger型才会先调cost)，之前选目标的逻辑写在cost里根本不会执行，
+		// 点了技能直接进content、holder/dest全是undefined报错；改成全部在content里完成
+		async content(event, trigger, player) {
 			// chooseTarget没有ai时默认选不中任何目标，这张牌从来发动不出来；补上ai——优先把
 			// 队友身上的乐不思蜀移走(holder选交情好的)，转移到敌方身上(dest选交情差的)
 			const holderResult = await player
@@ -16093,7 +16095,6 @@ export default {
 				.set("ai", target => get.attitude(get.player(), target))
 				.forResult();
 			if (!holderResult.bool) {
-				event.result = { bool: false };
 				return;
 			}
 			const holder = holderResult.targets[0];
@@ -16102,7 +16103,6 @@ export default {
 				.set("filterButton", button => get.name(button.link, holder) == "lebu")
 				.forResult();
 			if (!cardResult.bool || !cardResult.cards || !cardResult.cards.length) {
-				event.result = { bool: false };
 				return;
 			}
 			const destResult = await player
@@ -16110,16 +16110,10 @@ export default {
 				.set("ai", target => -get.attitude(get.player(), target))
 				.forResult();
 			if (!destResult.bool) {
-				event.result = { bool: false };
 				return;
 			}
-			event.holder = holder;
-			event.moveCard = cardResult.cards[0];
-			event.dest = destResult.targets[0];
-			event.result = { bool: true };
-		},
-		async content(event, trigger, player) {
-			const { holder, moveCard, dest } = event;
+			const moveCard = cardResult.cards[0];
+			const dest = destResult.targets[0];
 			holder.$give(moveCard, dest);
 			await game.delay();
 			await dest.addJudge(moveCard);
