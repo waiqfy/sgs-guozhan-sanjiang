@@ -22352,6 +22352,16 @@ export default {
 				});
 				console.log("[ai debug] " + get.translation(player) + " identity=" + player.identity + " isUnseen=" + player.isUnseen(2) + " hand=" + player.countCards("h") + " usableSha=" + player.getCardUsable("sha"));
 				console.table(rows);
+				console.table(
+					player.getCards("h").map(card => ({
+						card: get.translation(card),
+						enabled: lib.filter.cardEnabled(card, player),
+						usable: lib.filter.cardUsable(card, player, _status.event),
+						hasUseTarget: player.hasUseTarget(card),
+						useValue: player.getUseValue(card),
+					}))
+				);
+				console.log("[ai debug] skills=", player.getSkills(true).join(","), " forbidden/tempSkills=", Object.keys(player.tempSkills).join(","));
 			} catch (e) {
 				console.log("[ai debug] failed", e);
 			}
