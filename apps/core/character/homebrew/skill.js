@@ -22327,47 +22327,6 @@ export default {
 		},
 	},
 
-// gz3临时调试(排查AI出牌阶段不出牌、全部弃掉的问题)：下划线开头的技能会自动成为全局技能。
-// 只对非人类玩家在出牌阶段开始时打印一次对每名其他角色的态度、杀对其的得分、能否对其用杀，
-// 确认根因后整段删掉。
-	_gz3_aidebug: {
-		trigger: { global: "phaseUseBegin" },
-		forced: true,
-		silent: true,
-		popup: false,
-		charlotte: true,
-		filter(event, player) {
-			return event.player == player && player != game.me;
-		},
-		async content(event, trigger, player) {
-			try {
-				const rows = game.filterPlayer(current => current != player).map(current => {
-					const sha = { name: "sha" };
-					return {
-						target: get.translation(current) + "(" + current.identity + ")",
-						attitude: get.attitude(player, current),
-						canUseSha: player.canUse(sha, current),
-						shaEffect: get.effect(current, sha, player, player),
-					};
-				});
-				console.log("[ai debug] " + get.translation(player) + " identity=" + player.identity + " isUnseen=" + player.isUnseen(2) + " hand=" + player.countCards("h") + " usableSha=" + player.getCardUsable("sha"));
-				console.table(rows);
-				console.table(
-					player.getCards("h").map(card => ({
-						card: get.translation(card),
-						enabled: lib.filter.cardEnabled(card, player),
-						usable: lib.filter.cardUsable(card, player, _status.event),
-						hasUseTarget: player.hasUseTarget(card),
-						useValue: player.getUseValue(card),
-					}))
-				);
-				console.log("[ai debug] skills=", player.getSkills(true).join(","), " forbidden/tempSkills=", Object.keys(player.tempSkills).join(","));
-			} catch (e) {
-				console.log("[ai debug] failed", e);
-			}
-		},
-	},
-
 // ========== diaochan 貂蝉 ==========
 	// 离间：出牌阶段限一次，你可以弃置一张牌，然后令一名男性其他角色视为对另一名男性其他角色使用一张【决斗】（不能被【无懈可击】响应）。 参考lijian(standard)
 	// 之前用enable:"phaseUse"把"弃一张牌"(顶层filterCard+position)和"选两名目标"(顶层
@@ -23601,7 +23560,9 @@ export default {
 					if (get.suit(card) == get.suit(trigger.card)) {
 						trigger.getParent().targets.remove(trigger.target);
 					} else {
-						const result = await player.chooseToDiscard("he", true, c => get.color(c) == get.color(card)).forResult();
+						// 卡面"弃置一张与此牌颜色相同的牌"——"此牌"是被指定的那张牌(trigger.card)，不是被移去的
+					// 千幻牌；之前误拿千幻牌的颜色去比，弃牌条件整个搞反了
+					const result = await player.chooseToDiscard("he", true, c => get.color(c) == get.color(trigger.card)).forResult();
 						if (result.bool) {
 							trigger.getParent().targets.remove(trigger.target);
 						}
@@ -25448,7 +25409,18 @@ export default {
 		audio: 2,
 		trigger: { player: "phaseZhunbeiBegin" },
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("zishou")).forResult();
+			// 发动后本回合使用牌只能指定自己，需要指定他人的牌(杀/决斗/过河拆桥等)就全打不出去了，
+			// 手里这类牌多的话白白浪费整个回合(AI之前无ai回调，拿着一手杀也照样发动，整回合不出牌)
+			event.result = await player
+				.chooseBool(get.prompt2("zishou"))
+				.set("ai", () => {
+					const need = player.countCards("h", card => {
+						const info = get.info(card);
+						return get.type(card) != "equip" && !info.toself && info.selectTarget != -1;
+					});
+					return need <= 1;
+				})
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			const x = new Set(game.filterPlayer().map(current => current.group)).size || 1;
@@ -25473,8 +25445,14 @@ export default {
 			// 等AOE牌本来就没有距离限制）会在调用任何mod之前直接return true短路掉，上面这条
 			// targetInRange mod对这类牌根本不会被引擎调用到，导致"只能指定自己"管不住AOE。
 			// 改从cardEnabled2直接禁用selectTarget:-1(自动指定全场，不经过targetInRange)的牌。
+			// 注意：装备牌/桃/酒这类selectTarget也是-1，但它们是toself(只作用于自己)，属于"指定自己为
+			// 目标"，必须放行；之前一刀切导致zishou期间装备牌、桃、酒全部打不出去
 			cardEnabled2(card, player) {
-				if (get.itemtype(card) == "card" && get.info(card).selectTarget == -1) {
+				if (get.itemtype(card) != "card") {
+					return;
+				}
+				const info = get.info(card);
+				if (info.selectTarget == -1 && !info.toself) {
 					return false;
 				}
 			},
