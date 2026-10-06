@@ -25900,7 +25900,21 @@ export default {
 			return event.card.name == "sha";
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("tianming")).forResult();
+			// 没有ai回调时chooseBool默认拒绝，AI从来不发动。弃两张摸两张本身手牌数不变，
+			// 只要手里有够烂的牌(价值不高)就划算；但若体力唯一最大的角色是敌方，对方也能照做，要权衡
+			event.result = await player
+				.chooseBool(get.prompt2("tianming"))
+				.set("ai", () => {
+					const players = game.filterPlayer();
+					const maxHp = Math.max(...players.map(p => p.hp));
+					const maxPlayers = players.filter(p => p.hp == maxHp);
+					if (maxPlayers.length == 1 && maxPlayers[0] != player && get.attitude(player, maxPlayers[0]) < 0) {
+						return false;
+					}
+					const need = Math.min(2, player.countCards("he"));
+					return player.countCards("he", card => get.value(card, player) <= 5) >= need;
+				})
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			async function act(p) {
@@ -25943,7 +25957,16 @@ export default {
 		// 只有filterTarget没有ai.result时AI不会主动选carrier发动这个技能；把全部手牌交给
 		// target很信任的话才安全，所以carrier优先选交情好的角色；拼点对手则优先选敌方角色
 		ai: {
+			order: 7,
 			result: {
+				// 顶层缺result.player时AI几乎不会主动点这个技能(见ai-audit-log第二轮)；全部手牌交出去
+				// 代价大，只在手牌不多且场上确实有可对付的敌人时才用
+				player(player) {
+					if (player.countCards("h") > 4) {
+						return 0;
+					}
+					return game.hasPlayer(current => current != player && get.attitude(player, current) > 0) && game.hasPlayer(current => current != player && get.attitude(player, current) < 0) ? 1 : 0;
+				},
 				target(player, target) {
 					return 1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
