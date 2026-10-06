@@ -15965,24 +15965,40 @@ export default {
 		// _unused_assets/audio_unused_skill/potyanhui1~6.mp3 是原版焰洄的语音，之前用audio:2
 		// 等于没配语音，搬到apps/core/audio/skill/yanhui1~6.mp3并接上
 		audio: "yanhui",
-		trigger: { player: "useCardToTarget" },
+		// 卡面"当你使用牌指定目标后，你可以展示一名目标角色的一张手牌"——是一张牌的所有目标里选一名，
+		// 一张牌只触发一次(isFirstTarget)；之前用useCardToTarget每个目标各触发一次，AOE牌会对每个
+		// 目标都问一遍，而且不能自己选展示谁的。改成参考原版potyanhui：useCardToPlayered+isFirstTarget，
+		// 在所有有手牌的目标里选一名
+		trigger: { player: "useCardToPlayered" },
 		filter(event, player) {
-			return event.target.countCards("h") > 0;
+			return !!event.isFirstTarget && event.targets.some(target => target.countCards("h") > 0);
 		},
 		async cost(event, trigger, player) {
 			event.result = await player
-				.chooseBool(get.prompt("yanhui"))
-				.set("ai", () => {
-					// 展示的是目标的手牌，打自己等于白白暴露自己的手牌，不划算
-					if (trigger.target === player) {
-						return false;
-					}
-					return get.attitude(player, trigger.target) <= 0;
+				.chooseTarget({
+					prompt: get.prompt("yanhui"),
+					prompt2: "焰洄：展示一名目标角色的一张手牌",
+					filterTarget(card, player, target) {
+						return get.event().targets?.includes(target);
+					},
+					// 展示的是目标的手牌，展示自己的等于白白暴露；优先选敌方，队友不选
+					ai(target) {
+						const player = get.player();
+						if (target === player) {
+							return 0;
+						}
+						const att = get.attitude(player, target);
+						return att < 0 ? -att : 0;
+					},
 				})
+				.set(
+					"targets",
+					trigger.targets.filter(target => target.countCards("h") > 0)
+				)
 				.forResult();
 		},
 		async content(event, trigger, player) {
-			const target = trigger.target;
+			const target = event.targets[0];
 			const result = await player.choosePlayerCard(target, "h", true).forResult();
 			if (!result || !result.bool || !result.cards || !result.cards.length) {
 				return;
@@ -28018,9 +28034,22 @@ export default {
 			event.result = await player.chooseBool("凶暴：是否额外展示一张手牌，令其余参与者改为随机展示手牌？").set("ai", () => true).forResult();
 		},
 		async content(event, trigger, player) {
-			const hs = player.getCards("h");
-			const extra = hs.randomGet();
-			const first = hs.filter(c => c !== extra).randomGet();
+			// "其他角色改为随机展示"——随机只针对其他角色，自己展示的两张牌是自己选的，不能也随机
+			// (之前自己的两张也是randomGet，等于自己也被随机了)；两张同色才能稳定操纵议事意见，AI按此挑
+			const pick = await player
+				.chooseCard("h", 2, true, "凶暴：选择两张手牌展示(作为你的议事意见)")
+				.set("ai", card => {
+					const sel = ui.selected.cards;
+					if (sel.length && get.color(card) != get.color(sel[0])) {
+						return 0;
+					}
+					return 10 - get.value(card);
+				})
+				.forResult();
+			if (!pick?.bool || pick.cards?.length != 2) {
+				return;
+			}
+			const [first, extra] = pick.cards;
 			await player.showCards([extra], `${get.translation(player)}发动了〖凶暴〗`);
 			trigger.fixedResult = (trigger.fixedResult || []).concat([
 				[player, first],
