@@ -27930,14 +27930,17 @@ export default {
 		filter(event, player) {
 			return game.hasPlayer(target => target !== player && target.countCards("h") > 0);
 		},
-		async cost(event, trigger, player) {
-			event.result = await player
+		// enable型技能不会先调cost(只有trigger型才会)，之前选参与者的逻辑写在cost里从不执行，
+		// event.targets恒为空，永远只有自己一人议事；改成在content里直接选
+		async content(event, trigger, player) {
+			const picked = await player
 				.chooseTarget("擅政：选择参与议事的角色（不选则仅你自己参与）", [0, Infinity], (card, player, target) => target !== player && target.countCards("h") > 0)
 				.set("ai", target => get.attitude(get.player(), target))
 				.forResult();
-		},
-		async content(event, trigger, player) {
-			const joined = [player].concat((event.targets || []).sortBySeat());
+			if (!picked?.bool) {
+				return;
+			}
+			const joined = [player].concat((picked.targets || []).sortBySeat());
 			await player
 				.chooseToDebate(joined)
 				.set("callback", async (event, trigger, player) => {
