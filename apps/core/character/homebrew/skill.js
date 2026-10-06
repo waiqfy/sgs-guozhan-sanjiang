@@ -12593,6 +12593,11 @@ export default {
 			order(item, player) {
 				var player = _status.event.player;
 				var event = _status.event;
+				// 濒死求桃时(event.dying)，视为使用桃的目标就是濒死者，对敌方/未知势力角色用了等于
+				// 给敌人回血(AI刚打完这个人又用卫境救他)，只有态度为正才考虑发动
+				if (event.dying && get.attitude(player, event.dying) <= 0) {
+					return 0;
+				}
 				if (event.filterCard({ name: "sha" }, player, event)) {
 					if (
 						!player.hasShan() &&
