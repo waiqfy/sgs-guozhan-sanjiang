@@ -22327,6 +22327,37 @@ export default {
 		},
 	},
 
+// gz3临时调试(排查AI出牌阶段不出牌、全部弃掉的问题)：下划线开头的技能会自动成为全局技能。
+// 只对非人类玩家在出牌阶段开始时打印一次对每名其他角色的态度、杀对其的得分、能否对其用杀，
+// 确认根因后整段删掉。
+	_gz3_aidebug: {
+		trigger: { global: "phaseUseBegin" },
+		forced: true,
+		silent: true,
+		popup: false,
+		charlotte: true,
+		filter(event, player) {
+			return event.player == player && player != game.me;
+		},
+		async content(event, trigger, player) {
+			try {
+				const rows = game.filterPlayer(current => current != player).map(current => {
+					const sha = { name: "sha" };
+					return {
+						target: get.translation(current) + "(" + current.identity + ")",
+						attitude: get.attitude(player, current),
+						canUseSha: player.canUse(sha, current),
+						shaEffect: get.effect(current, sha, player, player),
+					};
+				});
+				console.log("[ai debug] " + get.translation(player) + " identity=" + player.identity + " isUnseen=" + player.isUnseen(2) + " hand=" + player.countCards("h") + " usableSha=" + player.getCardUsable("sha"));
+				console.table(rows);
+			} catch (e) {
+				console.log("[ai debug] failed", e);
+			}
+		},
+	},
+
 // ========== diaochan 貂蝉 ==========
 	// 离间：出牌阶段限一次，你可以弃置一张牌，然后令一名男性其他角色视为对另一名男性其他角色使用一张【决斗】（不能被【无懈可击】响应）。 参考lijian(standard)
 	// 之前用enable:"phaseUse"把"弃一张牌"(顶层filterCard+position)和"选两名目标"(顶层
