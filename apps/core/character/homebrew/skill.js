@@ -21,6 +21,22 @@ function diffGroup(a, b) {
 // 实际被摆在哪个槽位，不能想当然认定就是name3。name1/name2走正常的isUnseen(0)/isUnseen(1)
 // 暗置-明置判断，而name3从被抽到那一刻起就是直接展示的，不走isUnseen那一套(见
 // guozhan/src/patch/player.js里name3字段的注释)，因此恒定视为"已明置"。
+// 判断一个技能算不算锁定技：引擎的get.is.locked只认locked属性/trigger+forced/带mod这几种写法，
+// 漏掉了"卡面写着锁定技、但实现上是enable主动技/没写forced"的情况，所以再补一条看技能描述
+// 是不是以"锁定技"开头。曹爽擅专/托孤、许劭盈门/评鉴、阚泽宽释这类借用别人技能的效果，
+// 描述是"无标签"技能，锁定技不论主动与否都不能被借用。
+function isLockedLike(skill, player) {
+	const info = get.info(skill);
+	if (!info) {
+		return false;
+	}
+	if (info.locked === true || get.is.locked(skill, player)) {
+		return true;
+	}
+	const desc = lib.translate[skill + "_info"];
+	return typeof desc == "string" && /^锁定技/.test(desc.replace(/<[^>]+>/g, "").trim());
+}
+
 // 漸營取花色点数：虚拟牌(如武圣当杀)自身无花色点数，改按其唯一对应的实体牌取；
 // 多张实体牌转化的虚拟牌没有花色点数，返回无效值(suit为空、number为null)避免误判相同。
 function jianyingInfo(card, player) {
@@ -12937,46 +12953,36 @@ export default {
 				"respond",
 			],
 		},
+		// 描述是"无标签技能"：锁定技(不论主动与否)属于有标签，不能借；之前isCandidate反过来要求
+		// info.forced(只借得到锁定技)，正好是反的。借来的技能走正常的"cost(若有)→content"流程，
+		// 不是直接拿shanzhuan自己的event去硬调别人的content(读event.skill/event.name会读成擅专)
+		isCandidate(skill, owner, event, player, name) {
+			const info = get.info(skill);
+			if (skill == "shanzhuan" || !info || info.zhuSkill || info.limited || info.juexingji || info.hiddenSkill || info.charlotte || info.dutySkill) {
+				return false;
+			}
+			if (isLockedLike(skill, owner) || typeof info.content != "function" || !info.trigger) {
+				return false;
+			}
+			const names = [].concat(info.trigger.global || [], info.trigger.player || [], info.trigger.source || [], info.trigger.target || []);
+			if (!names.includes(name)) {
+				return false;
+			}
+			return typeof info.filter != "function" || info.filter(event, player, name);
+		},
 		filter(event, player, name) {
 			if (player.storage.shanzhuan_used) {
 				return false;
 			}
-			const isCandidate = skill => {
-				const info = get.info(skill);
-				if (!info || info.zhuSkill || info.limited || info.juexingji || info.hiddenSkill || info.charlotte || info.dutySkill) {
-					return false;
-				}
-				if (!info.forced || typeof info.content != "function" || info.content.constructor.name != "AsyncFunction" || !info.trigger) {
-					return false;
-				}
-				const names = [].concat(info.trigger.global || [], info.trigger.player || [], info.trigger.source || [], info.trigger.target || []);
-				if (!names.includes(name)) {
-					return false;
-				}
-				return typeof info.filter != "function" || info.filter(event, player, name);
-			};
-			return game.hasPlayer(current => current != player && !current.isUnseen() && current.getSkills(null, false).some(isCandidate));
+			return game.hasPlayer(current => current != player && !current.isUnseen() && current.getSkills(null, false).some(skill => lib.skill.shanzhuan.isCandidate(skill, current, event, player, name)));
 		},
 		async cost(event, trigger, player) {
 			event.result = await player.chooseBool(get.prompt2("shanzhuan")).forResult();
 		},
 		async content(event, trigger, player) {
 			const name = event.triggername;
-			const isCandidate = skill => {
-				const info = get.info(skill);
-				if (!info || info.zhuSkill || info.limited || info.juexingji || info.hiddenSkill || info.charlotte || info.dutySkill) {
-					return false;
-				}
-				if (!info.forced || typeof info.content != "function" || info.content.constructor.name != "AsyncFunction" || !info.trigger) {
-					return false;
-				}
-				const names = [].concat(info.trigger.global || [], info.trigger.player || [], info.trigger.source || [], info.trigger.target || []);
-				if (!names.includes(name)) {
-					return false;
-				}
-				return typeof info.filter != "function" || info.filter(trigger, player, name);
-			};
-			const owners = game.filterPlayer(current => current != player && !current.isUnseen() && current.getSkills(null, false).some(isCandidate));
+			const isCandidate = (skill, owner) => lib.skill.shanzhuan.isCandidate(skill, owner, trigger, player, name);
+			const owners = game.filterPlayer(current => current != player && !current.isUnseen() && current.getSkills(null, false).some(skill => isCandidate(skill, current)));
 			if (!owners.length) {
 				return;
 			}
@@ -12990,15 +12996,46 @@ export default {
 			const skillResult = await player
 				.chooseSkill(target, {
 					prompt: "擅专：请选择要借用的技能",
-					func: (info, skill) => isCandidate(skill),
+					func: (info, skill) => isCandidate(skill, target),
 				})
 				.forResult();
 			if (!skillResult || !skillResult.bool || !skillResult.skill) {
 				return;
 			}
+			const skill = skillResult.skill;
+			const info = get.info(skill);
+			let costResult = { bool: true };
+			if (typeof info.cost == "function") {
+				const costEvent = game.createEvent(`${skill}_cost`);
+				costEvent.player = player;
+				costEvent._trigger = trigger;
+				costEvent.triggername = name;
+				costEvent.skill = skill;
+				costEvent.setContent(info.cost);
+				costResult = await costEvent.forResult();
+			} else if (!info.direct) {
+				costResult = await player.chooseBool(get.prompt(skill, null, player)).set("ai", () => true).forResult();
+			}
+			if (!costResult || !costResult.bool) {
+				return;
+			}
 			player.storage.shanzhuan_used = true;
 			player.logSkill("shanzhuan", target);
-			await get.info(skillResult.skill).content(event, trigger, player);
+			const next = game.createEvent(skill);
+			next.player = player;
+			next._trigger = trigger;
+			next.triggername = name;
+			next.setContent(info.content);
+			if (costResult.targets && costResult.targets.length) {
+				next.targets = costResult.targets.slice(0);
+			}
+			if (costResult.cards && costResult.cards.length) {
+				next.cards = costResult.cards.slice(0);
+			}
+			if ("cost_data" in costResult) {
+				next.cost_data = costResult.cost_data;
+			}
+			await next;
 		},
 	},
 	shanzhuan_reset: {
@@ -13020,7 +13057,7 @@ export default {
 			return (
 				event.player.getStockSkills("仲村由理", "天下第一").filter(function (skill) {
 					var info = get.info(skill);
-					return info && !info.juexingji && !info.hiddenSkill && !info.zhuSkill && !info.charlotte && !info.limited && !info.dutySkill;
+					return info && !info.juexingji && !info.hiddenSkill && !info.zhuSkill && !info.charlotte && !info.limited && !info.dutySkill && !isLockedLike(skill, event.player);
 				}).length > 0
 			);
 		},
@@ -13028,7 +13065,7 @@ export default {
 		async content(event, trigger, player) {
 			const list = trigger.player.getStockSkills("仲村由理", "天下第一").filter(function (skill) {
 				var info = get.info(skill);
-				return info && !info.juexingji && !info.hiddenSkill && !info.zhuSkill && !info.charlotte && !info.limited && !info.dutySkill;
+				return info && !info.juexingji && !info.hiddenSkill && !info.zhuSkill && !info.charlotte && !info.limited && !info.dutySkill && !isLockedLike(skill, trigger.player);
 			});
 			if (list.length == 1) {
 				event._result = { control: list[0] };
@@ -20160,7 +20197,7 @@ export default {
 					return false;
 				}
 				const info = get.info(name);
-				if (!info || info.locked || info.sourceSkill) {
+				if (!info || info.locked || info.sourceSkill || isLockedLike(name, player)) {
 					return false;
 				}
 				// countSkill会自动合并stat.skill/stat.triggerSkill/useSkill历史记录三种统计口径，
@@ -26665,9 +26702,10 @@ export default {
 			for (let name of characters) {
 				if (Array.isArray(get.character(name).skills)) {
 					for (let skill of get.character(name).skills) {
+						// 评鉴只能借"无类型标签"的技能，锁定技(不论主动与否)也算有标签，不能借；
+						// 之前这里把"锁定技"从标签列表里剔掉再判断，等于放行了锁定技
 						let list = get.skillCategoriesOf(skill, player);
-						list.remove("锁定技");
-						if (list.length > 0) {
+						if (list.length > 0 || isLockedLike(skill, player)) {
 							continue;
 						}
 						let info = get.info(skill);
@@ -26858,7 +26896,7 @@ export default {
 					// 描述是"访客的无类型标签技能"——锁定技不该算在内：锁定技本来就是无条件
 					// 自动发动、没有"是否发动"这个选择点，这里却弹窗询问"是否发动"，跟锁定技
 					// 的定义矛盾，之前漏了这个排除
-					if (get.is.locked(event.skill, player)) {
+					if (isLockedLike(event.skill, player)) {
 						return false;
 					}
 					let skills = lib.skill.yingmen.getSkills(player.getStorage("yingmen"), player);
