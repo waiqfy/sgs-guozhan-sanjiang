@@ -11694,8 +11694,11 @@ export default {
 	shefu: {
 		skillAnimation: true,
 		animationColor: "water",
-		trigger: { player: "phaseJieshuBegin" },
-		direct: true,
+		// 卡面是"出牌阶段结束时"，之前写成phaseJieshuBegin(结束阶段)；另外之前带着direct:true——
+		// direct的技能引擎不会调cost(直接result.bool=true进content)，选牌的逻辑写在cost里永远不会
+		// 执行，content里event.cards恒为undefined，被"防崩溃"的提前return直接吞掉，表现就是
+		// 完全没有任何提示、技能从不发动。去掉direct，让引擎先走cost(选牌，可取消)再进content
+		trigger: { player: "phaseUseEnd" },
 		audio: 2,
 		group: ["shefu_nullify"],
 		filter(event, player) {
@@ -11703,7 +11706,7 @@ export default {
 		},
 		async cost(event, trigger, player) {
 			event.result = await player
-				.chooseCard("h", true, get.prompt2("shefu"))
+				.chooseCard("h", get.prompt2("shefu"))
 				.set("ai", card => 5 - get.value(card))
 				.forResult();
 		},
