@@ -6142,7 +6142,11 @@ export default {
 				.set("ai", target => {
 					const player = get.player();
 					const trigger = get.event().getTrigger();
-					return get.effect(target, trigger.card, player, player) * (trigger.targets.includes(target) ? -1 : 1);
+					// get.effect(目标, 牌, 使用者, 评估者)：使用者应是trigger.player(真正出牌的人)，不是
+					// 舍宴的拥有者；之前把董允自己当成使用者，算出来的"这张牌对目标是好是坏"是以董允的视角
+					// 当出牌者，五谷丰登对敌人的收益被算反/算0，AI不会去减少敌人的五谷丰登目标
+					const eff = get.effect(target, trigger.card, trigger.player, player);
+					return eff * (trigger.targets.includes(target) ? -1 : 1);
 				})
 				.set("targets", trigger.targets);
 			next.targetprompt2.add(target => {
@@ -21643,6 +21647,11 @@ export default {
 		filterCard: true,
 		position: "he",
 		selectCard: 1,
+		// 缺ai.result.player，AI几乎不会主动点这个技能
+		ai: {
+			order: 6,
+			result: { player: 1 },
+		},
 		async content(event, trigger, player) {
 			const targets = game.filterPlayer(current => current.countGainableCards(player, "e"));
 			let target;
@@ -24200,8 +24209,16 @@ export default {
 		filter(event, player) {
 			return player.storage.kuangfu_from && player.storage.kuangfu_from.isIn();
 		},
-		check(event, player) {
-			return get.attitude(player, player.storage.kuangfu_from) > 0;
+		// 这里的check(event, player)对enable主动技不是"要不要发动"的判断(那是filterCard选牌用的)，
+		// AI实际看的是ai.result.player，没有它AI永远不会点这个临时技能(队友给自己授权后白白浪费)
+		ai: {
+			order: 7,
+			result: {
+				player(player) {
+					const source = player.storage.kuangfu_from;
+					return source && get.attitude(player, source) > 0 ? 1 : 0;
+				},
+			},
 		},
 		async content(event, trigger, player) {
 			const source = player.storage.kuangfu_from;
@@ -26148,8 +26165,13 @@ export default {
 		filter(event, player) {
 			return !!(player.storage.yishe_from && player.storage.yishe_from.isIn() && !player.storage.yishe_from.getExpansions("yishe").length);
 		},
-		check() {
-			return true;
+		// check()对enable主动技不是"要不要发动"的判断，AI实际看的是ai.result.player；之前只有
+		// check没有ai，队友AI永远不会点这个临时技能，张鲁的"米"攒不起来
+		ai: {
+			order: 7,
+			result: {
+				player: 1,
+			},
 		},
 		async content(event, trigger, player) {
 			const source = player.storage.yishe_from;
@@ -26265,7 +26287,10 @@ export default {
 		trigger: { global: "useCardToTargeted" },
 		usable: 1,
 		filter(event, player) {
-			if (!event.card || (event.card.name != "sha" && get.type(event.card) != "trick")) {
+			// 卡面"当有角色使用杀或伤害类锦囊牌指定目标时"是对"这张牌"问一次：之前每个目标各触发一次，
+			// AOE牌(南蛮/万箭)会对每个目标都问一遍；加isFirstTarget只在第一个目标时问。并且锦囊
+			// 之前没限定"伤害类"，非伤害锦囊(顺手牵羊、无中生有等)也会问，补上get.tag(...,"damage")
+			if (!event.isFirstTarget || !event.card || (event.card.name != "sha" && !(get.type(event.card) == "trick" && get.tag(event.card, "damage")))) {
 				return false;
 			}
 			return player.getExpansions("yishe").length > 0;
