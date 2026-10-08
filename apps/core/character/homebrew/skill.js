@@ -18834,19 +18834,19 @@ export default {
 
 // ========== quancong 全琮 ==========
 	// 邀名：每回合各限一次，当你造成或受到伤害后，你可以选择一名角色，若其手牌数：大于等于你，你弃置其一张牌；小于等于你，其摸一张牌。 参考olyaoming
-	// "各限一次"指的是"造成伤害"和"受到伤害"这两个触发时机各自限一次（用player.storage.yaoming_used
-	// 记录本回合已经触发过的trigger名字），跟弃牌/摸牌是哪个分支无关——一次发动里该弃牌的弃牌、该
-	// 摸牌的摸牌，两个效果本来就不冲突，不需要按分支分别计次。
+	// "各限一次"指的是"造成伤害"和"受到伤害"这两个触发时机各自限一次，跟弃牌/摸牌是哪个分支无关——
+	// 一次发动里该弃牌的弃牌、该摸牌的摸牌，两个效果本来就不冲突，不需要按分支分别计次。
+	// 计次用player.getStat("skill")：引擎每个回合(不分谁的回合)都会给所有角色新建一份stat，自动按回合清零，
+	// 不需要自己写重置技能。之前用storage+yaoming_reset在roundStart(每轮开始)清零，粒度是"每轮"，
+	// 而卡面是"每回合"(含别人的回合)，别人回合里受到伤害发动过之后到下一轮才恢复，是错的。
 	yaoming: {
 		audio: 2,
 		trigger: {
 			player: "damageEnd",
 			source: "damageSource",
 		},
-		group: ["yaoming_reset"],
 		filter(event, player, name) {
-			const used = player.storage.yaoming_used || [];
-			return !used.includes(name);
+			return !player.getStat("skill")["yaoming_" + name];
 		},
 		async cost(event, trigger, player) {
 			const next = player.chooseTarget({
@@ -18889,7 +18889,10 @@ export default {
 			});
 			event.result = await next.forResult();
 		},
-		async content(event, trigger, player, name) {
+		async content(event, trigger, player) {
+			// content只有(event, trigger, player)三个参数，没有第4个name；之前用name记次数永远是undefined，
+			// 限次根本没生效过，改用event.triggername
+			const name = event.triggername;
 			const {
 				targets: [target],
 			} = event;
@@ -18904,23 +18907,10 @@ export default {
 			if (shouldDraw) {
 				await target.draw();
 			}
-			player.storage.yaoming_used = (player.storage.yaoming_used || []).concat(name);
+			player.getStat("skill")["yaoming_" + name] = 1;
 		},
 		ai: {
 			threaten: 1.1,
-		},
-		subSkill: {
-			reset: {
-				charlotte: true,
-				trigger: { global: "roundStart" },
-				forced: true,
-				popup: false,
-				// 纯记录/重置用的内部技能：暗置时也会因为子技能/group被算进隐藏技能，不加silent会弹"是否明置XX以发动【XX】"（莫名可以明置）
-				silent: true,
-				content() {
-					delete player.storage.yaoming_used;
-				},
-			},
 		},
 	},
 
@@ -23332,10 +23322,12 @@ export default {
 					lib.skill.yigui.grant(player);
 				},
 			},
-			// 每种牌名每回合限一次的"次数"重置：每回合开始时清空已使用记录。
+			// 每种牌名每回合限一次的"次数"重置：每个回合(含别人的回合)开始时清空已使用记录。
+			// 之前挂在roundStart(每轮开始)，粒度是"每轮"而不是"每回合"，别人回合里用过一次的牌名要等到
+			// 下一轮才能再用；改成每个回合开始时重置
 			reset: {
 				charlotte: true,
-				trigger: { global: "roundStart" },
+				trigger: { global: "phaseBeginStart" },
 				forced: true,
 				popup: false,
 				// 纯记录/重置用的内部技能：暗置时也会因为子技能/group被算进隐藏技能，不加silent会弹"是否明置XX以发动【XX】"（莫名可以明置）
@@ -25365,10 +25357,11 @@ export default {
 		},
 	},
 
+	// 卡面"每回合各限一次"，重置要按回合(含别人的回合)而不是按轮，原来挂roundStart粒度不对
 	shejia_reset: {
 		sourceSkill: "shejia",
 		charlotte: true,
-		trigger: { global: "roundStart" },
+		trigger: { global: "phaseBeginStart" },
 		forced: true,
 		popup: false,
 		// 纯记录/重置用的内部技能：暗置时也会因为子技能/group被算进隐藏技能，不加silent会弹"是否明置XX以发动【XX】"（莫名可以明置）
@@ -26246,7 +26239,10 @@ export default {
 		async cost(event, trigger, player) {
 			event.result = await player.chooseBool(get.prompt2("bushi")).set("ai", () => true).forResult();
 		},
-		async content(event, trigger, player, name) {
+		async content(event, trigger, player) {
+			// content没有第4个name参数(第4个是上一步result)，之前name恒不等于"damageSource"，
+			// "对其他角色造成伤害后令与其势力相同的角色获得米"那一支永远按自己的势力算；改用event.triggername
+			const name = event.triggername;
 			const refPlayer = name == "damageSource" ? trigger.player : player;
 			const candidates = game.filterPlayer(current => sameGroup(current, refPlayer));
 			if (!candidates.length) {
@@ -27247,7 +27243,9 @@ export default {
 		trigger: { player: ["useCard", "phaseZhunbeiBegin"] },
 		forced: true,
 		popup: false,
-		content(event, trigger, player, name) {
+		content(event, trigger, player) {
+			// 同上：content读不到第4参数name，改用event.triggername(否则准备阶段的重置永远不会执行)
+			const name = event.triggername;
 			if (name == "phaseZhunbeiBegin") {
 				player.storage.ruzong_targets = [];
 				return;
