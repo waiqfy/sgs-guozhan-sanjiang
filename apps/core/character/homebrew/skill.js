@@ -2815,7 +2815,7 @@ export default {
 						if (target.hasJudge("lebu") || target == player) {
 							return false;
 						}
-						if (get.attitude(player, target) > 4) {
+						if (get.attitude(player, target) > 3) {
 							return get.threaten(target) / Math.sqrt(target.hp + 1) / Math.sqrt(target.countCards("h") + 1) > 0;
 						}
 						return false;
@@ -2854,7 +2854,7 @@ export default {
 							if (target.hasJudge("lebu") || target == player) {
 								return false;
 							}
-							if (get.attitude(player, target) > 4) {
+							if (get.attitude(player, target) > 3) {
 								return get.threaten(target) / Math.sqrt(target.hp + 1) / Math.sqrt(target.countCards("h") + 1) > 0;
 							}
 							return false;
@@ -3047,8 +3047,9 @@ export default {
 		filter(event, player) {
 			return lib.skill.zaiqixx.count() > 0;
 		},
+		// 卡面/gz版是"弃牌阶段结束时"，之前写成phaseJieshuBegin(结束阶段开始时)
 		trigger: {
-			player: "phaseJieshuBegin",
+			player: "phaseDiscardEnd",
 		},
 		async content(event, trigger, player) {
 			let result;
@@ -11707,7 +11708,17 @@ export default {
 		async cost(event, trigger, player) {
 			event.result = await player
 				.chooseCard("h", get.prompt2("shefu"))
-				.set("ai", card => 5 - get.value(card))
+				.set("ai", card => {
+					// 埋伏的作用是"别人用同名牌时令其无效"，所以要埋别人真会用、且用了有价值的牌：
+					// 杀/闪/桃/酒/无懈/决斗/群体伤害锦囊这类优先；延时锦囊(闪电/乐不思蜀等)和装备牌别人几乎
+					// 不会用到同名牌，埋了纯属骗人没用(之前按价值挑，AI埋了张闪电)，不如不埋
+					const type = get.type(card, null, player);
+					if (type == "delay" || type == "equip") {
+						return -1;
+					}
+					const priority = { sha: 9, shan: 8, tao: 8, wuxie: 7, juedou: 7, jiu: 6, nanman: 6, wanjian: 6, guohe: 6, shunshou: 6, wuzhong: 5, taoyuan: 4 };
+					return (priority[get.name(card)] || 3) - get.value(card) / 5;
+				})
 				.forResult();
 		},
 		async content(event, trigger, player) {
@@ -11719,7 +11730,9 @@ export default {
 			if (!card) {
 				return;
 			}
-			const next = player.addToExpansion(card, player, "give");
+			// "give"动画会把这张牌的牌面亮给所有人看，埋伏就没意义了；改用giveAuto(官方设伏同款，
+			// 只有自己能看到牌面)
+			const next = player.addToExpansion(card, player, "giveAuto");
 			next.gaintag.add("shefu");
 			await next;
 			// 扣置：除程昱自己外，其他所有客户端都把这张牌的牌面盖住，只显示牌背
@@ -11733,7 +11746,18 @@ export default {
 				player
 			);
 		},
-		intro: { content: "expansion", markcount: "expansion" },
+		// "expansion"类型的介绍会把武将牌上的牌面展示给所有人(点标记就能看到埋的是什么)，
+		// 改成只有自己可见，其他人只看到张数
+		intro: {
+			mark(dialog, content, player) {
+				if (player.isUnderControl(true)) {
+					dialog.addAuto(player.getExpansions("shefu"));
+				} else {
+					return "共有" + get.cnNumber(player.getExpansions("shefu").length) + "张“伏兵”";
+				}
+			},
+			markcount: "expansion",
+		},
 		onremove(player, skill) {
 			const cards = player.getExpansions(skill);
 			if (cards.length) {
@@ -16942,6 +16966,8 @@ export default {
 		trigger: { player: "hideCharacterBegin" },
 		forced: true,
 		popup: false,
+		// 纯记录/重置用的内部技能：暗置时也会因为子技能/group被算进隐藏技能，不加silent会弹"是否明置XX以发动【XX】"（莫名可以明置）
+		silent: true,
 		filter(event, player) {
 			return event.toHide == "zhoutai" && player.getExpansions("buqu").length > 0;
 		},
@@ -17364,6 +17390,8 @@ export default {
 				trigger: { player: "phaseZhunbeiBegin" },
 				forced: true,
 				popup: false,
+				// 纯记录/重置用的内部技能：暗置时也会因为子技能/group被算进隐藏技能，不加silent会弹"是否明置XX以发动【XX】"（莫名可以明置）
+				silent: true,
 				async content(event, trigger, player) {
 					player.storage.shangyi_used = [];
 				},
@@ -18887,6 +18915,8 @@ export default {
 				trigger: { global: "roundStart" },
 				forced: true,
 				popup: false,
+				// 纯记录/重置用的内部技能：暗置时也会因为子技能/group被算进隐藏技能，不加silent会弹"是否明置XX以发动【XX】"（莫名可以明置）
+				silent: true,
 				content() {
 					delete player.storage.yaoming_used;
 				},
@@ -23308,6 +23338,8 @@ export default {
 				trigger: { global: "roundStart" },
 				forced: true,
 				popup: false,
+				// 纯记录/重置用的内部技能：暗置时也会因为子技能/group被算进隐藏技能，不加silent会弹"是否明置XX以发动【XX】"（莫名可以明置）
+				silent: true,
 				content() {
 					delete player.storage.yigui_used;
 				},
@@ -25253,6 +25285,8 @@ export default {
 		trigger: { global: "phaseAfter" },
 		forced: true,
 		popup: false,
+		// 纯记录/重置用的内部技能：暗置时也会因为子技能/group被算进隐藏技能，不加silent会弹"是否明置XX以发动【XX】"（莫名可以明置）
+		silent: true,
 		content(event, trigger, player) {
 			delete player.storage.gsshejia_armor_source;
 			delete player.storage.gsshejia_weapon_source;
@@ -25337,6 +25371,8 @@ export default {
 		trigger: { global: "roundStart" },
 		forced: true,
 		popup: false,
+		// 纯记录/重置用的内部技能：暗置时也会因为子技能/group被算进隐藏技能，不加silent会弹"是否明置XX以发动【XX】"（莫名可以明置）
+		silent: true,
 		content(event, trigger, player) {
 			player.storage.gsshejia_armor_used = false;
 			player.storage.gsshejia_weapon_used = false;
@@ -25957,6 +25993,8 @@ export default {
 		trigger: { player: ["useCardAfter", "phaseUseBegin"] },
 		forced: true,
 		popup: false,
+		// 纯记录/重置用的内部技能：暗置时也会因为子技能/group被算进隐藏技能，不加silent会弹"是否明置XX以发动【XX】"（莫名可以明置）
+		silent: true,
 		async content(event, trigger, player) {
 			if (trigger.name == "phaseUseBegin") {
 				delete player.storage.jianying_last;
