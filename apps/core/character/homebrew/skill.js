@@ -14568,7 +14568,9 @@ export default {
 		direct: true,
 		preHidden: true,
 		filter(event, player) {
-			return !!event.target && event.player != event.target && event.target.isFriendOf(player);
+			// 卞夫人在该位置(trigger.position，默认he)没牌可选时choosePlayerCard会直接结束返回undefined，
+			// 之前读result.bool报错，filter里先挡掉
+			return !!event.target && event.player != event.target && event.target.isFriendOf(player) && player.countCards(event.position || "he") >= (event.result?.cards?.length || 1);
 		},
 		audio: 2,
 		async content(event, trigger, player) {
@@ -14590,7 +14592,7 @@ export default {
 			next.selectButton = trigger.result.cards.length;
 			next.setHiddenSkill("wanwei");
 			const result = await next.forResult();
-			if (result.bool) {
+			if (result?.bool) {
 				player.logSkill("wanwei");
 				trigger.result.cards = result.links.slice(0);
 				trigger.result.links = result.links.slice(0);
