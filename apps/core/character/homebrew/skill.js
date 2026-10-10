@@ -932,6 +932,7 @@ export default {
 		trigger: { player: "useCardToTargeted" },
 		direct: true,
 		filter(event, player) {
+			console.log("[fengshi dbg]", get.translation(event.card), "first=", event.isFirstTarget, "targets=", event.targets?.length, "ban=", player.hasSkill("fengshi_ban"), "hand", event.target?.countCards("h"), "<", player.countCards("h"));
 			if (!event.isFirstTarget || event.targets.length != 1 || player.hasSkill("fengshi_ban")) {
 				return false;
 			}
@@ -20213,10 +20214,33 @@ export default {
 		// 描述是"你的回合内，你可以在相应时机使用"——不是只能在出牌阶段用，只要是自己回合内、
 		// 每个阶段开始的时机都该能拿出来重置一次别的技能。之前用enable:"phaseUse"把窗口锁死
 		// 在出牌阶段一个点上，跟文本不符
-		trigger: { player: ["phaseZhunbeiBegin", "phaseJudgeBegin", "phaseDrawBegin1", "phaseUseBegin", "phaseDiscardBegin", "phaseJieshuBegin"] },
-		usable: 1,
+		// 两条入口：①trigger版——跟别的触发技同一时机：某个技能刚在这个时机结算完，技能列表里就会
+		// 出现【宽释】，点它选刚用过的技能，把它从doneList放回todoList（并清掉次数记录），它就能在
+		// 同一时机再发动一次；只有"这个时机已经结算过技能"才出现，不会每个阶段都干问一遍。
+		// ②group里的kuanshi_use——出牌阶段随时点技能按钮，选一个本回合用完次数的技能刷新，原技能
+		// 按钮就回来了
+		trigger: { player: ["phaseBegin", "phaseZhunbeiBegin", "phaseJudgeBegin", "phaseDrawBegin1", "phaseUseBegin", "phaseUseEnd", "phaseDiscardBegin", "phaseJieshuBegin", "phaseEnd", "damageEnd", "useCardAfter"] },
+		group: "kuanshi_use",
 		filter(event, player) {
-			return lib.skill.kuanshi.getCandidates(player).length > 0;
+			return _status.currentPhase == player && lib.skill.kuanshi.getTriggered(event, player).length > 0;
+		},
+		// 这个时机里已经结算过(doneList)的、可再发动的无标签技能
+		getTriggered(event, player) {
+			const doing = event._triggering?.doing;
+			if (!doing || !doing.doneList) {
+				return [];
+			}
+			return doing.doneList
+				.filter(info => info.player == player && info.skill != "kuanshi")
+				.map(info => info.skill)
+				.unique()
+				.filter(name => {
+					const info = get.info(name);
+					if (!info || info.locked || info.sourceSkill || isLockedLike(name, player)) {
+						return false;
+					}
+					return typeof info.usable != "number" || player.countSkill(name) > 0;
+				});
 		},
 		getCandidates(player) {
 			return player.getSkills(null, false, false).filter(name => {
@@ -20244,8 +20268,11 @@ export default {
 			});
 		},
 		async cost(event, trigger, player) {
-			const list = lib.skill.kuanshi.getCandidates(player);
-			const result = await player.chooseButton(["宽释：选择一个本回合已用完次数的技能，重置其可用次数", [list, "skill"]], false).forResult();
+			const list = lib.skill.kuanshi.getTriggered(trigger, player);
+			const result = await player
+				.chooseButton(["宽释：选择一个本时机已结算的技能，令其可再次发动", [list, "skill"]], false)
+				.set("ai", button => 1 + Math.random())
+				.forResult();
 			if (result && result.bool && result.links && result.links.length) {
 				event.result = { bool: true, cost_data: result.links[0] };
 			} else {
@@ -20257,8 +20284,20 @@ export default {
 			if (!name || !lib.skill[name]) {
 				return;
 			}
-			// countSkill会看stat.skill/stat.triggerSkill两个统计口径里任意一个是数字的那个，
-			// 不确定这个技能实际记在哪一个里，两个都清掉才能保证countSkill重新算出0
+			lib.skill.kuanshi.resetSkill(player, name);
+			// 放回当前时机的待触发列表，仲裁循环下一轮会按filter重新判断它能不能发动
+			const doing = trigger._triggering?.doing;
+			if (doing) {
+				const entries = doing.doneList.filter(info => info.player == player && info.skill == name);
+				for (const entry of entries) {
+					doing.doneList.remove(entry);
+					doing.todoList.push(entry);
+				}
+			}
+		},
+		// 清掉次数记录：countSkill会看stat.skill/stat.triggerSkill两个统计口径里任意一个是数字的那个，
+		// 不确定这个技能实际记在哪一个里，两个都清掉才能保证countSkill重新算出0
+		resetSkill(player, name) {
 			const statSkill = player.getStat("skill");
 			const statTrigger = player.getStat("triggerSkill");
 			if (typeof statSkill[name] == "number") {
@@ -20269,6 +20308,28 @@ export default {
 			}
 			game.log(player, "发动了", "#g【宽释】", "，重置了", "#y" + get.translation(name));
 			player.markSkill(name);
+		},
+		subSkill: {
+			use: {
+				audio: "kuanshi",
+				enable: "phaseUse",
+				filter(event, player) {
+					return lib.skill.kuanshi.getCandidates(player).length > 0;
+				},
+				async content(event, trigger, player) {
+					const list = lib.skill.kuanshi.getCandidates(player);
+					const result = await player.chooseButton(["宽释：选择一个本回合已用完次数的技能，重置其可用次数", [list, "skill"]], true).forResult();
+					if (result && result.bool && result.links && result.links.length) {
+						lib.skill.kuanshi.resetSkill(player, result.links[0]);
+					}
+				},
+				ai: {
+					order: 1,
+					result: {
+						player: 0,
+					},
+				},
+			},
 		},
 		ai: {
 			threaten: 1,
@@ -26100,7 +26161,7 @@ export default {
 				await player.give(cards, carrier);
 			}
 			const result = await player
-				.chooseTarget(true, `密詔：请选择一名角色与${get.translation(carrier)}拼点`, (card, plyr, target) => target != player && target != carrier)
+				.chooseTarget(true, `密詔：请选择一名角色与${get.translation(carrier)}拼点`, (card, plyr, target) => target != player && target != carrier && carrier.canCompare(target))
 				.set("ai", target => -get.attitude(get.player(), target))
 				.forResult();
 			if (!result.bool || !result.targets || !result.targets.length) {
