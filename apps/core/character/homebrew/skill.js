@@ -14559,13 +14559,15 @@ export default {
 // ========== bianfuren 卞夫人 ==========
 	// 挽危：当同势力角色因被其他角色获得或弃置而确定移动牌时，你可以选择用自己的牌代替此次将被获取或弃置的牌。 参考wanwei(sp)
 	wanwei: {
-		trigger: { target: ["rewriteGainResult", "rewriteDiscardResult"] },
+		// 之前trigger用target角色、filter检查event.player(动手的人)是不是队友：target角色要求"卞夫人
+		// 自己就是被获得/弃置牌的那个人"，等于只能保护自己(官方原版挽危就是只保护自己)；而本卡面是
+		// "同势力角色"被获得/弃置牌，要能替队友挡——改成global监听，filter检查被获得/弃置牌的角色
+		// (event.target)是不是同势力，并且动手的人(event.player)不是他自己("被其他角色")
+		trigger: { global: ["rewriteGainResult", "rewriteDiscardResult"] },
 		direct: true,
 		preHidden: true,
-		// 文本是"同势力角色"，没写"其他"（"其他角色"指的是造成获得/弃置的另一方，不是这里的
-		// event.player），卞夫人自己的牌被别人获得/弃置时也该能发动
 		filter(event, player) {
-			return event.player.isFriendOf(player);
+			return !!event.target && event.player != event.target && event.target.isFriendOf(player);
 		},
 		audio: 2,
 		async content(event, trigger, player) {
@@ -17694,7 +17696,9 @@ export default {
 		// 摸牌"，但咱们自己的keshou_info写的是"孤军：你摸一张牌"，没有判定这个环节——按咱们
 		// 自己的描述来，不要为了对齐官方机制反而改出跟描述不符的效果
 		async content(event, trigger, player) {
-			if (event.result?.bool && event.result.cards?.length) {
+			// cost的结果(选的弃牌)会被引擎放进content事件的event.cards，不是event.result(那是content
+			// 事件自己的result，恒为undefined)——之前读event.result?.bool永远是假，伤害-1从来没生效过
+			if (event.cards?.length) {
 				trigger.num--;
 			}
 			// "孤军"只看"有没有同势力的人"，不要求自己已经明置——技能本身preHidden:true，
@@ -19851,36 +19855,19 @@ export default {
 		filter(event, player) {
 			return game.hasPlayer(target => lib.skill.dingpan.filterTarget(null, player, target));
 		},
+		// 卡面"出牌阶段每个势力限一次"：之前直接抄的官方身份局写法(usable=反贼人数等)，在国战里取到的是
+		// get.population(null,player)=场上势力数，等于整个出牌阶段最多发动势力数次、但对象的势力完全不受限，
+		// 同一个势力可以反复选。改成按目标的势力记录本阶段已选过的势力(未明置的各自算各自的势力)
 		filterTarget(card, player, target) {
-			return target.countCards("e") > 0;
+			return target.countCards("e") > 0 && !player.getStorage("dingpan_used").includes(lib.skill.dingpan.groupKey(target));
 		},
-		usable(skill, player) {
-			let num,
-				mode = get.mode();
-			if (mode == "identity" || mode == "doudizhu") {
-				if (mode == "identity" && _status.mode == "purple") {
-					num = player.getEnemies().length;
-				} else {
-					num = get.population("fan");
-				}
-			} else if (mode == "versus") {
-				if (!_status.mode || _status.mode != "two") {
-					num = player.getEnemies().length;
-				} else {
-					const target = game.findPlayer(x => {
-						return !game.hasPlayer(y => {
-							return x != y && y.getFriends().length > x.getFriends().length;
-						});
-					});
-					num = target ? target.getFriends(true).length : 1;
-				}
-			} else {
-				num = get.population ? get.population(null, player) : 1;
-			}
-			return num;
+		groupKey(target) {
+			return target.identity == "unknown" ? "unknown:" + target.playerid : target.identity;
 		},
 		async content(event, trigger, player) {
 			const { target } = event;
+			player.addTempSkill("dingpan_used", "phaseUseAfter");
+			player.markAuto("dingpan_used", [lib.skill.dingpan.groupKey(target)]);
 			await target.draw();
 			let goon = get.damageEffect(target, player, target) >= 0;
 			if (!goon && target.hp >= 4 && get.attitude(player, target) < 0) {
@@ -19947,6 +19934,11 @@ export default {
 			},
 			threaten: 1.1,
 		},
+	},
+
+	dingpan_used: {
+		charlotte: true,
+		onremove: true,
 	},
 
 // ========== sunhao 孙皓 ==========
@@ -20966,6 +20958,10 @@ export default {
 			if (!event.player.isFriendOf(player)) {
 				return false;
 			}
+			// 卡面"其他同势力角色的出牌阶段限一次"：之前既没限定出牌阶段内、也没限一次
+			if (!event.player.isPhaseUsing() || event.player.getStat("skill").lijun) {
+				return false;
+			}
 			return event.cards.filterInD().length;
 		},
 		direct: true,
@@ -20977,16 +20973,10 @@ export default {
 			if (!bool.bool) {
 				return;
 			}
+			trigger.player.getStat("skill").lijun = 1;
 			player.logSkill("lijun", trigger.player);
+			// 卡面只有"将此【杀】交给你"，没有摸牌效果(之前多了一步"是否令其摸一张牌")，已删除
 			await player.gain(trigger.cards.filterInD(), "gain2");
-			const bool2 = await player
-				.chooseBool()
-				.set("prompt", "是否令" + get.translation(trigger.player) + "摸一张牌？")
-				.set("choice", get.attitude(player, trigger.player) > 0)
-				.forResult();
-			if (bool2.bool) {
-				await trigger.player.draw();
-			}
 		},
 	},
 
