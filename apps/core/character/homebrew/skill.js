@@ -12038,6 +12038,9 @@ export default {
 			// "keepXianqu"这种没有具体target的查询完全文不对题，等于从来没真正保留过标记。
 			// 只要还有活着的盟友，先驱标记就应该留给xianfu2(先辅)用来结成共伤共疗的绑定，
 			// 而不是被通用摸牌效果先花掉；真的孤军作战、没有盟友时才没必要留，随手当摸牌用。
+			// hasSkillTag只认ai里写明的tag名(ai[tag]为真)才会去调skillTagFilter，之前漏写
+			// keepXianqu:true，上面的filter根本不会被问到，AI照样把标记拿去摸牌
+			keepXianqu: true,
 			skillTagFilter(player, tag, target) {
 				if (tag === "keepXianqu") {
 					return game.hasPlayer(current => current.isIn() && current !== player && current.isFriendOf(player));
