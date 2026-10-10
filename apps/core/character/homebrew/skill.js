@@ -18756,14 +18756,22 @@ export default {
 		},
 		async content(event, trigger, player) {
 			await player.draw();
-			const parentEvt = trigger.getParent();
-			if (parentEvt && typeof parentEvt.finish == "function") {
-				parentEvt.finish();
-			}
 			const phaseEvt = event.getParent("phase");
-			if (phaseEvt && phaseEvt.name == "phase") {
-				phaseEvt.finish();
+			if (!phaseEvt) {
+				return;
 			}
+			// 终止一切：从当前技能事件一路往上到回合事件，逐层 untrigger（清掉尚未执行的
+			// End/After 时机和同时机的其他技能）+ finish（content里后续创建的子事件会被直接跳过），
+			// 并清空 after 队列
+			for (let evt = event; evt && evt != phaseEvt; evt = evt.parent) {
+				evt.untrigger();
+				evt.finish();
+				evt.after.length = 0;
+			}
+			// 回合直接跳到 phaseEnd（num拉满=跳过剩余阶段，包括弃牌阶段），写法同 gz_zhaoran
+			game.log(phaseEvt.player, "结束了回合");
+			phaseEvt.num = phaseEvt.phaseList.length;
+			phaseEvt.goto(11);
 		},
 		ai: {
 			threaten: 1.4,
