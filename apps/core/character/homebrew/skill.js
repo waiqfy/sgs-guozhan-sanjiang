@@ -3223,9 +3223,27 @@ export default {
 				.chooseTarget(get.prompt2(event.skill))
 				.set("ai", target => {
 					const player = get.player();
-					return get.effect(target, { name: "recover" }, player, player);
+					// 满血/非友方白白弃牌，不发动；其余按"回血收益 - 最便宜的代价"算
+					if (!target.isDamaged() || get.attitude(player, target) <= 0) {
+						return 0;
+					}
+					const cost = lib.skill.shenzhi.getCost(player, target).cost;
+					const need = target.hp <= 1 ? 10 : target.hp == 2 ? 6 : 4;
+					return need > cost ? get.attitude(player, target) * (need - cost) : 0;
 				})
 				.forResult();
+		},
+		// 三种代价取最小：判定区(顺手拆延时锦囊)=0；弃自己所有手牌=手牌价值之和；装备区最后一张=该装备价值
+		getCost(player, target) {
+			const hs = player.getCards("h");
+			const es = target.getCards("e");
+			const list = [
+				{ area: "j", cost: target.countCards("j") ? 0 : Infinity },
+				{ area: "h", cost: hs.reduce((sum, card) => sum + get.value(card, player), 0) },
+				{ area: "e", cost: es.length ? get.value(es[es.length - 1], target) : Infinity },
+			];
+			list.sort((a, b) => a.cost - b.cost);
+			return list[0];
 		},
 		async content(event, trigger, player) {
 			const target = event.targets[0];
@@ -3242,16 +3260,8 @@ export default {
 					// 不划算了；装备区优先级最低，只有手牌太多舍不得弃、又没有判定区可选时
 					// 才退而求其次去拆装备
 					.set("ai", () => {
-						if (areas.includes("j")) {
-							return choiceList[0];
-						}
-						if (canHand && player.countCards("h") <= 3) {
-							return choiceList[1];
-						}
-						if (canArea) {
-							return choiceList[0];
-						}
-						return choiceList[1];
+						const best = lib.skill.shenzhi.getCost(player, target);
+						return best.area == "h" ? choiceList[1] : choiceList[0];
 					})
 					.forResult();
 				if (result.control == choiceList[0] && canArea) {
@@ -7866,8 +7876,10 @@ export default {
 							max += 5;
 						}
 					}
+					// 有阵绝时手牌清空才能触发，值得为此积极转化(order低所以是当回合其它牌用完之后才轮到)；
+					// 手牌总价值不超过阵绝的收益上限就转，不再要求总价值很低
 					if (player.hasSkill("zhenjue")) {
-						max += 7;
+						max += 12;
 					}
 					return val <= max ? 1 : 0;
 				},
@@ -15879,12 +15891,14 @@ export default {
 			const target = event.target,
 				cards = target.getCards("h"),
 				next = player.chooseToMove_new("攻心");
+			const hasHeart = cards.some(card => get.suit(card) == "heart");
 			next.set("list", [
 				[get.translation(target) + "的手牌", cards],
 				[["弃置"], ["置于牌堆顶"]],
 			]);
+			// 对方手里没有红桃时只能看牌，不该卡在"必须选一张红桃"的确定条件上
 			next.set("filterOk", moved => {
-				return moved[1].slice().concat(moved[2]).filter(card => get.suit(card) == "heart").length == 1;
+				return !hasHeart || moved[1].slice().concat(moved[2]).filter(card => get.suit(card) == "heart").length == 1;
 			});
 			next.set("filterMove", (from, to, moved) => {
 				if (moved[0].includes(from.link) && moved[1].length + moved[2].length >= 1 && [1, 2].includes(to)) {
@@ -15912,11 +15926,13 @@ export default {
 				}
 			}
 		},
+		// 缺order时AI排不上号，从不主动发动；只对手里有红桃的敌人用(引擎会再乘对目标的态度，这里只给方向)
 		ai: {
+			order: 9,
 			threaten: 1.5,
 			result: {
 				target(player, target) {
-					return -target.countCards("h");
+					return target.countCards("h", card => get.suit(card) == "heart") ? -1 : 0;
 				},
 			},
 		},
@@ -22386,20 +22402,45 @@ export default {
 		filter(event, player) {
 			return player.countCards("he") > 0;
 		},
-		// 没有filterCard/viewAs，纯content()内部自选分支的phaseUse主动技，官方参考同样没写ai，
-		// 引擎默认的兜底热情度评估基本不会主动发动这类技能，补一个合理的默认值（参考zhuanzheng的处理）
-		ai: {
-			order: 6,
-			result: {
-				player: 1,
-			},
+		// AI用：两个分支各算一个"收益-代价"。①弃牌回血：有已受伤的友方时，弃手牌里价值最低的一张，
+		// 友方越残血越值；②弃牌摸牌：能弃到几名势力各异、有牌可弃的敌人，每个3分，扣自己弃的那张牌的价值
+		plan(player) {
+			const hand = player.getCards("h");
+			let heal = null;
+			if (hand.length) {
+				const cheap = hand.slice().sort((a, b) => get.value(a, player) - get.value(b, player))[0];
+				const target = game
+					.filterPlayer(current => current.isDamaged() && get.attitude(player, current) > 0)
+					.sort((a, b) => a.hp - b.hp)[0];
+				if (target) {
+					const need = target.hp <= 1 ? 10 : target.hp == 2 ? 6 : 3;
+					heal = { target, score: need - get.value(cheap, player) };
+				}
+			}
+			const picked = [];
+			game.filterPlayer(current => current != player && current.countCards("he") > 0 && get.attitude(player, current) < 0)
+				.sort((a, b) => b.countCards("he") - a.countCards("he"))
+				.forEach(current => {
+					if (picked.length < 3 && !picked.some(p => p.isFriendOf(current))) {
+						picked.push(current);
+					}
+				});
+			let atk = null;
+			if (picked.length && player.countCards("he") > 0) {
+				const cheap = player.getCards("he").sort((a, b) => get.value(a, player) - get.value(b, player))[0];
+				atk = { targets: picked, score: picked.length * 3 - get.value(cheap, player) };
+			}
+			return { heal, atk };
 		},
 		async content(event, trigger, player) {
 			const choice = await player
 				.chooseControl("弃牌摸牌", "弃牌回血")
 				.set("prompt", "除疠：请选择一项")
 				.set("ai", () => {
-					return player.countCards("he") > 1 ? "弃牌摸牌" : "弃牌回血";
+					const plan = lib.skill.chuli.plan(player);
+					const healScore = plan.heal ? plan.heal.score : -Infinity;
+					const atkScore = plan.atk ? plan.atk.score : -Infinity;
+					return healScore >= atkScore ? "弃牌回血" : "弃牌摸牌";
 				})
 				.forResult();
 			if (choice.control == "弃牌摸牌") {
@@ -22430,12 +22471,12 @@ export default {
 					.set("skill", "chuli")
 					.set("ai", target => {
 						const attitude = get.attitude(get.player(), target);
-						// 队友被弃置的牌不一定是黑桃，摸不到牌纯粹让队友掉一张牌，不划算；
-						// 敌人则无所谓有没有黑桃，弃牌本身就是干扰，正常按好感度选
-						if (attitude > 0 && !target.getCards("e", card => get.suit(card) == "spade").length) {
+						// 之前直接返回attitude，等于优先挑队友(好感度越高分越高)——这是chooseTarget回调(直接当分数用)，
+						// 要自己取反：只选敌人；队友被弃牌还摸不到牌(多半不是黑桃)纯吃亏
+						if (attitude >= 0) {
 							return -1;
 						}
-						return attitude;
+						return -attitude;
 					})
 					.forResult();
 				if (!targets.bool || !targets.targets || !targets.targets.length) {
@@ -22458,13 +22499,17 @@ export default {
 					await game.asyncDraw(drawList);
 				}
 			} else {
-				const result = await player.chooseToDiscard("he", true).forResult();
-				if (result.bool) {
-					const target = await player
-						.chooseTarget("除疠：令一名角色回复1点体力", (card, player, target) => target.isDamaged())
-						.set("ai", target => get.attitude(get.player(), target))
-						.forResult();
-					if (target.bool && target.targets && target.targets.length) {
+				// 描述是"弃置一张手牌"(不是he)，且先选目标再弃牌，避免弃了牌却没有受伤角色可回复
+				const target = await player
+					.chooseTarget(true, "除疠：令一名角色回复1点体力", (card, player, target) => target.isDamaged())
+					.set("ai", target => {
+						const att = get.attitude(get.player(), target);
+						return att > 0 ? att * (3 - Math.min(target.hp, 2)) : att;
+					})
+					.forResult();
+				if (target.bool && target.targets && target.targets.length) {
+					const result = await player.chooseToDiscard("h", true).forResult();
+					if (result.bool) {
 						await target.targets[0].recover();
 					}
 				}
@@ -22473,7 +22518,10 @@ export default {
 		ai: {
 			order: 5,
 			result: {
-				player: 1,
+				player(player) {
+					const plan = lib.skill.chuli.plan(player);
+					return (plan.heal && plan.heal.score > 0) || (plan.atk && plan.atk.score > 0) ? 1 : 0;
+				},
 			},
 		},
 	},
