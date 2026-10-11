@@ -7860,28 +7860,36 @@ export default {
 			},
 			order: 0.5,
 			result: {
+				// 全部手牌合成一张牌：代价=除价值最高那张(算作被用掉)以外的手牌价值之和，牌多就不划算；
+				// 收益看场合：濒死求桃(自己>队友)、被杀/决斗要响应时按自己体力估算少受一次伤害，
+				// 再加上"含锦囊摸一张"和"手牌清空后阵绝可触发"的额外好处；收益超过代价才转化
 				player(player) {
-					if (_status.event.dying) {
-						return get.attitude(player, _status.event.dying);
-					}
-					if (_status.event.type === "respondShan") {
-						return 1;
-					}
-					let val = 0;
+					const evt = _status.event;
 					const hs = player.getCards("h");
-					let max = 0;
-					for (const i of hs) {
-						val += get.value(i, player);
-						if (get.type(i, null, player) === "trick") {
-							max += 5;
+					if (!hs.length) {
+						return 0;
+					}
+					const vals = hs.map(card => get.value(card, player));
+					const cost = vals.reduce((sum, v) => sum + v, 0) - Math.max(...vals);
+					let gain;
+					if (evt.dying) {
+						if (get.attitude(player, evt.dying) <= 0) {
+							return 0;
 						}
+						gain = evt.dying == player ? 20 : 10;
+					} else if (evt.type === "phase") {
+						// 出牌阶段主动转化：order很低所以是其它牌用完后才轮到；收益只剩锦囊摸牌/阵绝清手牌
+						gain = 0;
+					} else {
+						gain = player.hp <= 1 ? 10 : player.hp <= 2 ? 6 : 4;
 					}
-					// 有阵绝时手牌清空才能触发，值得为此积极转化(order低所以是当回合其它牌用完之后才轮到)；
-					// 手牌总价值不超过阵绝的收益上限就转，不再要求总价值很低
+					if (hs.some(card => get.type(card, null, player) === "trick")) {
+						gain += 3;
+					}
 					if (player.hasSkill("zhenjue")) {
-						max += 12;
+						gain += 4;
 					}
-					return val <= max ? 1 : 0;
+					return gain > cost ? 1 : 0;
 				},
 			},
 			threaten: 1.3,
