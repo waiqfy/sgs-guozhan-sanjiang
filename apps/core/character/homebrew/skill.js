@@ -19377,10 +19377,27 @@ export default {
 				return;
 			}
 		},
+		// 队友应优先用“弼”里的牌（用掉别人的牌不花自己的牌，还让弼主人摸牌），所以order拉高到手牌之上；
+		// 出牌阶段里只有该牌确实有价值目标时才选，响应时机(闪/无懈等)只要有可用的弼就用
 		ai: {
-			order: 1,
+			order: 20,
 			result: {
-				player: 1,
+				player(player) {
+					const evt = _status.event;
+					return game.hasPlayer(cur => {
+						if (!cur.isFriendOf(player) || !cur.hasSkill("kuangbi") || _status.currentPhase == cur) {
+							return false;
+						}
+						return cur.getExpansions("kuangbi").some(card => {
+							if (typeof evt.filterCard == "function" && !evt.filterCard(card, player, evt)) {
+								return false;
+							}
+							return evt.name != "chooseToUse" || evt.type != "phase" || player.hasValueTarget(card);
+						});
+					})
+						? 1
+						: 0;
+				},
 			},
 		},
 	},
