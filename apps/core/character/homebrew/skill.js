@@ -893,9 +893,13 @@ export default {
 							if (get.name(card) != "sha") {
 								return false;
 							}
+							// 选项1是"弃置一张牌并对你使用一张杀"：杀之外还得有另一张牌可弃
+							if (_status.event.player.countCards("he") < 2) {
+								return false;
+							}
 							return lib.filter.filterCard.apply(this, arguments);
 						},
-						"豹烈：对" + get.translation(player) + "使用一张杀，或令其弃置你的一张牌"
+						"豹烈：弃置一张牌并对" + get.translation(player) + "使用一张杀，或令其弃置你的一张牌"
 					)
 					.set("targetRequired", true)
 					.set("complexSelect", true)
@@ -915,6 +919,9 @@ export default {
 			"step 2";
 			if (result.bool == false && target.countCards("he") > 0) {
 				player.discardPlayerCard(target, "he", true);
+			} else if (result.bool && target.countCards("he") > 0) {
+				// 选项1的"弃置一张牌"部分（出杀之外另弃）
+				target.chooseToDiscard("he", true);
 			}
 			if (event.targets.length) {
 				event.goto(1);
@@ -19298,9 +19305,103 @@ export default {
 				},
 			},
 		},
+		// 缺result.player时AI从不主动发动enable:"phaseUse"技能；有同势力队友才值得放
 		ai: {
+			order: 6,
+			result: {
+				player(player) {
+					return game.hasPlayer(current => current != player && current.isFriendOf(player)) && player.countCards("he") > 0 ? 1 : 0;
+				},
+			},
 			threaten: 0.9,
 		},
+	},
+	// 借用"弼"的全局技能：之前只在skill_old.js(未被加载的归档文件)里定义，homebrew这边的
+	// kuangbi.init只往全局注册了一个压根不存在的kuangbi_borrow，队友(玩家和AI)完全用不了"弼"
+	kuangbi_borrow: {
+		aiShowTag: "draw",
+		charlotte: true,
+		enable: ["chooseToUse", "chooseToRespond"],
+		// "你的回合外"指弼主人(拥有匡弼的角色)的回合外；"与你势力相同的角色"自己对自己也算同势力
+		hiddenCard(player, name) {
+			return game.hasPlayer(cur => cur.isFriendOf(player) && cur.hasSkill("kuangbi") && _status.currentPhase != cur && cur.getExpansions("kuangbi").length > 0);
+		},
+		filter(event, player) {
+			if (event.responded) {
+				return false;
+			}
+			return game.hasPlayer(cur => cur.isFriendOf(player) && cur.hasSkill("kuangbi") && _status.currentPhase != cur && cur.getExpansions("kuangbi").some(card => event.filterCard(card, player, event)));
+		},
+		async content(event, trigger, player) {
+			const evt = event.getParent(2);
+			const cardsx = [];
+			game.filterPlayer(cur => cur.isFriendOf(player) && cur.hasSkill("kuangbi") && _status.currentPhase != cur).forEach(src => {
+				src.getExpansions("kuangbi").forEach(card => {
+					if (evt.filterCard(card, player, evt)) {
+						cardsx.push(card);
+					}
+				});
+			});
+			if (!cardsx.length) {
+				return;
+			}
+			const pick = await player
+				.chooseButton(["弼：选择要" + (evt.name == "chooseToUse" ? "使用" : "打出") + "的牌", cardsx], true)
+				.set("ai", button => get.value(button.link))
+				.forResult();
+			if (!pick.bool || !pick.links || !pick.links.length) {
+				return;
+			}
+			const card = pick.links[0];
+			const owner = game.filterPlayer(cur => cur.getExpansions("kuangbi").includes(card))[0];
+			if (owner) {
+				await owner.draw();
+			}
+			if (evt.name == "chooseToUse") {
+				game.broadcastAll(
+					(result, name) => {
+						lib.skill.kuangbi_borrow_backup.viewAs = { name: name, cards: [result], isCard: true };
+					},
+					card,
+					card.name
+				);
+				evt.set("_backupevent", "kuangbi_borrow_backup");
+				evt.set("openskilldialog", "请选择" + get.translation(card) + "的目标");
+				evt.backup("kuangbi_borrow_backup");
+			} else {
+				delete evt.result.used;
+				delete evt.result.skill;
+				evt.result.card = get.autoViewAs(card);
+				evt.result.cards = [card];
+				evt.redo();
+				return;
+			}
+		},
+		ai: {
+			order: 1,
+			result: {
+				player: 1,
+			},
+		},
+	},
+	kuangbi_borrow_backup: {
+		precontent() {
+			var name = event.result.card.name,
+				cards = event.result.card.cards.slice(0);
+			event.result.cards = cards;
+			var rcard = cards[0],
+				card;
+			if (rcard.name == name) {
+				card = get.autoViewAs(rcard);
+			} else {
+				card = get.autoViewAs({ name, isCard: true });
+			}
+			event.result.card = card;
+			event.result._apply_args = { addSkillCount: false };
+		},
+		filterCard: () => false,
+		selectCard: -1,
+		log: false,
 	},
 
 // ========== zumao 祖茂 ==========
