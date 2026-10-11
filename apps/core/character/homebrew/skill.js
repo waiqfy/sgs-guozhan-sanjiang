@@ -18021,6 +18021,12 @@ export default {
 			return player != target && !target.isLinked();
 		},
 		selectTarget: [1, 2],
+		// 不写multitarget时引擎对每个目标各跑一次content：选了两个目标，第一次content结束时断绁已把
+		// 自己横置，第二次content开头看到"已经处于连环"，就多送一次奋命(这就是之前"被自己技能连锁后
+		// 立刻发动奋命"的真正原因，下面event._alreadyLinked只能挡重入、挡不住这个)。
+		// 声明multitarget后只执行一次，event.targets就是全部目标
+		multitarget: true,
+		multiline: true,
 		async content(event, trigger, player) {
 			// 用局部const记录"发动前是否已连环"，在content()因为断线重连/事件重放等原因被
 			// 重新执行时会失效——第二次进来时player已经在第一次执行时被link()过了，局部
