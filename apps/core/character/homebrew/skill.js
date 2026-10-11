@@ -15926,13 +15926,14 @@ export default {
 				}
 			}
 		},
-		// 缺order时AI排不上号，从不主动发动；只对手里有红桃的敌人用(引擎会再乘对目标的态度，这里只给方向)
+		// 缺order时AI排不上号，从不主动发动。AI不能偷看对方手牌，所以不判断有没有红桃，
+		// 只按手牌数估：手牌越多越可能有红桃，方向给负(引擎会再乘对目标的态度，敌人才得正分)
 		ai: {
 			order: 9,
 			threaten: 1.5,
 			result: {
 				target(player, target) {
-					return target.countCards("h", card => get.suit(card) == "heart") ? -1 : 0;
+					return -Math.min(target.countCards("h"), 3) / 3;
 				},
 			},
 		},
