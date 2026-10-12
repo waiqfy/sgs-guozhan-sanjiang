@@ -23520,6 +23520,15 @@ export default {
 								return false;
 							}
 						}
+						// 濒死求桃：chooseToUse自身的filterTarget已经把目标限定为濒死角色，必须沿用(同官方yigui_backup
+						// 的写法)；直接用lib.filter.filterTarget时，【桃】的filterTarget只认"自己"，给队友救命的桃就变成自己吃了
+						const evt = _status.event;
+						if (evt._backup && evt._backup.filterTarget) {
+							return evt._backup.filterTarget(card, player, target);
+						}
+						if (evt.type == "dying" && evt.dying) {
+							return target == evt.dying;
+						}
 						return lib.filter.filterTarget.apply(this, arguments);
 					},
 					onuse(result, player) {
@@ -23590,6 +23599,8 @@ export default {
 	jihun: {
 		audio: "jihun",
 		trigger: { player: "damageEnd", global: "dyingAfter" },
+		// 制衡机制(卡面"你的回合开始时，你可以重铸至多两个“魂”")：挂在group里，作为独立的可选触发
+		group: "jihun_recast",
 		preHidden: true,
 		filter(event, player) {
 			if (event.name == "damage") {
@@ -23611,6 +23622,45 @@ export default {
 				player.markAuto("yigui", []);
 				game.log(player, "获得了一张", "#g“魂（" + get.translation(c) + "）”");
 			}
+		},
+		subSkill: {
+			// 重铸：把选中的魂放回未加入游戏的武将牌堆，再从牌堆摸等量的新魂(先放回再抽，避免牌堆空时抽不到)
+			recast: {
+				audio: "jihun",
+				sourceSkill: "jihun",
+				trigger: { player: "phaseBegin" },
+				filter(event, player) {
+					return (player.storage.yigui || []).length > 0;
+				},
+				async cost(event, trigger, player) {
+					const souls = player.storage.yigui || [];
+					const result = await player
+						.chooseButton(["汲魂：重铸至多两个“魂”", [souls, "character"]], [1, 2])
+						// AI：场上没有任何角色能成为这张魂的目标(势力对不上且没有未明置/野心家)就换掉，其余留着
+						.set("ai", button => {
+							const player = get.player();
+							const match = lib.skill.yigui.matchGroup;
+							return game.hasPlayer(current => match(button.link, current)) ? 0 : 1;
+						})
+						.forResult();
+					event.result = result && result.bool && result.links?.length ? { bool: true, cost_data: result.links.slice(0) } : { bool: false };
+				},
+				async content(event, trigger, player) {
+					const list = event.cost_data;
+					const pool = _status.characterlist;
+					for (const character of list) {
+						player.storage.yigui.remove(character);
+						pool.add(character);
+					}
+					let num = 0;
+					for (let i = 0; i < list.length && pool.length; i++) {
+						player.storage.yigui.push(pool.randomRemove());
+						num++;
+					}
+					player.markAuto("yigui", []);
+					game.log(player, "重铸了", get.cnNumber(list.length) + "张", "#g“魂”");
+				},
+			},
 		},
 	},
 
