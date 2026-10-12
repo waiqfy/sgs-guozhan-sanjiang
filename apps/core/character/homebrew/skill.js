@@ -18014,6 +18014,46 @@ export default {
 				return false;
 			});
 		},
+		// AI用：在不重复移动同一张牌的前提下，找当前收益最大的一次移动。收益=装备对接收方的价值×我对接收方的态度
+		// -装备对失去方的价值×我对失去方的态度(接收方原有同类装备会被顶掉，也算损失)；没有正收益返回null
+		bestMove(player, used) {
+			let best = null;
+			for (const from of game.players) {
+				for (const card of from.getCards("e")) {
+					if (used.includes(card)) {
+						continue;
+					}
+					for (const to of game.players) {
+						if (to == from || to.isMin() || !to.canEquip(card)) {
+							continue;
+						}
+						let score = get.equipValue(card, to) * get.attitude(player, to) - get.equipValue(card, from) * get.attitude(player, from);
+						const old = to.getEquip(get.subtype(card));
+						if (old) {
+							score -= get.equipValue(old, to) * get.attitude(player, to);
+						}
+						if (score > 0 && (!best || score > best.score)) {
+							best = { from, to, card, score };
+						}
+					}
+				}
+			}
+			return best;
+		},
+		// 限定技：连着最多3次最优移动的总收益够高才值得发动，否则留着
+		planValue(player) {
+			const used = [];
+			let total = 0;
+			for (let i = 0; i < 3; i++) {
+				const move = lib.skill.yongjin.bestMove(player, used);
+				if (!move) {
+					break;
+				}
+				used.push(move.card);
+				total += move.score;
+			}
+			return total;
+		},
 		async content(event, trigger, player) {
 			player.awakenSkill(event.name);
 			let extra = 0;
@@ -18061,7 +18101,14 @@ export default {
 							}) > 0
 						);
 					})
-					.set("ai", () => Math.random())
+					// 之前ai是随机数，限定技乱挪装备：改成按bestMove的结果选(先选失去方、再选接收方)，没有正收益就不选(取消)
+					.set("ai", target => {
+						const move = lib.skill.yongjin.bestMove(get.player(), get.event().cards);
+						if (!move) {
+							return 0;
+						}
+						return target == (ui.selected.targets.length ? move.to : move.from) ? 1 : 0;
+					})
 					.set("multitarget", true)
 					.set("cards", event.cards)
 					.set("targetprompt", ["被移走", "移动目标"])
@@ -18086,6 +18133,10 @@ export default {
 					})
 					.set("targets1", event.targets[1])
 					.set("cards", event.cards)
+					.set("ai", button => {
+						const move = lib.skill.yongjin.bestMove(get.player(), get.event().cards);
+						return move && move.card == button.link ? 10 : get.equipValue(button.link, get.event().targets1);
+					})
 					.forResult();
 				if (!chooseCardResult.bool || !chooseCardResult.links.length) {
 					break;
@@ -18100,7 +18151,10 @@ export default {
 		ai: {
 			order: 6,
 			result: {
-				player: 1,
+				// 限定技不能能用就用：最优的连续移动总收益要够高才发动
+				player(player) {
+					return lib.skill.yongjin.planValue(player) >= 12 ? 1 : 0;
+				},
 			},
 		},
 	},
@@ -18399,11 +18453,17 @@ export default {
 				await player.recover();
 			}
 		},
+		// 缺result.target时AI选两个目标是随机的：先选的是"给牌方"(手牌更多)，要挑敌人(被抽走一张手牌)，
+		// 后选的是"得牌方"(手牌更少)，要挑队友。引擎会再乘对目标的态度，所以这里只给方向：
+		// 给牌方-1(敌人得正分)，得牌方+1(队友得正分)
 		ai: {
 			order: 10.5,
 			threaten: 2.3,
 			result: {
 				player: 1,
+				target(player, target) {
+					return ui.selected.targets.length ? 1 : -1;
+				},
 			},
 		},
 	},
@@ -18429,18 +18489,17 @@ export default {
 					prompt: get.prompt(event.skill),
 					prompt2: "令一名其他角色摸三张牌、回复1点体力并复原武将牌",
 					filterTarget: lib.filter.notMe,
+					// 限定技只留给真正需要且明确的队友：已明置同势力、态度够高(>3)，且确实残血/翻面/只剩2血以内
 					ai(target) {
 						const player = get.player();
-						let num = get.attitude(player, target);
-						if (num > 0) {
-							if (target.getHp() == 1) {
-								num += 2;
-							}
-							if (target.isDamaged()) {
-								num += 2;
-							}
+						if (!isClearFriend(player, target)) {
+							return -1;
 						}
-						return num;
+						const num = get.attitude(player, target);
+						if (num <= 3 || !(target.isDamaged() || target.isTurnedOver() || target.getHp() <= 2)) {
+							return -1;
+						}
+						return num + (target.getHp() == 1 ? 2 : 0) + (target.isDamaged() ? 2 : 0) + (target.isTurnedOver() ? 3 : 0);
 					},
 				})
 				.forResult();
