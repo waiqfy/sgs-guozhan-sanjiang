@@ -3064,7 +3064,9 @@ export default {
 
 			result = await player
 				.chooseTarget([1, lib.skill.zaiqixx.count()], get.prompt2("zaiqixx"), (card, player, target) => {
-					return target.side == player.side || sameGroup(target, player);
+					// 国战里player.side恒为undefined，之前的"target.side == player.side"对所有人都成立，
+					// 野心家/异势力的人也被选进来了；只认sameGroup(同势力，野心家不与任何人同势力)
+					return sameGroup(target, player);
 				})
 				.set("ai", function (target) {
 					return get.attitude(_status.event.player, target);
