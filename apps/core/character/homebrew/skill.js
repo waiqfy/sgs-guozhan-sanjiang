@@ -14445,12 +14445,15 @@ export default {
 			if (!hs.length) {
 				return;
 			}
+			// AI：场上没有明确的友方(态度>0的其他角色)就一张都不给，别随手送给敌人
+			const hasFriend = game.hasPlayer(current => current != player && get.attitude(player, current) > 0);
 			const result = await player
 				.chooseCardButton({
 					prompt: "遗计：请选择至多两张牌交给其他角色",
 					cards: hs,
 					select: [0, hs.length],
 				})
+				.set("ai", button => (hasFriend ? 1 : 0))
 				.forResult();
 			if (result?.links?.length) {
 				const target = await player
@@ -14458,6 +14461,7 @@ export default {
 						prompt: `将${get.translation(result.links)}交给一名角色`,
 						filterTarget: (card, player, target) => target != player,
 						forced: true,
+						ai: target => get.attitude(get.player(), target),
 					})
 					.forResult();
 				if (target?.targets?.length) {
@@ -14518,7 +14522,18 @@ export default {
 			if (!options.length) {
 				return;
 			}
-			const result = await player.chooseControl(options).set("prompt", "治严：请选择一项").forResult();
+			const result = await player
+				.chooseControl(options)
+				.set("prompt", "治严：请选择一项")
+				.set("ai", () => {
+					// 交出手牌这一支只在有明确友方(态度>0)且确实有超出体力的手牌要交时才选，否则摸牌
+					const canGive = options.includes("交出手牌") && player.countCards("h") > player.hp && game.hasPlayer(current => current != player && get.attitude(player, current) > 0);
+					if (canGive) {
+						return "交出手牌";
+					}
+					return options.includes("摸牌至上限") ? "摸牌至上限" : options[0];
+				})
+				.forResult();
 			if (result.control == "摸牌至上限") {
 				player.getHistory("custom").push({ zhiyan_draw: true });
 				const num = player.maxHp - player.countCards("h");
@@ -15540,8 +15555,10 @@ export default {
 		ai: {
 			order: 4,
 			result: {
+				// 交牌是给对方的礼物：引擎会再乘对target的态度，只给方向不能返回-1(否则敌人=负负得正反而优先)；
+				// 非同势力的对象一律0分，没有明确队友就不发动
 				target(player, target) {
-					return sameGroup(target, player) ? 1 : get.attitude(player, target) > 0 ? 1 : -1;
+					return sameGroup(target, player) ? 1 : 0;
 				},
 			},
 		},
@@ -26013,22 +26030,33 @@ export default {
 		aiShowCost: true,
 		audio: 2,
 		trigger: { global: ["loseAfter", "loseAsyncAfter"] },
+		// loseAsyncAfter(多名角色同时失去牌，如礼让)没有event.player，直接读event.player.getl会报
+		// "Cannot read properties of undefined"；改成按所有其他角色逐个检查getl
+		getTargets(event, player) {
+			return game.filterPlayer(current => {
+				if (current == player || !current.isIn() || !current.countCards("h")) {
+					return false;
+				}
+				const evt = event.getl && event.getl(current);
+				return !!(evt && evt.hs && evt.hs.length);
+			});
+		},
 		filter(event, player) {
 			if (_status.currentPhase != player || player.storage.liru_mieji_active) {
 				return false;
 			}
-			if (event.player == player) {
-				return false;
-			}
-			const evt = event.getl && event.getl(event.player);
-			return !!(evt && evt.hs && evt.hs.length);
+			return lib.skill.liru_mieji.getTargets(event, player).length > 0;
 		},
-		// chooseBool没有ai时会被默认拒绝；这是纯粹的骚扰技能，对敌方角色发动即可
+		// 这是纯粹的骚扰技能，AI只对敌方角色发动(chooseTarget的ai直接当分数用)
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("liru_mieji", trigger.player)).set("ai", () => get.attitude(player, trigger.player) <= 0).forResult();
+			const list = lib.skill.liru_mieji.getTargets(trigger, player);
+			event.result = await player
+				.chooseTarget(get.prompt2("liru_mieji"), (card, plyr, target) => list.includes(target))
+				.set("ai", target => -get.attitude(get.player(), target))
+				.forResult();
 		},
 		async content(event, trigger, player) {
-			const target = trigger.player;
+			const target = event.targets[0];
 			if (!target.isIn() || !target.countCards("h")) {
 				return;
 			}
@@ -26924,7 +26952,8 @@ export default {
 				.chooseBool(get.prompt2("yirang"))
 				// 揖讓会把手牌全部展示交出去，还搭上"招祸"，只有自己体力上限已经很低（≤2）
 				// 快撑不住的时候换血才划算，体力上限还高时AI不应该主动发动
-				.set("ai", () => player.maxHp <= 2)
+				// 且得有明确的友方可交(态度>0，体力上限比自己高才有"补上限"的意义)，否则不发动
+				.set("ai", () => player.maxHp <= 2 && game.hasPlayer(current => current != player && current.maxHp > player.maxHp && get.attitude(player, current) > 0))
 				.forResult();
 		},
 		async content(event, trigger, player) {
@@ -26936,6 +26965,7 @@ export default {
 			const nonBasic = cards.filter(c => get.type(c) != "basic");
 			const result = await player
 				.chooseTarget(true, "揖讓：请选择一名角色交给其非基本牌", (card, plyr, target) => target != player)
+				.set("ai", target => get.attitude(get.player(), target) * (target.maxHp > get.player().maxHp ? 2 : 1))
 				.forResult();
 			if (!result.bool || !result.targets || !result.targets.length) {
 				player.removeSkill("zhaohuo");
@@ -27638,8 +27668,14 @@ export default {
 			threaten: 0.8,
 			order: 6,
 			result: {
+				// 之前target返回的符号是反的(对敌人+1、对友军-1，再被引擎乘一次态度，两边都变负，AI永远不发动)。
+				// 现在：给牌是礼物(target恒1，对友方为正)，player按"两人攻击范围内共同覆盖的敌我"估算群伤收益
+				player(player, target) {
+					const shared = game.filterPlayer(current => current.isIn() && current != player && current != target && current.inRangeOf(player) && current.inRangeOf(target));
+					return shared.reduce((sum, current) => sum + (get.attitude(player, current) < 0 ? 1 : get.attitude(player, current) > 0 ? -1.5 : 0), 0) > 0 ? 1 : 0;
+				},
 				target(player, target) {
-					return get.attitude(player, target) < 0 ? 1 : -1;
+					return 1;
 				},
 			},
 		},
