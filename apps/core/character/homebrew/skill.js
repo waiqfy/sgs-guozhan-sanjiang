@@ -1976,16 +1976,18 @@ export default {
 				prompt2 = `请弃置任意张牌，然后其展示你一张牌，若此牌颜色为${get.translation(color)}，你可选择一项：此【杀】不计入次数限制/不可被响应/伤害+1`;
 			await target
 				.chooseToDiscard(prompt, prompt2, [1, Infinity], "he", true, "allowChooseAll")
+				// AI(被追命的一方)：追命者展示的是弃牌后剩下的牌，只要剩下的牌里没有声明颜色的牌，就不会吃到加成。
+				// 所以最优解是把"he"里声明颜色的牌尽量弃光(装备区的牌是公开的，攻击者一定会挑中)，
+				// 代价是这些牌的价值：体力越低越怕被加成，越愿意弃；弃得起的才弃，
+				// 非声明颜色的牌一律不弃(forced至少选1张时自然会落到价值最低的那张)
 				.set("ai", card => {
-					let color = get.event().color,
+					const color = get.event().color,
 						player = get.player();
-					if (get.position(card) == "e" && get.color(card) == color) {
-						return 2;
+					if (get.color(card) == color) {
+						const fear = player.getHp() <= 2 ? 10 : player.getHp() <= 3 ? 7 : 5;
+						return fear - get.value(card, player) + (get.position(card) == "e" ? 2 : 0);
 					}
-					if (player.getHp() <= 2 && get.color(card) == color) {
-						return Math.random() < 0.5;
-					}
-					return 0;
+					return -get.value(card, player) / 10;
 				})
 				.set("color", color);
 			if (target.countCards("he")) {
