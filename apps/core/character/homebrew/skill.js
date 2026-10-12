@@ -12,6 +12,11 @@ import { lib, game, ui, get, ai, _status } from "noname";
 function sameGroup(a, b) {
 	return !!a && !!b && a.identity !== "unknown" && b.identity !== "unknown" && a.isFriendOf(b);
 }
+// "明确的队友"：已明置且势力相同(sameGroup排除未明置)，再要求态度为正。国战里未明置/势力重叠的角色
+// get.attitude也可能给出正值(+4)，只看态度会把牌送给其实是敌人的人，送牌/送摸牌类AI应该用这个
+function isClearFriend(player, target) {
+	return !!target && target != player && sameGroup(target, player) && get.attitude(player, target) > 0;
+}
 function diffGroup(a, b) {
 	return !!a && !!b && a.identity !== "unknown" && b.identity !== "unknown" && a.isEnemyOf(b);
 }
@@ -3228,7 +3233,7 @@ export default {
 				.set("ai", target => {
 					const player = get.player();
 					// 满血/非友方白白弃牌，不发动；其余按"回血收益 - 最便宜的代价"算
-					if (!target.isDamaged() || get.attitude(player, target) <= 0) {
+					if (!target.isDamaged() || !isClearFriend(player, target)) {
 						return 0;
 					}
 					const cost = lib.skill.shenzhi.getCost(player, target).cost;
@@ -3298,7 +3303,7 @@ export default {
 				.chooseTarget(get.prompt2(event.skill), lib.filter.notMe)
 				.set("ai", target => {
 					const player = get.player();
-					return get.effect(target, { name: "draw" }, player, player);
+					return isClearFriend(player, target) ? get.effect(target, { name: "draw" }, player, player) : -1;
 				})
 				.forResult();
 		},
@@ -3323,7 +3328,7 @@ export default {
 				.chooseTarget(get.prompt2("shushen"), lib.filter.notMe)
 				.set("ai", target => {
 					const player = get.player();
-					return get.effect(target, { name: "recover" }, player, player);
+					return isClearFriend(player, target) ? get.effect(target, { name: "recover" }, player, player) : -1;
 				})
 				.forResult();
 		},
@@ -14446,7 +14451,7 @@ export default {
 				return;
 			}
 			// AI：场上没有明确的友方(态度>0的其他角色)就一张都不给，别随手送给敌人
-			const hasFriend = game.hasPlayer(current => current != player && get.attitude(player, current) > 0);
+			const hasFriend = game.hasPlayer(current => isClearFriend(player, current));
 			const result = await player
 				.chooseCardButton({
 					prompt: "遗计：请选择至多两张牌交给其他角色",
@@ -14527,7 +14532,7 @@ export default {
 				.set("prompt", "治严：请选择一项")
 				.set("ai", () => {
 					// 交出手牌这一支只在有明确友方(态度>0)且确实有超出体力的手牌要交时才选，否则摸牌
-					const canGive = options.includes("交出手牌") && player.countCards("h") > player.hp && game.hasPlayer(current => current != player && get.attitude(player, current) > 0);
+					const canGive = options.includes("交出手牌") && player.countCards("h") > player.hp && game.hasPlayer(current => isClearFriend(player, current));
 					if (canGive) {
 						return "交出手牌";
 					}
@@ -20063,8 +20068,9 @@ export default {
 				.chooseTarget(get.prompt("hongde"), "令一名其他角色摸" + get.cnNumber(num) + "张牌", function (card, player, target) {
 					return target != player;
 				})
+				// 没有明确队友(已明置同势力且态度为正)就不发动，不往不确定身份的角色身上乱送牌
 				.set("ai", function (target) {
-					return get.attitude(get.player(), target);
+					return isClearFriend(get.player(), target) ? get.attitude(get.player(), target) : -1;
 				})
 				.set("num", num)
 				.forResult();
@@ -22489,7 +22495,7 @@ export default {
 			if (hand.length) {
 				const cheap = hand.slice().sort((a, b) => get.value(a, player) - get.value(b, player))[0];
 				const target = game
-					.filterPlayer(current => current.isDamaged() && get.attitude(player, current) > 0)
+					.filterPlayer(current => current.isDamaged() && isClearFriend(player, current))
 					.sort((a, b) => a.hp - b.hp)[0];
 				if (target) {
 					const need = target.hp <= 1 ? 10 : target.hp == 2 ? 6 : 3;
@@ -26953,7 +26959,7 @@ export default {
 				// 揖讓会把手牌全部展示交出去，还搭上"招祸"，只有自己体力上限已经很低（≤2）
 				// 快撑不住的时候换血才划算，体力上限还高时AI不应该主动发动
 				// 且得有明确的友方可交(态度>0，体力上限比自己高才有"补上限"的意义)，否则不发动
-				.set("ai", () => player.maxHp <= 2 && game.hasPlayer(current => current != player && current.maxHp > player.maxHp && get.attitude(player, current) > 0))
+				.set("ai", () => player.maxHp <= 2 && game.hasPlayer(current => current.maxHp > player.maxHp && isClearFriend(player, current)))
 				.forResult();
 		},
 		async content(event, trigger, player) {
