@@ -3223,13 +3223,18 @@ export default {
 		animationColor: "soil",
 		audio: 2,
 		trigger: { player: "phaseZhunbeiBegin" },
+		// 两个选项(目标有恰好只剩一张牌的区域 / 你有手牌可弃)至少要满足一个才能选这名角色，
+		// 都不满足时选了也什么都做不了，不该出现在可选对象里
+		canUse(player, target) {
+			return lib.skill.shenzhi.getAreas(target).length > 0 || player.countCards("h") > 0;
+		},
 		filter(event, player) {
-			return true;
+			return game.hasPlayer(current => lib.skill.shenzhi.canUse(player, current));
 		},
 		preHidden: true,
 		async cost(event, trigger, player) {
 			event.result = await player
-				.chooseTarget(get.prompt2(event.skill))
+				.chooseTarget(get.prompt2(event.skill), (card, plyr, target) => lib.skill.shenzhi.canUse(plyr, target))
 				.set("ai", target => {
 					const player = get.player();
 					// 满血/非友方白白弃牌，不发动；其余按"回血收益 - 最便宜的代价"算
@@ -3268,7 +3273,10 @@ export default {
 			const target = event.targets[0];
 			const areas = lib.skill.shenzhi.getAreas(target);
 			const canHand = player.countCards("h") > 0;
-			if (areas.length || canHand) {
+			if (!areas.length && !canHand) {
+				return;
+			}
+			{
 				const choiceList = ["弃置其一个区域内的最后一张牌", "弃置你的所有手牌"];
 				const controls = [];
 				if (areas.length) {
