@@ -6503,8 +6503,10 @@ export default {
 					.forResult();
 				return;
 			}
-			// 保护同势力目标：先选一张牌置于牌堆顶(这是发动的代价)，之后与使用者拼点；
-			// AI只在受保护的目标是友方、使用者不是友方时才发动，并拿最不值钱的牌垫底
+			// 保护同势力目标：先选一张牌置于牌堆顶，之后与使用者拼点。这张牌正好就是天辩"用牌堆顶的牌拼点"
+			// 要用的那张——所以不是垫一张废牌，而是要垫"拼点最强"的牌：红桃点数视为K，其余看点数，
+			// 点数相同时再偏向使用价值低的(反正拼点后会进弃牌堆)。
+			// AI只在受保护的目标是友方、使用者不是友方时才发动
 			const result = await player
 				.chooseCard("he", get.prompt("zhuandui", trigger.player), "将一张牌置于牌堆顶，然后与" + get.translation(trigger.player) + "拼点，若你赢，此【杀】无效")
 				.set("ai", card => {
@@ -6513,7 +6515,8 @@ export default {
 					if (get.attitude(player, evt.target) <= 0 || get.attitude(player, evt.player) > 0) {
 						return 0;
 					}
-					return 8 - get.value(card, player);
+					const power = get.suit(card, player) == "heart" ? 13 : get.number(card, player);
+					return Math.max(0.1, power - get.value(card, player) * 0.5);
 				})
 				.forResult();
 			event.result = result.bool ? { bool: true, cards: result.cards, cost_data: result.cards } : { bool: false };
@@ -6530,10 +6533,13 @@ export default {
 				return;
 			}
 			await game.cardsGotoPile(event.cards, "insert");
+			// 告诉天辩：这次拼点牌堆顶是我刚垫上去的牌，AI应当用它拼点(不然天辩的check可能选手牌)
+			player.storage.zhuandui_top = true;
 			if (!trigger.player.isIn() || !player.canCompare(trigger.player, !!player.hasSkill("tianbian"))) {
 				return;
 			}
 			const result = await player.chooseToCompare(trigger.player).forResult();
+			delete player.storage.zhuandui_top;
 			if (result.bool) {
 				// 赢：此杀对该目标无效
 				evt.excluded.add(trigger.target);
@@ -6551,6 +6557,10 @@ export default {
 		enable: "chooseCard",
 		check(event, player) {
 			var player = _status.event.player;
+			// 专对刚把一张高点数牌垫到牌堆顶：用它拼点
+			if (player.storage.zhuandui_top) {
+				return 20;
+			}
 			return !player.hasCard(function (card) {
 				var val = get.value(card);
 				return val < 0 || (val <= 4 && (get.number(card) >= 11 || get.suit(card) == "heart"));
