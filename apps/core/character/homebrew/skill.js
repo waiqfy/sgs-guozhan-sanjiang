@@ -19832,6 +19832,14 @@ export default {
 			if (result.bool) {
 				card = cards.find(card => card.cardid === result.cards[0]._cardid);
 			}
+			// 后半句"否则，你可以将这些牌置于牌堆底"：三张里没有此牌(没有任何一张能满足当前的使用/打出要求)时才问，
+			// 之前这半句完全没实现，看完的三张牌一直留在牌堆顶
+			const hasUsable = cardsx.some(cardx => {
+				if (player.hasSkill("aozhan") && cardx.name == "tao") {
+					return evt.filterCard({ name: "sha", isCard: true, cards: [cardx] }, evt.player, evt) || evt.filterCard({ name: "shan", isCard: true, cards: [cardx] }, evt.player, evt);
+				}
+				return evt.filterCard(cardx, evt.player, evt);
+			});
 			const cards2 = player.getCards("s", card => card.hasGaintag("aocai_hs"));
 			if (player.isOnline2()) {
 				player.send(
@@ -19848,6 +19856,17 @@ export default {
 			cards2.forEach(i => i.delete());
 			if (player == game.me) {
 				ui.updatehl();
+			}
+			if (!card && !hasUsable) {
+				const bottom = await player
+					.chooseBool("傲才：是否将这" + get.cnNumber(cards.length) + "张牌置于牌堆底？", get.translation(cards))
+					// AI：这三张牌的总价值偏低就丢到牌堆底(别让自己或队友摸到废牌)，好牌留在顶上
+					.set("ai", () => cards.reduce((sum, c) => sum + get.value(c, player), 0) <= cards.length * 5)
+					.forResult();
+				if (bottom.bool) {
+					await game.cardsGotoPile(cards);
+					game.log(player, "将", get.cnNumber(cards.length) + "张牌置于了牌堆底");
+				}
 			}
 			if (card) {
 				let name = card.name,
