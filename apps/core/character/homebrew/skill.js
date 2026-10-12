@@ -3242,44 +3242,69 @@ export default {
 				})
 				.forResult();
 		},
-		// 三种代价取最小：判定区(顺手拆延时锦囊)=0；弃自己所有手牌=手牌价值之和；装备区最后一张=该装备价值
+		// "区域中的最后一张牌"：前提是该区域(手牌区/装备区/判定区)恰好只剩这一张牌。三个区域里满足的都能选，
+		// 满足的不止一个时再让玩家选具体哪个区域
+		areaNames: { h: "手牌区", e: "装备区", j: "判定区" },
+		getAreas(target) {
+			return ["j", "e", "h"].filter(pos => target.countCards(pos) == 1);
+		},
+		// AI用：选项一的代价=被弃置的那张牌对目标的价值(判定区的延时锦囊弃了反而是好事，取0)，
+		// 选项二的代价=自己所有手牌的价值之和；取代价最小的，返回{type:"area"/"hand", area, cost}
 		getCost(player, target) {
-			const hs = player.getCards("h");
-			const es = target.getCards("e");
-			const list = [
-				{ area: "j", cost: target.countCards("j") ? 0 : Infinity },
-				{ area: "h", cost: hs.reduce((sum, card) => sum + get.value(card, player), 0) },
-				{ area: "e", cost: es.length ? get.value(es[es.length - 1], target) : Infinity },
-			];
+			const list = lib.skill.shenzhi.getAreas(target).map(pos => ({
+				type: "area",
+				area: pos,
+				cost: pos == "j" ? 0 : get.value(target.getCards(pos)[0], target),
+			}));
+			if (player.countCards("h")) {
+				list.push({ type: "hand", cost: player.getCards("h").reduce((sum, card) => sum + get.value(card, player), 0) });
+			} else {
+				list.push({ type: "hand", cost: 0 });
+			}
 			list.sort((a, b) => a.cost - b.cost);
 			return list[0];
 		},
 		async content(event, trigger, player) {
 			const target = event.targets[0];
-			const areas = ["j", "e"].filter(pos => target.getCards(pos).length);
-			const canArea = areas.length > 0;
+			const areas = lib.skill.shenzhi.getAreas(target);
 			const canHand = player.countCards("h") > 0;
-			if (canArea || canHand) {
-				const choiceList = ["弃置其区域内最后一张牌", "弃置你的所有手牌"];
-				const result = await player
-					.chooseControl(choiceList)
-					.set("choiceList", choiceList)
-					.set("prompt", get.prompt2(event.skill))
-					// 优先级：判定区最优先(代价最低)；其次是弃自己手牌，但手牌数超过3张就
-					// 不划算了；装备区优先级最低，只有手牌太多舍不得弃、又没有判定区可选时
-					// 才退而求其次去拆装备
-					.set("ai", () => {
-						const best = lib.skill.shenzhi.getCost(player, target);
-						return best.area == "h" ? choiceList[1] : choiceList[0];
-					})
-					.forResult();
-				if (result.control == choiceList[0] && canArea) {
-					// areas按["j","e"]顺序过滤，取第一个(优先判定区)而不是最后一个——
-					// 之前用areas.length-1取到的其实是"e"(装备区)排在判定区前面，顺序反了
-					const pos = areas[0];
-					const cards = target.getCards(pos);
-					await target.discard(cards[cards.length - 1]);
-				} else if (canHand) {
+			if (areas.length || canHand) {
+				const choiceList = ["弃置其一个区域内的最后一张牌", "弃置你的所有手牌"];
+				const controls = [];
+				if (areas.length) {
+					controls.push("选项一");
+				}
+				if (canHand) {
+					controls.push("选项二");
+				}
+				let choice = controls[0];
+				if (controls.length > 1) {
+					const result = await player
+						.chooseControl(controls)
+						.set("choiceList", choiceList)
+						.set("prompt", get.prompt2(event.skill))
+						.set("ai", () => (lib.skill.shenzhi.getCost(player, target).type == "hand" ? "选项二" : "选项一"))
+						.forResult();
+					choice = result.control;
+				}
+				if (choice == "选项一") {
+					let pos = areas[0];
+					if (areas.length > 1) {
+						const names = areas.map(p => lib.skill.shenzhi.areaNames[p]);
+						const result = await player
+							.chooseControl(names)
+							.set("prompt", "神智：选择弃置其哪个区域的最后一张牌")
+							.set("ai", () => {
+								const best = lib.skill.shenzhi.getCost(player, target);
+								return lib.skill.shenzhi.areaNames[best.type == "area" ? best.area : areas[0]];
+							})
+							.forResult();
+						pos = areas[names.indexOf(result.control)] || areas[0];
+					}
+					const next = target.discard(target.getCards(pos)[0]);
+					next.discarder = player;
+					await next;
+				} else {
 					await player.discard(player.getCards("h"));
 				}
 			}
