@@ -6472,42 +6472,72 @@ export default {
 	},
 
 // ========== qinmi 秦宓 ==========
-	// 专对：同势力角色成为【杀】的目标后，你可以与使用者拼点，若你赢，此【杀】无效；若你没赢，且你不是此牌的目标，你可以将一张手牌置于牌堆顶，取消此【杀】的所有目标，然后你成为此【杀】的目标。 参考zhuandui
+	// 专对：当你使用【杀】指定目标后，你可以与其拼点，若你赢，其不能响应此【杀】；同势力角色成为【杀】的目标后，你可以将一张牌置于牌堆顶然后与使用者拼点，若你赢，此【杀】无效。 参考zhuandui(改：按新卡面，原版"拼点没赢则转移目标"的分支已删除)
 	zhuandui: {
 		audio: 2,
-		trigger: { global: "useCardToTargeted" },
-		filter(event, player) {
+		// useCardToPlayered：你使用杀指定目标后(每个目标各一次)；useCardToTargeted：同势力角色(含你自己)成为杀的目标后
+		trigger: { player: "useCardToPlayered", global: "useCardToTargeted" },
+		filter(event, player, name) {
 			if (event.card.name != "sha") {
 				return false;
 			}
-			if (event.player == player || event.target == player) {
+			if (name == "useCardToPlayered") {
+				// 自己使用杀：global也会匹配到自己是目标的useCardToTargeted，这里只处理Playered
+				return event.player == player && event.target.isIn() && player.canCompare(event.target, !!player.hasSkill("tianbian"));
+			}
+			// 同势力角色成为目标；使用者不能是自己(自己不能和自己拼点，自己出杀走上面那一支)
+			if (event.player == player || !event.player.isIn() || !sameGroup(event.target, player)) {
 				return false;
 			}
-			if (!sameGroup(event.target, player)) {
-				return false;
-			}
-			return player.canCompare(event.player);
+			return player.countCards("he") > 0 && player.canCompare(event.player, !!player.hasSkill("tianbian"));
 		},
-		logTarget: "player",
-		check(event, player) {
-			return get.attitude(player, event.target) > 0;
+		logTarget(event, player, name) {
+			return name == "useCardToPlayered" ? event.target : event.player;
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseToCompare(trigger.player).forResult();
+			if (event.triggername == "useCardToPlayered") {
+				// AI只对敌人拼点
+				event.result = await player
+					.chooseBool(get.prompt2("zhuandui", trigger.target))
+					.set("ai", () => get.attitude(player, trigger.target) < 0)
+					.forResult();
+				return;
+			}
+			// 保护同势力目标：先选一张牌置于牌堆顶(这是发动的代价)，之后与使用者拼点；
+			// AI只在受保护的目标是友方、使用者不是友方时才发动，并拿最不值钱的牌垫底
+			const result = await player
+				.chooseCard("he", get.prompt("zhuandui", trigger.player), "将一张牌置于牌堆顶，然后与" + get.translation(trigger.player) + "拼点，若你赢，此【杀】无效")
+				.set("ai", card => {
+					const player = get.player();
+					const evt = get.event().getTrigger();
+					if (get.attitude(player, evt.target) <= 0 || get.attitude(player, evt.player) > 0) {
+						return 0;
+					}
+					return 8 - get.value(card, player);
+				})
+				.forResult();
+			event.result = result.bool ? { bool: true, cards: result.cards, cost_data: result.cards } : { bool: false };
 		},
 		async content(event, trigger, player) {
 			const evt = trigger.getParent();
-			if (event.bool) {
-				player.logSkill("zhuandui", trigger.target);
-				evt.excluded.add(trigger.target);
-			} else if (!evt.targets.includes(player) && player.countCards("h")) {
-				const result = await player.chooseCard("h", 1, "专对：将一张手牌置于牌堆顶，取消此【杀】的所有目标，然后你成为此【杀】的目标").forResult();
+			if (event.triggername == "useCardToPlayered") {
+				const result = await player.chooseToCompare(trigger.target).forResult();
 				if (result.bool) {
-					await game.cardsGotoPile(result.cards, "insert");
-					evt.excluded.addArray(evt.targets);
-					evt.targets.length = 0;
-					evt.targets.push(player);
+					// 赢：其不能响应此杀
+					evt.directHit.add(trigger.target);
+					game.log(trigger.target, "不能响应", trigger.card);
 				}
+				return;
+			}
+			await game.cardsGotoPile(event.cards, "insert");
+			if (!trigger.player.isIn() || !player.canCompare(trigger.player, !!player.hasSkill("tianbian"))) {
+				return;
+			}
+			const result = await player.chooseToCompare(trigger.player).forResult();
+			if (result.bool) {
+				// 赢：此杀对该目标无效
+				evt.excluded.add(trigger.target);
+				game.log(trigger.card, "对", trigger.target, "无效");
 			}
 		},
 		ai: {
@@ -18562,10 +18592,13 @@ export default {
 				player.addTempSkill(card.name);
 			}
 		},
+		// 之前只有result.player:1没有result.target，AI选目标时敌我不分，会对队友发动；
+		// 弃置对方一张牌是对目标的负面效果：result.target给负号，引擎会再乘对目标的态度，敌人得正分
 		ai: {
 			order: 9,
 			result: {
-				player: 1,
+				player: 0,
+				target: -1,
 			},
 			threaten: 1.3,
 		},
