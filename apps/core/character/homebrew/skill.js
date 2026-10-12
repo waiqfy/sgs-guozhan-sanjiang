@@ -23606,7 +23606,8 @@ export default {
 			if (event.name == "damage") {
 				return true;
 			}
-			return event.player.isFriendOf(player) && event.player.isIn() && !event.player.isDead();
+			// 卡面："其他角色"进入濒死被救回后(不限势力)
+			return event.player != player && event.player.isIn() && !event.player.isDead();
 		},
 		check() {
 			return true;
