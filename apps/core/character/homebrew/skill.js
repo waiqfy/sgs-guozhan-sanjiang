@@ -18337,6 +18337,17 @@ export default {
 			if (target.isMin()) {
 				return false;
 			}
+			// AI：只允许选bestPair算出的那一对(玩家自己操作时不受影响)，之前AI随便换装备
+			if (_status.event.isMine && !_status.event.isMine() && _status.event.player == player) {
+				const best = lib.skill.ganlu.bestPair(player);
+				if (!best) {
+					return false;
+				}
+				if (ui.selected.targets.length == 0) {
+					return best.pair.includes(target);
+				}
+				return best.pair.includes(target) && target != ui.selected.targets[0];
+			}
 			if (ui.selected.targets.length == 0) {
 				return true;
 			}
@@ -18346,6 +18357,34 @@ export default {
 			return Math.abs(ui.selected.targets[0].countCards("e") - target.countCards("e")) <= player.maxHp - player.hp;
 		},
 		multitarget: true,
+		// AI用：枚举所有合法的两人组合，收益=各自装备组交换后，装备对新主人的价值差×我对该角色的态度
+		equipSum(cards, owner) {
+			return cards.reduce((sum, card) => sum + get.equipValue(card, owner), 0);
+		},
+		bestPair(player) {
+			const list = game.filterPlayer(cur => !cur.isMin());
+			let best = null;
+			for (let i = 0; i < list.length; i++) {
+				for (let j = i + 1; j < list.length; j++) {
+					const a = list[i],
+						b = list[j];
+					const ea = a.getCards("e"),
+						eb = b.getCards("e");
+					if (!ea.length && !eb.length) {
+						continue;
+					}
+					if (Math.abs(ea.length - eb.length) > player.maxHp - player.hp) {
+						continue;
+					}
+					const sum = lib.skill.ganlu.equipSum;
+					const score = get.attitude(player, a) * (sum(eb, a) - sum(ea, a)) + get.attitude(player, b) * (sum(ea, b) - sum(eb, b));
+					if (score > 0 && (!best || score > best.score)) {
+						best = { pair: [a, b], score };
+					}
+				}
+			}
+			return best;
+		},
 		async content(event, trigger, player) {
 			const { targets } = event;
 			targets[0].swapEquip(targets[1]);
@@ -18359,7 +18398,10 @@ export default {
 		ai: {
 			order: 10,
 			result: {
-				player: 1,
+				// 没有有利可图的换装组合就不发动
+				player(player) {
+					return lib.skill.ganlu.bestPair(player) ? 1 : 0;
+				},
 			},
 			threaten(player, target) {
 				return 0.8 * Math.max(1 + target.maxHp - target.hp);
@@ -19419,6 +19461,30 @@ export default {
 
 	anguo_share: {
 		charlotte: true,
+		// "视为装备着"不只是攻击距离/距离修正：同势力队友的回合里，若其武器/防具栏是空的而朱治装备着，
+		// 把对应装备牌自带的技能临时赋予队友(到其回合结束)，这样武器防具的效果才真正能用，AI也会照常使用
+		trigger: { player: "phaseBeginStart" },
+		forced: true,
+		popup: false,
+		silent: true,
+		filter(event, player) {
+			return game.hasPlayer(cur => cur != player && cur.isIn() && cur.isFriendOf(player) && cur.hasSkill("anguo") && [1, 2].some(slot => !player.getEquip(slot) && cur.getEquip(slot)));
+		},
+		async content(event, trigger, player) {
+			for (const src of game.filterPlayer(cur => cur != player && cur.isIn() && cur.isFriendOf(player) && cur.hasSkill("anguo"))) {
+				for (const slot of [1, 2]) {
+					const equip = src.getEquip(slot);
+					if (!equip || player.getEquip(slot)) {
+						continue;
+					}
+					const skills = (get.info(equip).skills || []).filter(skill => lib.skill[skill] && !player.hasSkill(skill));
+					if (skills.length) {
+						player.addTempSkill(skills);
+						game.log(player, "因【安国】临时获得了", equip, "的技能");
+					}
+				}
+			}
+		},
 		mod: {
 			attackRange(player, num) {
 				const src = game.filterPlayer(cur => cur != player && cur.isFriendOf(player) && cur.hasSkill("anguo"))[0];
@@ -19857,11 +19923,13 @@ export default {
 			if (player == game.me) {
 				ui.updatehl();
 			}
-			if (!card && !hasUsable) {
+			// "否则"指的是"没有使用或打出牌"(包括三张里有可用的但选择不用)，不是"三张里没有可用牌"。
+			// 目的主要是把这三张移走，让下一次发动更容易看到新的、可用的牌(顺带也能控牌)
+			if (!card) {
 				const bottom = await player
 					.chooseBool("傲才：是否将这" + get.cnNumber(cards.length) + "张牌置于牌堆底？", get.translation(cards))
-					// AI：这三张牌的总价值偏低就丢到牌堆底(别让自己或队友摸到废牌)，好牌留在顶上
-					.set("ai", () => cards.reduce((sum, c) => sum + get.value(c, player), 0) <= cards.length * 5)
+					// AI：三张里没有可用牌(这次没用上)就换掉，下次才更可能看到能用的；有可用牌却没用才留着
+					.set("ai", () => !hasUsable)
 					.forResult();
 				if (bottom.bool) {
 					await game.cardsGotoPile(cards);
@@ -21198,7 +21266,15 @@ export default {
 					return event.player && player.isFriendOf(event.player) && event.player.countMark("yinyang_mark") > 0;
 				},
 				async cost(event, trigger, player) {
-					event.result = await trigger.player.chooseBool(`怀橘：是否弃置1枚"阴阳鱼"标记，防止你受到的伤害？`).forResult();
+					// 标记很宝贵(还能当桃/摸牌用)：AI只在这次伤害会让自己掉到1血以下(含濒死)，或伤害>=2时才用，
+					// 小伤害不浪费。之前没写ai，被默认逻辑乱用
+					event.result = await trigger.player
+						.chooseBool(`怀橘：是否弃置1枚"阴阳鱼"标记，防止你受到的伤害？`)
+						.set("ai", () => {
+							const p = trigger.player;
+							return trigger.num >= 2 || p.hp - trigger.num <= 1;
+						})
+						.forResult();
 				},
 				async content(event, trigger, player) {
 					trigger.player.removeMark("yinyang_mark", 1, false);
@@ -21223,10 +21299,11 @@ export default {
 				.set("prompt", "遗礼：是否少摸一张牌或流失一点体力，获得2枚“阴阳鱼”标记？")
 				.set("ai", () => {
 					const player = get.player();
+					// 标记要有用武之地才值得付代价：低体力且手牌也少时不发动；体力富余才愿意流失体力
 					if (player.hp <= 2) {
-						return "少摸一张牌";
+						return player.countCards("h") <= 1 ? "不发动" : "少摸一张牌";
 					}
-					return "流失一点体力";
+					return player.hp >= 4 ? "流失一点体力" : "少摸一张牌";
 				})
 				.forResult();
 			const choice = result.control;
@@ -21248,8 +21325,16 @@ export default {
 			}
 			// [0,N]的多选chooseTarget没有ai时默认选不中任何人，标记分不出去；补上ai优先给交情好的角色
 			const giveResult = await player
-				.chooseTarget("遗礼：你可以令任意名其他角色各获得你的1枚“阴阳鱼”标记", [0, others.length], (card, player, target) => target != player)
-				.set("ai", target => get.attitude(get.player(), target))
+				.chooseTarget("遗礼：你可以令任意名其他角色各获得你的1枚“阴阳鱼”标记", [0, Math.min(others.length, player.countMark("yinyang_mark"))], (card, player, target) => target != player)
+				// 只给明确队友(已明置同势力)，且自己至少留1枚(AI最多分出标记数-1个)
+				.set("ai", target => {
+					const p = get.player();
+					if (!isClearFriend(p, target)) {
+						return -1;
+					}
+					const given = ui.selected.targets.length;
+					return given >= p.countMark("yinyang_mark") - 1 ? -1 : get.attitude(p, target);
+				})
 				.forResult();
 			if (giveResult.bool && giveResult.targets && giveResult.targets.length) {
 				for (const target of giveResult.targets) {
@@ -28434,7 +28519,10 @@ export default {
 				return false;
 			}
 			if (event.name === "damage") {
-				return !!event.card && get.itemtype(event.card) !== "card";
+				// 之前用get.itemtype(event.card) !== "card"判断"虚拟牌"：event.card在事件里一律是VCard，
+				// 这个条件对任何牌造成的伤害都成立，等于每回合首次受到任何牌的伤害都能免。改用引擎的
+				// get.is.virtualCard(没有任何实体牌对应才算虚拟牌，视为使用的牌)
+				return !!event.card && get.is.virtualCard(event.card);
 			}
 			return event.name === "loseHp";
 		},
