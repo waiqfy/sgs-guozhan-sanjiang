@@ -15668,14 +15668,23 @@ export default {
 		onuse(event, player) {
 			player.addTempSkill("lxdushi_effect");
 		},
-		// AI要懂得变连营：只有"手牌只剩这一张红色牌"时发动才会因此失去最后的手牌，摸一张并把度势换成连营，
-		// 这时才值得用；order很低，让AI先把别的牌出完、手牌被压到只剩一张红牌后再轮到这个技能
+		// AI要主动变连营：度势没有次数限制，每用一次手牌净减1张(摸2弃2、用掉1张红牌)，连用到手牌只剩最后一张
+		// 红牌时发动，就会因此失去最后的手牌，摸一张并把度势换成连营。所以只要有红牌、手牌不多就用：
+		// 只剩一张红牌时必用；有队友时(他们也能摸2弃2受益)手牌<=3才用，没有队友时(收益全靠变连营)放宽到<=5。
+		// order很低，先让AI把别的牌出完再轮到这个技能
 		ai: {
 			order: 0.5,
 			result: {
 				player(player) {
 					const hs = player.getCards("h");
-					return hs.length == 1 && get.color(hs[0], player) === "red" ? 5 : 0;
+					if (!hs.some(card => get.color(card, player) === "red")) {
+						return 0;
+					}
+					if (hs.length == 1) {
+						return 5;
+					}
+					const hasFriend = game.hasPlayer(current => current != player && current.isFriendOf(player));
+					return hs.length <= (hasFriend ? 3 : 5) ? 1 : 0;
 				},
 			},
 			threaten: 1.2,
