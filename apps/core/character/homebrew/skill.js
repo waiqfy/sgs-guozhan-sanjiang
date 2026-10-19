@@ -17946,9 +17946,11 @@ export default {
 	// 旋略：当你失去装备区里的牌或一次性失去至少两张牌后，你可以弃置一名其他角色的一张牌。 参考xuanlve(guozhan)
 	xuanlve: {
 		audio: 2,
+		// 只监听loseAfter/loseAsyncAfter漏掉了装备牌被移走/被换下/被获得等路径(装备被移动走走的是equipAfter，
+		// 被别人获得走gainAfter)，补成官方xuanlve的完整时机列表，和本文件其他"失去牌后"的技能(弘德等)一致
 		trigger: {
 			player: "loseAfter",
-			global: "loseAsyncAfter",
+			global: ["equipAfter", "addJudgeAfter", "gainAfter", "loseAsyncAfter", "addToExpansionAfter"],
 		},
 		preHidden: true,
 		filter(event, player) {
