@@ -28591,9 +28591,10 @@ export default {
 		},
 		async content(event, trigger, player) {
 			const target = event.target;
-			const num = Math.min(2, target.countCards("h"));
+			// 描述是"交给你两张牌"不限手牌：之前只算手牌("h")，对方手牌空、只有装备时一张都不给，却照样出杀
+			const num = Math.min(2, target.countCards("he"));
 			if (num > 0) {
-				await target.chooseToGive(player, "h", true, `引戈：交给${get.translation(player)}${get.cnNumber(num)}张牌`, num);
+				await target.chooseToGive(player, "he", true, `引戈：交给${get.translation(player)}${get.cnNumber(num)}张牌`, num);
 			}
 			if (!target.isIn()) {
 				return;
