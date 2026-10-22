@@ -7805,15 +7805,18 @@ export default {
 			const target = result1.targets[0];
 			await player.discard(result1.cards);
 			const name = await player
-				.chooseButton(["请选择一个基本牌或普通锦囊牌的牌名", [get.inpileVCardList(info => info[1] == "basic" || info[1] == "trick").filter(card => card[2] != "wuxie"), "vcard"]])
+				// 之前三处写错导致"无法选择牌名"：①inpileVCardList的过滤用info[1]=="basic"，但vcard条目是
+				// [类别中文名, "", 牌名]，info[1]是空串，条件恒假，候选列表是空的；②AI里读button[2]，应为button.link[2]；
+				// ③forResultBool不存在(GameEvent只有forResult)，调用即报错
+				.chooseButton(["请选择一个基本牌或普通锦囊牌的牌名", [get.inpileVCardList(info => ["basic", "trick"].includes(get.type(info[2])) && info[2] != "wuxie"), "vcard"]], true)
 				.set("ai", button => {
-					const cardname = button[2];
+					const cardname = button.link[2];
 					const targetCount = target.countCards("he", c => get.name(c) == cardname);
 					const selfCount = player.countCards("he", c => get.name(c) == cardname);
-					return targetCount - selfCount;
+					return targetCount - selfCount + Math.random() * 0.1;
 				})
-				.forResultBool();
-			if (!name) {
+				.forResult();
+			if (!name || !name.bool || !name.links?.length) {
 				return;
 			}
 			const cardName = name.links[0][2];
@@ -15897,7 +15900,12 @@ export default {
 			return _status._aozhan || aliveRatio <= 0.5;
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt("duojing"), "夺荆：是否令" + get.translation(trigger.player) + "跳过出牌阶段？").forResult();
+			// check因为有cost被忽略，之前chooseBool没有ai，开局就乱用。夺荆换来的是一个只有出牌阶段的额外回合(并失去克己)，
+			// 应该留到残局：存活角色不多(<=4)，且被夺的是明置的敌人(全是暗将时没有可打击的明确对象，白白浪费)
+			event.result = await player
+				.chooseBool(get.prompt("duojing"), "夺荆：是否令" + get.translation(trigger.player) + "跳过出牌阶段？")
+				.set("ai", () => game.players.length <= 4 && trigger.player.identity != "unknown" && get.attitude(player, trigger.player) < 0)
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			trigger.cancel();
