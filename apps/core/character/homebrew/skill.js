@@ -28576,8 +28576,9 @@ export default {
 		audio: 2,
 		enable: "phaseUse",
 		usable: 1,
+		// 对方得有两张牌(手牌+装备)可交，不足两张的不能选为目标，而不是选了之后少交或不交仍照常出杀
 		filterTarget(card, player, target) {
-			return target !== player;
+			return target !== player && target.countCards("he") >= 2;
 		},
 		// ai里只有threaten，不影响AI要不要主动用它；target要被迫交牌+被迫用杀攻击一人，选敌方角色
 		ai: {
