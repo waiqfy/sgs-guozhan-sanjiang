@@ -12132,6 +12132,11 @@ export default {
 			return !game.hasPlayer(current => current.isIn() && current.hasSkill("zhengxian") && current.isFriendOf(player));
 		},
 		async cost(event, trigger, player) {
+			// 有cost的技能引擎不会读顶层check，AI是否发动要自己在cost里判断(玩家本人手动决定不受影响)
+			if (player != game.me && !get.info(event.skill).check(trigger, player)) {
+				event.result = { bool: false };
+				return;
+			}
 			event.result = await player.chooseBool(get.prompt2("xianfu", trigger.player)).forResult();
 		},
 		async content(event, trigger, player) {
@@ -14383,7 +14388,12 @@ export default {
 			return !player.storage.luoyi_used;
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt(event.name)).forResult();
+			// chooseBool不写ai时引擎默认choice=true，AI一律选"是"；这里按收益判断
+			// 限定技且废除防具栏：只在防具栏本来就空(不亏)时才用
+			event.result = await player
+				.chooseBool(get.prompt(event.name))
+				.set("ai", () => !player.getEquip(2))
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			player.awakenSkill(event.name);
@@ -14809,7 +14819,11 @@ export default {
 					return !player.isUnseen(2);
 				},
 				async cost(event, trigger, player) {
-					event.result = await player.chooseBool("诗酒：是否重铸任意张牌，然后暗置此武将牌？").forResult();
+					// chooseBool不写ai时引擎默认choice=true，AI一律选"是"；这里按收益判断
+					event.result = await player
+						.chooseBool("诗酒：是否重铸任意张牌，然后暗置此武将牌？")
+						.set("ai", () => false)
+						.forResult();
 				},
 				async content(event, trigger, player) {
 					if (player.countCards("he")) {
@@ -18253,7 +18267,11 @@ export default {
 			return player.isLinked() && (player.countCards("he") > 0 || game.hasPlayer(current => current != player && current.isLinked() && current.countCards("he") > 0));
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("fenming")).forResult();
+			// chooseBool不写ai时引擎默认choice=true，AI一律选"是"；这里按收益判断
+			event.result = await player
+				.chooseBool(get.prompt2("fenming"))
+				.set("ai", () => game.hasPlayer(current => current != player && current.isLinked() && current.countCards("he") > 0 && get.attitude(player, current) < 0))
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			await lib.skill.fenming.doFenming(player);
@@ -18323,6 +18341,11 @@ export default {
 		logTarget: "source",
 		preHidden: true,
 		async cost(event, trigger, player) {
+			// 有cost的技能引擎不会读顶层check，AI是否发动要自己在cost里判断(玩家本人手动决定不受影响)
+			if (player != game.me && !get.info(event.skill).check(trigger, player)) {
+				event.result = { bool: false };
+				return;
+			}
 			const result = await player.chooseJunlingFor(trigger.source).forResult();
 			event.result = { bool: true, cost_data: { junling: result.junling, targets: result.targets } };
 		},
@@ -19027,7 +19050,19 @@ export default {
 			return event.player.isIn() && !event.player.isDying();
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("jielu", trigger.player)).forResult();
+			// chooseBool不写ai时引擎默认choice=true，AI一律选"是"；这里按收益判断
+			// 截路会结束当前回合：AI只在敌方的回合里发动(白赚一张牌还让对方少打)，或自己的回合已到弃牌/结束阶段、或手牌已空时才用
+			event.result = await player
+				.chooseBool(get.prompt2("jielu", trigger.player))
+				.set("ai", () => {
+					const cur = _status.currentPhase;
+					if (cur && cur != player) {
+						return get.attitude(player, cur) < 0;
+					}
+					const phase = trigger.getParent("phase")?.currentPhase;
+					return ["phaseDiscard", "phaseJieshu"].includes(phase) || !player.countCards("h");
+				})
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			await player.draw();
@@ -21804,6 +21839,11 @@ export default {
 			return target === strongest;
 		},
 		async cost(event, trigger, player) {
+			// 有cost的技能引擎不会读顶层check，AI是否发动要自己在cost里判断(玩家本人手动决定不受影响)
+			if (player != game.me && !get.info(event.skill).check(trigger, player)) {
+				event.result = { bool: false };
+				return;
+			}
 			await player
 				.chooseToGive(trigger.player, "he", [0, Infinity])
 				.set("prompt", get.prompt2(event.skill))
@@ -27116,7 +27156,12 @@ export default {
 			return type == "basic" || type == "trick";
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("jili", trigger.card)).forResult();
+			// chooseBool不写ai时引擎默认choice=true，AI一律选"是"；这里按收益判断
+			// 令此牌结算两次：只有这张牌对自己有利(比如桃/无中生有)时才值得，被杀被拆时不能发动
+			event.result = await player
+				.chooseBool(get.prompt2("jili", trigger.card))
+				.set("ai", () => get.effect(player, trigger.card, trigger.player, player) > 0)
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			trigger.getParent().effectCount++;
@@ -28326,6 +28371,8 @@ export default {
 		async cost(event, trigger, player) {
 			event.result = await player
 				.chooseBool(get.prompt("xishe", trigger.player), "是否弃置一张装备区里的牌，视为对其使用一张【杀】？")
+				// 只对敌人、且这张杀对其确有收益时才拆自己的装备
+				.set("ai", () => get.attitude(player, trigger.player) < 0 && get.effect(trigger.player, { name: "sha" }, player, player) > 0)
 				.forResult();
 		},
 		async content(event, trigger, player) {

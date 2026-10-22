@@ -179,3 +179,15 @@ attitude判断的24处逐个看过正负号，都和描述一致（打击型为�
 ### 同一天顺手修的其他AI/方向问题
 
 - tianxiang(天香)：chooseCardTarget缺ai回调，AI会把伤害/失去体力转给队友，补ai1/ai2只选敌方。
+
+## 第四轮：chooseBool 不写 ai 的真实默认行为
+
+之前的假设"chooseBool 没有 ai 会被默认拒绝"是错的。player.chooseBool 里 `next.choice` 缺省为 `true`，AI 对没有 `.set("ai")` 的 chooseBool 一律选"是"。
+再叠加"有 cost 的技能引擎不读顶层 check"，导致大量"AI 乱发动"：夺荆开局就用、截路自己回合直接结束、济力对杀也翻倍……
+
+本轮处理：
+- 有 `check` 又有 `cost` 却没引用 check 的：xianfu2/buyi/zhiwei 在 cost 开头按 `get.info(event.skill).check` 给 AI 拦截。
+- 明显有代价的可选 chooseBool 补了 ai：jielu、shijiu、luoyi、xishe、fenming、jili、duojing。
+- 仍然没有 ai 的 chooseBool 约 40 处(多为纯收益的摸牌类，AI 一律发动可以接受)，需要时再逐个看。
+
+扫描脚本思路：在 skill.js 里找 `.chooseBool(` 且后续链式调用到 `forResult` 前没有 `.set("ai"` 的位置。
