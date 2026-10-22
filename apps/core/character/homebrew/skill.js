@@ -8043,34 +8043,35 @@ export default {
 	qiuan: {
 		audio: 2,
 		trigger: { player: "damageBegin4" },
+		preHidden: true,
 		filter(event, player) {
 			if (player.getExpansions("qiuan").length) {
 				return game.hasPlayer(current => current != player);
 			}
-			return event.cards && event.cards.filterInD().length > 0;
+			return !!(event.cards && event.cards.filterInD().length > 0);
 		},
-		check(event, player) {
+		// 之前没有cost、只靠顶层check：有"函"时引擎先弹一次"是否发动"，content里再弹一次选目标，要确认两次；
+		// 而且content里调用的player.loseToExpansion根本不是玩家方法(引擎里没有这个函数)，转移"函"必然报错。
+		// 改成和官方一致的cost+content：转移用addToExpansion({source})把牌从自己的"函"挪给目标
+		async cost(event, trigger, player) {
 			if (player.getExpansions("qiuan").length) {
-				return true;
+				// 转移"函"给敌人(量反时会让对方失去体力、被孟达拿牌)，所以AI选敌人
+				event.result = await player
+					.chooseTarget("求安：是否将“函”转移给一名其他角色？", lib.filter.notMe)
+					.set("ai", target => -get.attitude(get.player(), target))
+					.forResult();
+			} else {
+				event.result = await player
+					.chooseBool(get.prompt("qiuan"), "防止此伤害并将造成此伤害的牌置于武将牌上")
+					.set("ai", () => get.damageEffect(player, trigger.source || player, player, trigger.nature) < 0)
+					.forResult();
 			}
-			if (get.damageEffect(player, event.source || player, player, event.nature) >= 0) {
-				return false;
-			}
-			return true;
 		},
-		preHidden: true,
 		async content(event, trigger, player) {
 			if (player.getExpansions("qiuan").length) {
+				const target = event.targets[0];
 				const cards = player.getExpansions("qiuan");
-				const target = await player
-					.chooseTarget(get.prompt2("qiuan"), lib.filter.notMe)
-					.set("ai", target => {
-						return get.attitude(get.player(), target);
-					})
-					.forResult();
-				if (target.bool) {
-					await player.loseToExpansion(cards, target.targets[0], "qiuan");
-				}
+				await target.addToExpansion({ cards, source: player, animate: "gain2", gaintag: ["qiuan"] });
 				return;
 			}
 			const cards = trigger.cards.filterInD();
@@ -8095,32 +8096,33 @@ export default {
 	// 量反：准备阶段开始时，有"函"的角色获得其"函"，然后失去1点体力。若其为你，当你于本回合使用因此获得的"函"造成伤害后，你可以获得受伤角色的一张牌；若其不为你，你获得其一张牌。 参考liangfan(offline)
 	liangfan: {
 		audio: 2,
+		// 时机：有"函"的角色自己的准备阶段(官方写法)。之前global监听所有准备阶段后，把场上所有有"函"的角色一起结算了，
+		// 变成了任何人的准备阶段都会触发，且其他角色的"函"也被提前结算
 		trigger: { global: "phaseZhunbeiBegin" },
 		forced: true,
 		filter(event, player) {
-			return game.hasPlayer(current => current.getExpansions("qiuan").length > 0);
+			return event.player.getExpansions("qiuan").length > 0;
 		},
 		logTarget(event, player) {
-			return game.filterPlayer(current => current.getExpansions("qiuan").length > 0);
+			return event.player;
 		},
 		async content(event, trigger, player) {
-			const targets = game.filterPlayer(current => current.getExpansions("qiuan").length > 0);
-			for (const target of targets) {
-				const cards = target.getExpansions("qiuan");
-				if (target == player) {
-					const next = player.gain({
-						cards,
-						animate: "gain2",
-						gaintag: ["liangfan"],
-					});
-					player.addTempSkill("liangfan2");
-					await next;
-					await player.loseHp();
-				} else {
-					await target.loseToExpansion(cards, player, "liangfan_gain");
-					await target.loseHp();
-					await player.gainPlayerCard(target, "he", true);
-				}
+			const owner = trigger.player;
+			const cards = owner.getExpansions("qiuan");
+			const isSelf = owner == player;
+			// 有"函"的角色获得其"函"(loseToExpansion不是玩家方法，之前的非自己分支必然报错)
+			const next = owner.gain({
+				cards,
+				animate: "gain2",
+				gaintag: ["liangfan"],
+			});
+			if (isSelf) {
+				player.addTempSkill("liangfan2");
+			}
+			await next;
+			await owner.loseHp();
+			if (!isSelf && owner.isIn() && owner.countGainableCards(player, "he")) {
+				await player.gainPlayerCard(owner, "he", true);
 			}
 		},
 		ai: {
@@ -26235,8 +26237,11 @@ export default {
 			maxHandcard(player, num) {
 				return num + (player.storage.zishou_x || 0);
 			},
-			targetInRange(card, player, target) {
-				if (get.itemtype(card) == "card" && target != player) {
+			// 之前用targetInRange：没有range字段的牌(决斗/过河拆桥/借刀杀人/铁索连环等)会在mod被调用前就返回true，
+			// 这个mod对它们完全不生效，还会被指定他人；改用playerEnabled(直接禁用"他人"作为这张牌的目标)，
+			// 且不再限制itemtype(转化/视为使用的牌也要管)，只限本回合出牌阶段
+			playerEnabled(card, player, target) {
+				if (target != player && player.isPhaseUsing()) {
 					return false;
 				}
 			},
