@@ -19485,8 +19485,29 @@ export default {
 				}
 				if (want.length) {
 					current.addAdditionalSkill("anguo_virtual", want);
+					current.storage.anguo_virtual_armor = lib.skill.anguo.getArmor(src);
 				} else {
 					current.removeAdditionalSkills("anguo_virtual");
+					// 视为装备的防具因为穿上了真实防具而撤掉，视同"失去装备区里的该防具"：太平要术摸两张牌、
+					// 之后体力大于1则失去1点体力；白银狮子回复1点体力(这两件的"失去"效果平时靠真实牌的onLose挂临时技能，
+					// 视为装备没有真实牌，所以在这里直接结算)
+					const lost = current.storage.anguo_virtual_armor;
+					delete current.storage.anguo_virtual_armor;
+					if (current.getEquip(2) && (lost == "taipingyaoshu" || lost == "baiyin")) {
+						const evt = game.createEvent("anguo_lose", false);
+						evt.player = current;
+						evt.armor = lost;
+						evt.setContent(async (event, trigger, player) => {
+							if (event.armor == "taipingyaoshu") {
+								await player.draw(2);
+								if (player.hp > 1) {
+									await player.loseHp();
+								}
+							} else {
+								await player.recover();
+							}
+						});
+					}
 				}
 			}
 		},
@@ -19589,8 +19610,8 @@ export default {
 			result: {
 				// 限定技：手里有估值严格高于安国当前防具(默认明光铠=6)的防具，且场上有同势力队友才值得
 				player(player) {
-					const current = get.equipValueNumber({ name: lib.skill.anguo.getArmor(player) });
-					return game.hasPlayer(cur => cur != player && cur.isFriendOf(player)) && player.countCards("he", card => get.subtype(card) == "equip2" && (get.equipValue(card) > current || card.name == "taipingyaoshu")) ? 1 : 0;
+					// 估值>=5的防具都值得换(含白银狮子，它的回血很强)，限定技只能一次，太差的不换
+					return game.hasPlayer(cur => cur != player && cur.isFriendOf(player)) && player.countCards("he", card => get.subtype(card) == "equip2" && get.equipValue(card) >= 5) ? 1 : 0;
 				},
 			},
 		},
