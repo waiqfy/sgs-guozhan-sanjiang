@@ -19475,7 +19475,9 @@ export default {
 				const src = lib.skill.anguo.getSource(current);
 				let want = [];
 				if (src && !current.getEquip(2)) {
-					want = (lib.card[lib.skill.anguo.getArmor(src)]?.skills || []).slice(0);
+					// 护心镜的原效果要求装备区里有真实的护心镜牌(getEquips("huxinjing"))，视为装备时不成立，
+					// 换成自己的anguo_hxj；故鄣说明里"护心镜的效果每名角色限一次"：该角色用过一次后不再给
+					want = (lib.card[lib.skill.anguo.getArmor(src)]?.skills || []).map(skill => (skill == "huxinjing" ? "anguo_hxj" : skill)).filter(skill => skill != "anguo_hxj" || !current.storage.anguo_hxj_used);
 				}
 				const have = current.additionalSkills?.anguo_virtual || [];
 				if (have.length == want.length && have.every((skill, i) => skill == want[i])) {
@@ -19501,6 +19503,35 @@ export default {
 		},
 		ai: {
 			threaten: 0.8,
+		},
+	},
+
+	// 视为装备的护心镜：当你受到伤害时，若伤害值大于1或大于等于你的体力值，防止此伤害。每名角色限一次(用过后安国不再给)。
+	// 条件与真实护心镜一致(国战下只看"伤害值>=体力值"，其余情况伤害>1)，没有"置入弃牌堆"这一步(不是真实装备)
+	anguo_hxj: {
+		charlotte: true,
+		sourceSkill: "anguo",
+		trigger: { player: "damageBegin4" },
+		forced: true,
+		filter(event, player) {
+			if (player.storage.anguo_hxj_used) {
+				return false;
+			}
+			if (event.num < player.hp && (get.mode() === "guozhan" || event.num <= 1)) {
+				return false;
+			}
+			if (player.hasSkillTag("unequip2")) {
+				return false;
+			}
+			if (event.source && event.source.hasSkillTag("unequip", false, { name: event.card ? event.card.name : null, target: player, card: event.card })) {
+				return false;
+			}
+			return true;
+		},
+		async content(event, trigger, player) {
+			player.storage.anguo_hxj_used = true;
+			trigger.cancel();
+			lib.skill.anguo.refreshAll();
 		},
 	},
 
@@ -19556,9 +19587,10 @@ export default {
 		ai: {
 			order: 6,
 			result: {
-				// 限定技：手里有明显好于明光铠的防具(估值>=6)且场上有同势力队友才值得
+				// 限定技：手里有估值严格高于安国当前防具(默认明光铠=6)的防具，且场上有同势力队友才值得
 				player(player) {
-					return game.hasPlayer(cur => cur != player && cur.isFriendOf(player)) && player.countCards("he", card => get.subtype(card) == "equip2" && get.equipValue(card) >= 6) ? 1 : 0;
+					const current = get.equipValueNumber({ name: lib.skill.anguo.getArmor(player) });
+					return game.hasPlayer(cur => cur != player && cur.isFriendOf(player)) && player.countCards("he", card => get.subtype(card) == "equip2" && get.equipValue(card) > current) ? 1 : 0;
 				},
 			},
 		},
