@@ -1032,7 +1032,7 @@ panzhangmazhong: {
 		sex: "male",
 		group: "wu",
 		hp: 4,
-		skills: ["anguo"],
+		skills: ["anguo", "guguo"],
 	},
 	sundeng: {
 		sex: "male",

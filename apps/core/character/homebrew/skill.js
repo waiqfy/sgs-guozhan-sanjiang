@@ -19446,90 +19446,120 @@ export default {
 	},
 
 // ========== zhuzhi 朱治 ==========
-	// 安国：锁定技，若其他同势力角色的装备区没有武器/防具牌，其视为装备着你装备区内的武器/防具牌。若其装备区有武器/防具牌，其攻击距离/其他角色计算与其的距离+1。若你的装备区仅有一张牌，此牌不能被弃置或获得。 参考skill_old.js
+	// 安国：锁定技，与你势力相同的角色若装备区没有防具牌，视为装备着【明光铠】；若其装备区有防具牌，其手牌上限+X（X为与你势力相同的角色数）。 原创(按新卡面重写，原版"装备距离/武器共享"已删除)
 	anguo: {
 		aiShowTag: "support",
 		audio: 2,
 		forced: true,
-		mod: {
-			cardDiscardable(card, player) {
-				if (player.getEquips().length == 1 && player.getEquips()[0] == card) {
-					return false;
+		locked: true,
+		// "视为装备着"：把该装备牌自带的技能(lib.card[name].skills，明光铠就是取消火攻类/防连环)以附加技能的形式
+		// 给到没有防具的同势力角色，装备区一变化/有人明置/有人死亡就整体重新算一遍
+		trigger: {
+			global: ["gameStart", "phaseBeginStart", "equipAfter", "loseAfter", "loseAsyncAfter", "gainAfter", "showCharacterAfter", "dieAfter"],
+		},
+		silent: true,
+		popup: false,
+		filter() {
+			return true;
+		},
+		// 找到对target而言有效的安国持有者：已明置、与target同势力(含自己)
+		getSource(target) {
+			return game.findPlayer(cur => cur.isIn() && cur.hasSkill("anguo") && cur.identity != "unknown" && (cur == target || cur.isFriendOf(target)));
+		},
+		// 当前"安国"里的那件防具：默认明光铠，故郭后改成置于武将牌上的那张
+		getArmor(src) {
+			return (src && src.storage.anguo_armor) || "minguangkai";
+		},
+		refreshAll() {
+			for (const current of game.players) {
+				const src = lib.skill.anguo.getSource(current);
+				let want = [];
+				if (src && !current.getEquip(2)) {
+					want = (lib.card[lib.skill.anguo.getArmor(src)]?.skills || []).slice(0);
 				}
-			},
-			canBeDiscarded(card, player, target) {
-				if (target.getEquips().length == 1 && target.getEquips()[0] == card) {
-					return false;
+				const have = current.additionalSkills?.anguo_virtual || [];
+				if (have.length == want.length && have.every((skill, i) => skill == want[i])) {
+					continue;
 				}
-			},
-			canBeGained(card, player, target) {
-				if (target.getEquips().length == 1 && target.getEquips()[0] == card) {
-					return false;
+				if (want.length) {
+					current.addAdditionalSkill("anguo_virtual", want);
+				} else {
+					current.removeAdditionalSkills("anguo_virtual");
 				}
-			},
+			}
 		},
 		init(player) {
 			game.addGlobalSkill("anguo_share", player);
+			lib.skill.anguo.refreshAll();
 		},
 		onremove(player) {
 			game.removeGlobalSkill("anguo_share", player);
+			setTimeout(() => lib.skill.anguo.refreshAll(), 0);
+		},
+		async content(event, trigger, player) {
+			lib.skill.anguo.refreshAll();
 		},
 		ai: {
 			threaten: 0.8,
 		},
 	},
 
+	// 手牌上限+X：global技能(每个角色都挂着)，对有防具牌的同势力角色生效，X为与安国持有者势力相同的角色数
 	anguo_share: {
 		charlotte: true,
-		// "视为装备着"不只是攻击距离/距离修正：同势力队友的回合里，若其武器/防具栏是空的而朱治装备着，
-		// 把对应装备牌自带的技能临时赋予队友(到其回合结束)，这样武器防具的效果才真正能用，AI也会照常使用
-		trigger: { player: "phaseBeginStart" },
-		forced: true,
-		popup: false,
-		silent: true,
+		mod: {
+			maxHandcard(player, num) {
+				if (!player.getEquip(2)) {
+					return;
+				}
+				const src = lib.skill.anguo.getSource(player);
+				if (!src) {
+					return;
+				}
+				return num + game.countPlayer(cur => cur == src || cur.isFriendOf(src));
+			},
+		},
+	},
+
+	// 故郭：限定技，你可以将一张防具牌置于你的武将牌上，然后将"安国"中的【明光铠】改为此牌。 原创(无参考)
+	guguo: {
+		audio: 2,
+		limited: true,
+		skillAnimation: true,
+		animationColor: "wood",
+		enable: "phaseUse",
+		filterCard(card) {
+			return get.subtype(card) == "equip2";
+		},
+		position: "he",
+		selectCard: 1,
+		discard: false,
+		lose: false,
+		delay: false,
 		filter(event, player) {
-			return game.hasPlayer(cur => cur != player && cur.isIn() && cur.isFriendOf(player) && cur.hasSkill("anguo") && [1, 2].some(slot => !player.getEquip(slot) && cur.getEquip(slot)));
+			return player.countCards("he", card => get.subtype(card) == "equip2") > 0;
+		},
+		check(card) {
+			return get.equipValue(card);
+		},
+		intro: {
+			content: "expansion",
+			markcount: "expansion",
 		},
 		async content(event, trigger, player) {
-			for (const src of game.filterPlayer(cur => cur != player && cur.isIn() && cur.isFriendOf(player) && cur.hasSkill("anguo"))) {
-				for (const slot of [1, 2]) {
-					const equip = src.getEquip(slot);
-					if (!equip || player.getEquip(slot)) {
-						continue;
-					}
-					const skills = (get.info(equip).skills || []).filter(skill => lib.skill[skill] && !player.hasSkill(skill));
-					if (skills.length) {
-						player.addTempSkill(skills);
-						game.log(player, "因【安国】临时获得了", equip, "的技能");
-					}
-				}
-			}
+			player.awakenSkill(event.name);
+			await player.addToExpansion({ cards: event.cards, source: player, gaintag: ["guguo"] });
+			player.storage.anguo_armor = event.cards[0].name;
+			game.log(player, "将【安国】中的防具改为", event.cards[0]);
+			lib.skill.anguo.refreshAll();
 		},
-		mod: {
-			attackRange(player, num) {
-				const src = game.filterPlayer(cur => cur != player && cur.isFriendOf(player) && cur.hasSkill("anguo"))[0];
-				if (!src) {
-					return;
-				}
-				if (player.getEquip(1)) {
-					return num + 1;
-				}
-				const weapon = src.getEquip(1);
-				if (weapon) {
-					return Math.max(num, src.getEquipRange([weapon]));
-				}
-			},
-			globalTo(from, to, distance) {
-				const src = game.filterPlayer(cur => cur != to && cur.isFriendOf(to) && cur.hasSkill("anguo"))[0];
-				if (!src) {
-					return;
-				}
-				if (to.getEquip(2)) {
-					return distance + 1;
-				}
-				if (src.getEquip(2)) {
-					return distance + 1;
-				}
+		ai: {
+			order: 6,
+			result: {
+				// 限定技：手里有明显好于明光铠的防具(估值>=6)且场上有同势力队友才值得
+				player(player) {
+					return game.hasPlayer(cur => cur != player && cur.isFriendOf(player)) && player.countCards("he", card => get.subtype(card) == "equip2" && get.equipValue(card) >= 6) ? 1 : 0;
+				},
 			},
 		},
 	},
