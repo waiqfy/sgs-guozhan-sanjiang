@@ -19590,7 +19590,7 @@ export default {
 				// 限定技：手里有估值严格高于安国当前防具(默认明光铠=6)的防具，且场上有同势力队友才值得
 				player(player) {
 					const current = get.equipValueNumber({ name: lib.skill.anguo.getArmor(player) });
-					return game.hasPlayer(cur => cur != player && cur.isFriendOf(player)) && player.countCards("he", card => get.subtype(card) == "equip2" && get.equipValue(card) > current) ? 1 : 0;
+					return game.hasPlayer(cur => cur != player && cur.isFriendOf(player)) && player.countCards("he", card => get.subtype(card) == "equip2" && (get.equipValue(card) > current || card.name == "taipingyaoshu")) ? 1 : 0;
 				},
 			},
 		},
