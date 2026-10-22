@@ -11907,7 +11907,12 @@ export default {
 				}, cards[0]);
 				await player.loseToDiscardpile([cards[0]]);
 			}
-			trigger.untrigger();
+			// 之前只调trigger.untrigger()，只是清掉useCard上还没触发的时机，牌本身照样生效(所以【闪】被设伏后
+			// sha照样被挡下)；令牌无效的正确做法是清空目标并标记全部被排除，牌的content会被跳过
+			// ，闪的content(把event.result写成"shaned")不执行，杀就没被抵消
+			trigger.targets.length = 0;
+			trigger.all_excluded = true;
+			game.log(trigger.card, "被无效了");
 		},
 		ai: {
 			skillTagFilter(player, tag, target) {
@@ -13118,8 +13123,17 @@ export default {
 			if (isLockedLike(skill, owner) || typeof info.content != "function" || !info.trigger) {
 				return false;
 			}
-			const names = [].concat(info.trigger.global || [], info.trigger.player || [], info.trigger.source || [], info.trigger.target || []);
-			if (!names.includes(name)) {
+				// 触发时机的"角色限定"必须匹配：trigger.player:"phaseUseBegin"这类写法只在"自己"的阶段才算满足条件，
+			// 之前只比对了时机名、忽略了角色限定，导致别人的任何阶段开始都会被当成"曹爽满足了该技能的发动条件"，
+			// 回合一开始就能借一个别人的技能
+			const trig = info.trigger;
+			const matched = ["global", "player", "source", "target"].some(role => {
+				if (!trig[role] || !(Array.isArray(trig[role]) ? trig[role] : [trig[role]]).includes(name)) {
+					return false;
+				}
+				return role == "global" || event[role] === player;
+			});
+			if (!matched) {
 				return false;
 			}
 			return typeof info.filter != "function" || info.filter(event, player, name);
@@ -13136,26 +13150,35 @@ export default {
 		async content(event, trigger, player) {
 			const name = event.triggername;
 			const isCandidate = (skill, owner) => lib.skill.shanzhuan.isCandidate(skill, owner, trigger, player, name);
-			const owners = game.filterPlayer(current => current != player && !current.isUnseen() && current.getSkills(null, false).some(skill => isCandidate(skill, current)));
-			if (!owners.length) {
-				return;
-			}
-			let target = owners[0];
-			if (owners.length > 1) {
-				const result = await player.chooseTarget(get.prompt2("shanzhuan"), (card, plyr, tgt) => owners.includes(tgt)).forResult();
-				if (result && result.targets && result.targets[0]) {
-					target = result.targets[0];
+			// 弹出"是否发动擅专"确认后，子菜单一次性列出场上所有满足条件的(明置角色，无标签技能)组合，选一个即可，
+			// 不再先选角色再选技能
+			const options = [];
+			for (const owner of game.filterPlayer(current => current != player && !current.isUnseen())) {
+				for (const skill of owner.getSkills(null, false)) {
+					if (isCandidate(skill, owner)) {
+						options.push({ owner, skill });
+					}
 				}
 			}
-			const skillResult = await player
-				.chooseSkill(target, {
-					prompt: "擅专：请选择要借用的技能",
-					func: (info, skill) => isCandidate(skill, target),
-				})
-				.forResult();
-			if (!skillResult || !skillResult.bool || !skillResult.skill) {
+			if (!options.length) {
 				return;
 			}
+			const labels = options.map(item => get.translation(item.owner) + "：【" + get.skillTranslation(item.skill, item.owner) + "】");
+			let pick = options[0];
+			if (options.length > 1) {
+				const choice = await player
+					.chooseControl(labels, "cancel2")
+					.set("prompt", "擅专：请选择要视为发动的技能")
+					// AI：优先借能对自己有利的、且技能拥有者是友方时的(安全)技能，随机一个也行
+					.set("ai", () => Math.floor(Math.random() * labels.length))
+					.forResult();
+				if (!choice || choice.control == "cancel2" || !labels.includes(choice.control)) {
+					return;
+				}
+				pick = options[labels.indexOf(choice.control)];
+			}
+			const target = pick.owner;
+			const skillResult = { bool: true, skill: pick.skill };
 			const skill = skillResult.skill;
 			const info = get.info(skill);
 			let costResult = { bool: true };
@@ -13194,7 +13217,7 @@ export default {
 	},
 	shanzhuan_reset: {
 		charlotte: true,
-		trigger: { global: "phaseZhunbeiBegin" },
+		trigger: { global: "phaseBeginStart" },
 		forced: true,
 		popup: false,
 		silent: true,
@@ -20448,7 +20471,8 @@ export default {
 				})
 				.set("goon", goon)
 				.set("prompt", "定叛")
-				.set("choiceList", ["获得" + get.translation(player) + "装备区里的所有牌，然后令其对你造成1点伤害", "令" + get.translation(player) + "弃置你装备区里的一张牌"])
+				// 选项一是"其获得自己装备区里的所有牌"(代码本来就是target.gain(target自己的装备区)，只是提示文字写成了步骘的装备区)
+				.set("choiceList", ["获得你装备区里的所有牌，然后令" + get.translation(player) + "对你造成1点伤害", "令" + get.translation(player) + "弃置你装备区里的一张牌"])
 				.forResult();
 			if (result.control == "选项二") {
 				await player.discardPlayerCard(target, true, "e");
