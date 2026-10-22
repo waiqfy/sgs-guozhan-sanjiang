@@ -19466,7 +19466,7 @@ export default {
 		getSource(target) {
 			return game.findPlayer(cur => cur.isIn() && cur.hasSkill("anguo") && cur.identity != "unknown" && (cur == target || cur.isFriendOf(target)));
 		},
-		// 当前"安国"里的那件防具：默认明光铠，故郭后改成置于武将牌上的那张
+		// 当前"安国"里的那件防具：默认明光铠，故鄣后改成置于武将牌上的那张
 		getArmor(src) {
 			return (src && src.storage.anguo_armor) || "minguangkai";
 		},
@@ -19521,8 +19521,8 @@ export default {
 		},
 	},
 
-	// 故郭：限定技，你可以将一张防具牌置于你的武将牌上，然后将"安国"中的【明光铠】改为此牌。 原创(无参考)
-	guguo: {
+	// 故鄣：限定技，你可以将一张防具牌置于你的武将牌上，然后将"安国"中的【明光铠】改为此牌。 原创(无参考)
+	guzhang: {
 		audio: 2,
 		limited: true,
 		skillAnimation: true,
@@ -19548,7 +19548,7 @@ export default {
 		},
 		async content(event, trigger, player) {
 			player.awakenSkill(event.name);
-			await player.addToExpansion({ cards: event.cards, source: player, gaintag: ["guguo"] });
+			await player.addToExpansion({ cards: event.cards, source: player, gaintag: ["guzhang"] });
 			player.storage.anguo_armor = event.cards[0].name;
 			game.log(player, "将【安国】中的防具改为", event.cards[0]);
 			lib.skill.anguo.refreshAll();
