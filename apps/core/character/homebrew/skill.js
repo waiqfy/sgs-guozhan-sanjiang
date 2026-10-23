@@ -22226,7 +22226,9 @@ export default {
 		async content(event, trigger, player) {
 			const target = event.target;
 			await target.drawTo(Math.min(5, target.maxHp));
-			target.addTempSkill("boyan_block", { player: "phaseAfter" });
+			// {player:"phaseAfter"}是"挂技能的角色(目标)自己的phaseAfter"，等于封到目标的下个回合结束，
+			// 时机错了；描述是"本回合"=驳言发动的这个回合，用默认到期(任意回合结束)
+			target.addTempSkill("boyan_block");
 		},
 	},
 	boyan_block: {
@@ -22235,6 +22237,17 @@ export default {
 		intro: { content: "本回合不能使用或打出手牌" },
 		mod: {
 			cardEnabled(card, player) {
+				if (get.position(card) === "h") {
+					return false;
+				}
+			},
+			// "不能使用或打出"：打出(响应)走cardRespondable，只拦cardEnabled拦不住打出闪/杀
+			cardRespondable(card, player) {
+				if (get.position(card) === "h") {
+					return false;
+				}
+			},
+			cardSavable(card, player) {
 				if (get.position(card) === "h") {
 					return false;
 				}
@@ -22826,6 +22839,26 @@ export default {
 // ========== huatuo 华佗 ==========
 	// 急救：你于回合外可以将一张红色牌当【桃】使用。 参考jijiu(standard)
 	jijiu: {
+		// 官方有而这里漏掉的：红色牌对AI来说价值至少按桃算，AI据此才会把红牌(含装备)当桃拿去救人
+		mod: {
+			aiValue(player, card, num) {
+				if (get.name(card) !== "tao" && get.color(card) !== "red") {
+					return;
+				}
+				const cards = player.getCards("hs", card => get.name(card) === "tao" || get.color(card) === "red");
+				cards.sort((a, b) => (get.name(a) === "tao" ? 1 : 2) - (get.name(b) === "tao" ? 1 : 2));
+				const geti = () => {
+					if (cards.includes(card)) {
+						return cards.indexOf(card);
+					}
+					return cards.length;
+				};
+				return Math.max(num, [6.5, 4, 3, 2][Math.min(geti(), 2)]);
+			},
+			aiUseful(...args) {
+				return lib.skill.jijiu.mod.aiValue(...args);
+			},
+		},
 		locked: false,
 		audio: 2,
 		audioname: ["re_huatuo"],
@@ -26239,6 +26272,10 @@ export default {
 			event.result = await player
 				.chooseBool(get.prompt2("zishou"))
 				.set("ai", () => {
+					// 判定区有乐不思蜀：本回合出牌阶段会被跳过，"只能指定自己"的限制毫无影响，白赚摸牌和手牌上限
+					if (player.hasJudge("lebu")) {
+						return true;
+					}
 					const need = player.countCards("h", card => {
 						const info = get.info(card);
 						return get.type(card) != "equip" && !info.toself && info.selectTarget != -1;
