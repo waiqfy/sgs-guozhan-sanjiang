@@ -76,11 +76,37 @@ function isCharacterShown(player, skill) {
 // name1/name2这一对，完全不认识name3（见content.ts的changeCharacter实现），所以第三将槽位
 // 换将照抄xushuTransThird()换第三将时的写法：直接removeSkill旧技能、置换name3、更新
 // avatar3g/name3这两个UI节点、再addSkill新技能。
-function pickCharacterCandidates() {
+// 换将的候选池不能包含"选人阶段亮出过的"(包括没被选中的)和"已经出场过的"武将：
+// _status.characterlist里会混着这两类(没被选走的候选、以及被换下场又放回池子的武将)，要再过滤掉。
+// 已见集合持续累积：每个玩家当前的主/副/第三将、选将时剩下的候选(_gz3Leftover)，
+// 以及全局技能_gz3_seen_record在每个回合开始时记录的所有在场武将(换下场的也不会丢)
+function recordSeenCharacters() {
+	if (!_status.gz3_seen) {
+		_status.gz3_seen = new Set();
+	}
+	for (const current of game.players.concat(game.dead || [])) {
+		for (const name of [current.name1, current.name2, current.name3]) {
+			if (name) {
+				_status.gz3_seen.add(name);
+			}
+		}
+		for (const name of current._gz3Leftover || []) {
+			_status.gz3_seen.add(name);
+		}
+	}
+	return _status.gz3_seen;
+}
+function freshCharacterPool() {
 	if (!_status.characterlist) {
 		game.initCharacterList();
 	}
-	const pool = _status.characterlist.filter(name => lib.character[name]);
+	const seen = recordSeenCharacters();
+	return _status.characterlist.filter(name => lib.character[name] && !seen.has(name));
+}
+// 旧式"step N"写法的技能(jianglve/guiyin)拆开编译后拿不到模块作用域的函数，挂到lib上供它们调用
+lib.gz3FreshPool = freshCharacterPool;
+function pickCharacterCandidates() {
+	const pool = freshCharacterPool();
 	const shuffled = pool.slice();
 	shuffled.randomSort();
 	return shuffled.slice(0, Math.min(2, shuffled.length));
@@ -2335,10 +2361,16 @@ export default {
 				}
 			},
 		},
+		// 失去1点体力视为使用伤害牌，限定技：体力>=3、场上有体力<=2的敌人(有望击杀)时才用，不能能用就用
 		ai: {
 			order: 1.9,
-			result: { player: 1 },
+			result: {
+				player(player) {
+					return player.hp >= 3 && game.hasPlayer(current => current != player && get.attitude(player, current) < 0 && current.hp <= 2) ? 1 : 0;
+				},
+			},
 		},
+
 	},
 
 // ========== weiyan 魏延 ==========
@@ -4191,9 +4223,7 @@ export default {
 				if (!_status.characterlist) {
 					game.initCharacterList();
 				}
-				var pool = _status.characterlist.filter(function (name) {
-					return lib.character[name];
-				});
+				var pool = lib.gz3FreshPool();
 				pool.randomSort();
 				event.candidates = pool.slice(0, Math.min(2, pool.length));
 				if (!event.candidates.length) {
@@ -4984,23 +5014,26 @@ export default {
 		trigger: {
 			player: "phaseZhunbeiBegin",
 		},
+		// 加强：获得的是这两名角色各一张牌(手牌+装备区)，不再限手牌
 		filter(event, player) {
-			return game.countPlayer(current => current.countCards("h")) >= 2;
+			return game.countPlayer(current => current.countCards("he")) >= 2;
 		},
 		async cost(event, trigger, player) {
 			event.result = await player
 				.chooseTarget(get.prompt2(event.skill), 2, (card, player, target) => {
-					return target.countCards("h");
+					return target.countCards("he");
 				})
+				// 必用：必须选满两名角色才能发动，之前eff<=0(如目标是友军)时AI直接弃选、技能就不发动了。
+				// 这里保证每个候选分数恒为正(下限0.5)，敌人(顺手牵羊收益高)优先，不够再补友军/自己以外的人
 				.set("ai", target => {
 					const player = get.player();
-					let eff = get.effect(target, { name: "shunshou_copy2" }, player, player),
+					let eff = Math.max(0.5, get.effect(target, { name: "shunshou_copy2" }, player, player)),
 						count = player.countCards("h", { color: "red" }) - 2;
 					if (ui.selected.targets.length) {
 						const first = ui.selected.targets[0];
 						if (first.hp != target.hp) {
 							const current = first.hp > target.hp ? target : first;
-							return eff + get.effect(current, { name: "wuzhong" }, current, player) * count;
+							return Math.max(0.5, eff + get.effect(current, { name: "wuzhong" }, current, player) * count);
 						}
 					}
 					return eff;
@@ -5008,9 +5041,9 @@ export default {
 				.forResult();
 		},
 		async content(event, trigger, player) {
-			const gains = event.targets.filter(current => current != player && current.countCards("h"));
+			const gains = event.targets.filter(current => current != player && current.countCards("he"));
 			if (gains.length) {
-				await player.gainMultiple(gains, "h");
+				await player.gainMultiple(gains, "he");
 			}
 			await player.showHandcards(`${get.translation(player)}发动了【怀兵】`);
 			const num = event.targets.reduce((sum, current) => sum + current.getHp(), 0) / 2,
@@ -7459,9 +7492,7 @@ export default {
 			if (!_status.characterlist) {
 				game.initCharacterList();
 			}
-			var pool2 = _status.characterlist.filter(function (name) {
-				return lib.character[name];
-			});
+			var pool2 = lib.gz3FreshPool();
 			pool2.randomSort();
 			event.candidates = pool2.slice(0, Math.min(2, pool2.length));
 			event.doChange = !!event.candidates.length;
@@ -10748,13 +10779,17 @@ export default {
 				},
 			},
 		},
+		// 摸到五张牌：手牌<=2时才划算(摸>=3张)，并且场上有敌人(废除判定区/造成伤害有对象)
 		ai: {
 			order: 10,
 			result: {
-				player: 1,
+				player(player) {
+					return player.countCards("h") <= 2 && game.hasPlayer(current => current != player && get.attitude(player, current) < 0) ? 1 : 0;
+				},
 			},
 			threaten: 1.3,
 		},
+
 	},
 
 	// 裂围：锁定技，当你杀死一名角色后，你的限定技视为未发动过。 参考liewei(sp)
@@ -12057,7 +12092,11 @@ export default {
 			return !game.hasPlayer(current => current.hp < player.hp);
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt(event.name)).set("ai", () => true).forResult();
+			// 限定技：补牌数>=3才值得(开局手牌是满的时候不会用)，并按check判断是否会因摸牌过多拿到崩坏而吃亏
+			event.result = await player
+				.chooseBool(get.prompt(event.name))
+				.set("ai", () => player.maxHp - player.countCards("h") >= 3 && get.info("juyi").check(trigger, player))
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			player.awakenSkill(event.name);
@@ -19436,19 +19475,18 @@ export default {
 			const es = target.getCards("e");
 			await player.gain(es, target, "give");
 		},
+		// 限定技：对方装备区至少2张牌才值得拿
 		ai: {
 			order: 6,
 			result: {
 				target(player, target) {
 					const ne = target.countCards("e");
-					if (!ne) {
-						return 0;
-					}
-					return -ne;
+					return ne >= 2 ? -ne : 0;
 				},
 			},
 			threaten: 1.3,
 		},
+
 	},
 
 	// 兴学：结束阶段，你可以令至多X名角色（X为你的体力上限）依次摸一张牌，并将一张牌置于牌堆顶或将此牌交给另一名此技能的目标。 参考mobilexingxue
@@ -21854,15 +21892,18 @@ export default {
 		},
 		// 限定技只能用一次，绑定对象是"谁的准备阶段先到"就是谁，不该逮谁绑谁——只在对方是
 		// 关系很好的队友、或者当前全场威胁最高的敌人时才愿意发动，否则宁可等下一个候选人
+		// 至微绑定后：该角色造成伤害我摸牌、受到伤害我弃手牌、我的弃牌给他。所以要绑"明确的友方、会打人(有杀或
+		// 伤害类技能)、不太会挨打(体力不低)"，且不能开局就用(第3轮之后、场上局势明朗)；
+		// 绑敌人没有任何收益，之前对"威胁最大的敌人"也会发动，已删除
 		check(event, player) {
 			const target = event.player;
-			if (player.isFriendOf(target)) {
-				return get.attitude(player, target) > 3;
+			if (!isClearFriend(player, target) || get.attitude(player, target) <= 3) {
+				return false;
 			}
-			const strongest = game
-				.filterPlayer(current => current !== player && !player.isFriendOf(current))
-				.sort((a, b) => get.threaten(b) - get.threaten(a))[0];
-			return target === strongest;
+			if (game.roundNumber < 3 || target.hp < 3) {
+				return false;
+			}
+			return target.countCards("h", "sha") > 0 || target.hasSkillTag("damage");
 		},
 		async cost(event, trigger, player) {
 			// 有cost的技能引擎不会读顶层check，AI是否发动要自己在cost里判断(玩家本人手动决定不受影响)
@@ -23541,7 +23582,12 @@ export default {
 		derivation: "benghuai",
 		ai: {
 			order: 10,
-			result: { player: 1 },
+			// 限定技：移除副将、+3体力上限回3血、拿崩坏——只有体力<=2(确实需要回血)时才划算
+			result: {
+				player(player) {
+					return player.hp <= 2 ? 1 : 0;
+				},
+			},
 		},
 	},
 	// 崩坏：锁定技，结束阶段，若你不是体力值最小的角色，你选择一项：1.失去1点体力，2.减1点体力上限。（获得自"暴凌"/"举义"）
@@ -24564,13 +24610,17 @@ export default {
 				}
 			}
 		},
+		// 限定技：与我同势力的角色至少2名(含自己)才值得，且我手牌不多(摸3张的收益才大)
 		ai: {
 			threaten: 1,
 			order: 8,
 			result: {
-				player: 1,
+				player(player) {
+					return game.countPlayer(current => current == player || sameGroup(current, player)) >= 2 && player.countCards("h") <= 3 ? 1 : 0;
+				},
 			},
 		},
+
 	},
 
 // ========== kongrong 孔融 ==========
@@ -25300,7 +25350,11 @@ export default {
 			}
 		},
 		async cost(event, trigger, player) {
-			event.result = await player.chooseBool(get.prompt2("yangwei")).set("ai", () => true).forResult();
+			// 发动后其他角色依次可以对你使用一张无距离限制的杀：加了2血上限+回2血之后，体力仍要>=3才扛得住
+			event.result = await player
+				.chooseBool(get.prompt2("yangwei"))
+				.set("ai", () => player.hp + 2 >= 4)
+				.forResult();
 		},
 		async content(event, trigger, player) {
 			await lib.skill.yangwei.grant(player);
@@ -26500,16 +26554,23 @@ export default {
 		// 只给了result.target(选起始目标的评分)，没给result.player——跟文件里其他同类限定技
 		// 反复踩过的坑一样，缺了result.player，引擎默认的发动热情评估就是0，AI从来不会主动
 		// 发动这个限定技。起始目标从敌方角色开始传导弃牌/伤害链最有利，优先选交情差的角色
+		// 限定技，所有其他角色(含友军)都受影响：只在有敌人体力<=2(有望击杀)、且没有体力<=2的友军时才用
 		ai: {
 			order: 9,
 			result: {
-				player: 1,
+				player(player) {
+					const others = game.filterPlayer(current => current != player);
+					const enemyLow = others.filter(current => get.attitude(player, current) < 0 && current.hp <= 2).length;
+					const friendLow = others.filter(current => get.attitude(player, current) >= 0 && current.hp <= 2).length;
+					return enemyLow >= 1 && friendLow == 0 ? 1 : 0;
+				},
 				target(player, target) {
 					return -1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
 				},
 			},
 			threaten: 1.6,
 		},
+
 		async content(event, trigger, player) {
 			player.awakenSkill(event.name);
 			const start = event.target;
@@ -26667,13 +26728,18 @@ export default {
 		delay: false,
 		// enable:"phaseUse"的技能只有filterTarget、没有ai.result时，AI不会主动选目标发动这个
 		// 限定技；把全部装备送给target后由target自己选择回血或输出，所以target选交情好的角色更安全
+		// 限定技：装备区至少2张(X>=2才值得)且自己已受伤时才用，目标只给明确的友方(target给正号，引擎再乘态度)
 		ai: {
 			result: {
+				player(player) {
+					return player.countCards("e") >= 2 && player.isDamaged() ? 1 : 0;
+				},
 				target(player, target) {
-					return 1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
+					return isClearFriend(player, target) ? 1 : 0;
 				},
 			},
 		},
+
 		async content(event, trigger, player) {
 			const cards = player.getCards("e");
 			const target = event.target;
@@ -26725,6 +26791,20 @@ export default {
 	// 点数相同→重铸一张牌，两者都相同则两项都执行。另外虚拟牌(如武圣当杀)自身没有花色点数，
 	// 之前直接get.suit/get.number取到"none"/null，既触发不了又会让两张虚拟牌互相误判相同，
 	// 改成按其唯一对应的实体牌取花色点数(多张实体牌转化的虚拟牌无花色点数，视为不匹配)。
+	// 记录出场过的武将(见recordSeenCharacters)：换将后被换下场的武将不会再被抽到
+	_gz3_seen_record: {
+		trigger: { global: ["gameStart", "phaseBeginStart", "showCharacterAfter"] },
+		forced: true,
+		silent: true,
+		popup: false,
+		charlotte: true,
+		filter() {
+			return true;
+		},
+		async content() {
+			recordSeenCharacters();
+		},
+	},
 	jianying: {
 		aiShowTag: "draw",
 		aiShowCost: true,
@@ -26732,6 +26812,10 @@ export default {
 		trigger: { player: "useCard" },
 		group: ["jianying_record"],
 		filter(event, player) {
+			// 描述是"当你于出牌阶段使用牌时"：回合外/其他阶段使用的牌不算，之前没有这个限制
+			if (!player.isPhaseUsing()) {
+				return false;
+			}
 			const last = player.storage.jianying_last;
 			if (!last) {
 				return false;
@@ -26781,6 +26865,10 @@ export default {
 		async content(event, trigger, player) {
 			if (trigger.name == "phaseUseBegin") {
 				delete player.storage.jianying_last;
+				return;
+			}
+			// 只记录出牌阶段内使用的牌，回合外使用的牌不能成为"上一张牌"
+			if (!player.isPhaseUsing()) {
 				return;
 			}
 			player.storage.jianying_last = jianyingInfo(trigger.card, player);
@@ -29092,15 +29180,20 @@ export default {
 		filterTarget: lib.filter.notMe,
 		derivation: ["feiyang", "bahu"],
 		// ai里只有threaten，不影响AI要不要主动用它；赠予的是强力技能，选交情好的角色才安全
+		// 限定技：给明确的友方；第2轮之后才用(别开局就送出去)
 		ai: {
 			order: 9,
 			result: {
+				player(player) {
+					return game.roundNumber >= 2 && game.hasPlayer(current => isClearFriend(player, current)) ? 1 : 0;
+				},
 				target(player, target) {
-					return 1; // 引擎会再乘一次对target的态度，这里只给方向/量级，不能再返回attitude(否则被平方、敌友得分一样)
+					return isClearFriend(player, target) ? 1 : 0;
 				},
 			},
 			threaten: 1.6,
 		},
+
 		async content(event, trigger, player) {
 			const { target, name: skillName } = event;
 			player.awakenSkill(skillName);
