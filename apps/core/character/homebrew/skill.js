@@ -5023,20 +5023,30 @@ export default {
 				.chooseTarget(get.prompt2(event.skill), 2, (card, player, target) => {
 					return target.countCards("he");
 				})
-				// 必用：必须选满两名角色才能发动，之前eff<=0(如目标是友军)时AI直接弃选、技能就不发动了。
-				// 这里保证每个候选分数恒为正(下限0.5)，敌人(顺手牵羊收益高)优先，不够再补友军/自己以外的人
+				// AI：怀兵后续是buff还是debuff取决于"我展示的手牌里红牌数R"：体力较少的那名目标，下个摸牌阶段摸牌数/
+				// 出牌阶段杀的次数/弃牌阶段手牌上限都会被改成R。R大(>=3)对友方是增益、对敌方不利；R小(0~1)对敌方是削弱、
+				// 对友方是坑。R在拿牌前先估为"现有红牌数+1"(两张牌各约一半是红色)。
+				// 引擎会按选目标的先后依次调用，第一个目标先给"拿牌收益"，第二个目标再结合体力较少者算出整体分数；
+				// 整体<=0(比如体力较少者是友方、但红牌太少)时AI就不选，不是无脑必用
 				.set("ai", target => {
 					const player = get.player();
-					let eff = Math.max(0.5, get.effect(target, { name: "shunshou_copy2" }, player, player)),
-						count = player.countCards("h", { color: "red" }) - 2;
-					if (ui.selected.targets.length) {
-						const first = ui.selected.targets[0];
-						if (first.hp != target.hp) {
-							const current = first.hp > target.hp ? target : first;
-							return Math.max(0.5, eff + get.effect(current, { name: "wuzhong" }, current, player) * count);
-						}
+					const red = player.countCards("h", { color: "red" }) + 1;
+					const eff = t => (t == player ? 0 : get.effect(t, { name: "shunshou_copy2" }, player, player));
+					const buff = lower => {
+						const sign = Math.sign(get.attitude(player, lower));
+						// 摸牌数(原2)、杀次数(原1)、手牌上限(原为体力值)改成red后的净收益，按±1的态度符号折算
+						const value = red - 2 + (red - 1) * 0.5 + (red - lower.hp) * 0.5;
+						return sign * value;
+					};
+					if (!ui.selected.targets.length) {
+						return eff(target) + 0.1;
 					}
-					return eff;
+					const first = ui.selected.targets[0];
+					let score = eff(target);
+					if (first.hp != target.hp) {
+						score += buff(first.hp < target.hp ? first : target);
+					}
+					return score;
 				})
 				.forResult();
 		},
