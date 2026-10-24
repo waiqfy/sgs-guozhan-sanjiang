@@ -12,6 +12,15 @@ import { lib, game, ui, get, ai, _status } from "noname";
 function sameGroup(a, b) {
 	return !!a && !!b && a.identity !== "unknown" && b.identity !== "unknown" && a.isFriendOf(b);
 }
+// 本轮里排在after后面、还没轮到的存活角色(按座位号)：轮到这些人之前，"本轮"都还没结束。
+// 问天"失效到本轮结束"、眩惑"本轮不能再发动"这类以轮为单位的限制，代价取决于本轮还剩多少回合——
+// 如果after就是本轮最后一个回合(后面没有座位更靠后的人)，马上就是下一轮，限制几乎没有代价，AI可以随便用
+function laterPlayersInRound(after) {
+	if (!after) {
+		return [];
+	}
+	return game.filterPlayer(current => current != after && current.getSeatNum() > after.getSeatNum());
+}
 // "明确的队友"：已明置且势力相同(sameGroup排除未明置)，再要求态度为正。国战里未明置/势力重叠的角色
 // get.attitude也可能给出正值(+4)，只看态度会把牌送给其实是敌人的人，送牌/送摸牌类AI应该用这个
 function isClearFriend(player, target) {
@@ -1544,6 +1553,10 @@ export default {
 		// 且颜色符合时才使用，不乱用(玩家本人不受限制)
 		canUseName(player, name) {
 			if (player == game.me) {
+				return true;
+			}
+			// "本轮内失效"：当前回合已是本轮最后一个回合时，失效马上就会随着下一轮开始解除，没有代价，随便用
+			if (!laterPlayersInRound(_status.currentPhase).length) {
 				return true;
 			}
 			const top = player.storage.wentian_top;
@@ -4364,19 +4377,24 @@ export default {
 			if (isAlly(target)) {
 				return true;
 			}
-			for (let p = target.getNext(); p != player; p = p.getNext()) {
-				if (p.isIn() && isAlly(p)) {
-					return target.countCards("h", card => get.name(card) == "tao") > 0;
-				}
+			// 对敌人发动后"本轮不能再发动"：只数本轮里座次排在这名目标之后的角色(这轮还没轮到的)，
+			// 之前用getNext一路绕圈数到自己，把已经过去的回合(和下一轮)也算进去了。本轮后面没有队友了，马上下一轮，
+			// 锁定没有代价，当然可以随便用
+			if (laterPlayersInRound(target).some(p => p != player && isAlly(p))) {
+				return target.countCards("h", card => get.name(card) == "tao") > 0;
 			}
 			return true;
 		},
+		// 之前这个reset没有被group挂到玩家身上，且是在自己准备阶段才重置；"本轮"的限制应当在每轮开始时解除
+		group: "xuanhuo_reset",
 		subSkill: {
 			reset: {
 				sub: true,
-				trigger: { player: "phaseZhunbeiBegin" },
+				charlotte: true,
+				trigger: { global: "roundStart" },
 				silent: true,
 				forced: true,
+				popup: false,
 				content() {
 					delete player.storage.xuanhuo_locked;
 				},
@@ -4419,13 +4437,7 @@ export default {
 					if (player.storage.xuanhuo_locked) {
 						return 0;
 					}
-					let hasFutureAlly = false;
-					for (let p = target.getNext(); p != player; p = p.getNext()) {
-						if (p.isIn() && isAlly(p)) {
-							hasFutureAlly = true;
-							break;
-						}
-					}
+					const hasFutureAlly = laterPlayersInRound(target).some(p => p != player && isAlly(p));
 					if (!hasFutureAlly) {
 						return 1;
 					}
