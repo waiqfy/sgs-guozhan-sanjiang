@@ -1537,6 +1537,20 @@ export default {
 		async content(event, trigger, player) {
 			const num = Math.min(5, game.countPlayer());
 			await player.chooseToGuanxing(num).set("prompt", "问天：点击或拖动将牌移动到牌堆顶或牌堆底").forResult();
+			// 记下整理后的牌堆顶(AI看过所以是已知牌)，之后才能判断这张牌当无懈(黑)/火攻(红)是否会让本技能失效
+			player.storage.wentian_top = ui.cardPile.firstChild;
+		},
+		// AI用：问天的牌是牌堆顶的牌，颜色不对(无懈要黑、火攻要红)就会本轮失效；AI只在"自己整理过、牌堆顶仍是那张已知牌"
+		// 且颜色符合时才使用，不乱用(玩家本人不受限制)
+		canUseName(player, name) {
+			if (player == game.me) {
+				return true;
+			}
+			const top = player.storage.wentian_top;
+			if (!top || ui.cardPile.firstChild !== top) {
+				return false;
+			}
+			return get.color(top, false) == (name == "wuxie" ? "black" : "red");
 		},
 		subSkill: {
 			viewas: {
@@ -1544,7 +1558,7 @@ export default {
 				enable: "chooseToUse",
 				filter(event, player) {
 					for (const name of ["wuxie", "huogong"]) {
-						if (event.filterCard(get.autoViewAs({ name }, "unsure"), player, event)) {
+						if (lib.skill.wentian.canUseName(player, name) && event.filterCard(get.autoViewAs({ name }, "unsure"), player, event)) {
 							return true;
 						}
 					}
@@ -1554,7 +1568,7 @@ export default {
 					if (player.isTempBanned("wentian")) {
 						return false;
 					}
-					return name == "wuxie";
+					return name == "wuxie" && lib.skill.wentian.canUseName(player, name);
 				},
 				viewAs(cards, player) {
 					const event = get.event(),
@@ -16849,9 +16863,13 @@ export default {
 		},
 		// chooseTarget没有ai时默认选不中任何目标，这张牌从来发动不出来；优先挑一名敌方角色拼点
 		async cost(event, trigger, player) {
+			// 输掉拼点会被对方视为使用决斗，因此受到伤害就失去鹰扬：AI只在"有把握赢"(手牌最大点数>=10)，
+			// 或对方没有手牌可拼(canCompare不要求，但对方无牌时点数固定为0)时才发动，且体力>=2扛得住决斗
+			const maxNum = Math.max(0, ...player.getCards("h").map(card => get.number(card, player)));
+			const confident = player.hp >= 2 && maxNum >= 10;
 			event.result = await player
 				.chooseTarget(get.prompt(event.skill), "你可以与一名其他角色拼点", (card, player, target) => target != player)
-				.set("ai", target => -get.attitude(get.player(), target))
+				.set("ai", target => (confident ? -get.attitude(get.player(), target) : -1))
 				.forResult();
 		},
 		async content(event, trigger, player) {
