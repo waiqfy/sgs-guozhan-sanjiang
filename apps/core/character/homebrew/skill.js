@@ -4373,7 +4373,9 @@ export default {
 		// 同样逻辑的check()，确保"对敌人不要着急，等等看后面有没有队友"真正生效
 		check(event, player) {
 			const target = event.player;
-			const isAlly = t => (player.identity == "ye" || t.identity == "ye" ? sameGroup(t, player) : t.group == player.group);
+			// 引擎把所有没亮的人group都置为"unknown"(见guozhan patch/content.js)：用group相等判断，AI自己没亮时任何没亮的人都被当成同势力。
+			// 改用引擎的isFriendOf：它会按AI自己的真实势力(未亮时取name1的势力)和对方已亮明的身份判断，对方没亮则不算队友
+			const isAlly = t => t != player && player.isFriendOf(t);
 			if (isAlly(target)) {
 				return true;
 			}
@@ -4427,7 +4429,7 @@ export default {
 				player(player, target) {
 					// AI自己知道自己的真实势力(player.group恒为真实势力，即使自己还暗置)，
 					// 不需要像sameGroup那样要求双方identity都已确定——包括对方还暗置、亮出后才成为队友的情况。
-					const isAlly = target => (player.identity == "ye" || target.identity == "ye" ? sameGroup(target, player) : target.group == player.group);
+					const isAlly = target => target != player && player.isFriendOf(target);
 					if (isAlly(target)) {
 						return 1;
 					}
