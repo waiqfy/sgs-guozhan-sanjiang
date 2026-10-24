@@ -2311,6 +2311,11 @@ export default {
 					nature: button.link[3],
 					storage: { cuifeng: true },
 				});
+				// 摧锋回合结束时目标受到的伤害不为1就重置：杀可以被闪避(0点)或造成>=2点，都能重置，
+				// 最容易达成；其他伤害牌多半刚好1点伤害。所以尽量用它打杀(普通杀优先，属性杀其次)
+				if (button.link[2] == "sha") {
+					return Math.max(effect, 0) + 10 + (button.link[3] ? 0 : 1);
+				}
 				if (effect > 0) {
 					return effect;
 				}
@@ -2361,12 +2366,13 @@ export default {
 				}
 			},
 		},
-		// 失去1点体力视为使用伤害牌，限定技：体力>=3、场上有体力<=2的敌人(有望击杀)时才用，不能能用就用
+		// 失去1点体力打一张杀(可被闪避=0点或>=2点伤害都会重置，等于几乎无成本)：体力>=2、有敌人就可以用，
+		// 不再要求"敌人残血"，因为打杀有很大概率能重置
 		ai: {
 			order: 1.9,
 			result: {
 				player(player) {
-					return player.hp >= 3 && game.hasPlayer(current => current != player && get.attitude(player, current) < 0 && current.hp <= 2) ? 1 : 0;
+					return player.hp >= 2 && game.hasPlayer(current => current != player && get.attitude(player, current) < 0) ? 1 : 0;
 				},
 			},
 		},
@@ -27376,6 +27382,29 @@ export default {
 		filterCard: () => false,
 		selectCard: -1,
 		prompt: "视为使用一张【火攻】",
+		// 不为本阶段第一次发动、且这张火攻没造成伤害就会失去观火。第一次发动即使没伤害也只是白得一个加伤，没有风险；
+		// 之后每次发动，AI只在"必定造成伤害"时才用：火攻要求弃置与目标展示的牌同花色的手牌，目标展示的牌若全是已知的
+		// (手牌全已公开)，我手牌只需覆盖这些花色；否则要覆盖全部四种花色才算稳。AI不满足就不发动，不去冒失去技能的险。
+		// (玩家本人手动发动不受限制)
+		isSafe(player) {
+			const phase = _status.event.getParent?.("phaseUse");
+			const count = player.getHistory("useSkill", evt => evt.skill == "guanhuo" && (!phase || evt.event.getParent("phaseUse") === phase)).length;
+			if (count == 0) {
+				return game.hasPlayer(current => get.attitude(player, current) < 0 && current.countCards("h") > 0);
+			}
+			const mine = new Set(player.getCards("h").map(card => get.suit(card, player)));
+			return game.hasPlayer(current => {
+				if (get.attitude(player, current) >= 0 || current.countCards("h") == 0) {
+					return false;
+				}
+				const known = current.getKnownCards(player);
+				const suits = known.length == current.countCards("h") ? known.map(card => get.suit(card, current)) : ["spade", "heart", "club", "diamond"];
+				return suits.every(suit => mine.has(suit));
+			});
+		},
+		viewAsFilter(player) {
+			return player == game.me || lib.skill.guanhuo.isSafe(player);
+		},
 		ai: {
 			order(item, player) {
 				return get.order({ name: "huogong" }) + 0.01;
