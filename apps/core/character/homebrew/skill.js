@@ -2392,7 +2392,9 @@ export default {
 									target.checkHistory("damage", evt => (num += evt.num));
 								});
 								if (num !== 1) {
-									player.awakenedSkills.remove("cuifeng");
+									// 限定技的重置必须用restoreSkill：它会同时清掉awakenedSkills、重新启用被awakenSkill禁用的"_awake"、
+								// 并把storage里的标记还原；之前只从awakenedSkills里移除，技能实际仍处于被禁用状态，重置无效
+								player.restoreSkill("cuifeng");
 								}
 								delete player.storage.cuifeng_check;
 							});
@@ -14549,23 +14551,76 @@ export default {
 			threaten: 1.8,
 		},
 		subSkill: {
+			// 之前viewAs写死{name:"sha"}、position:"e"：废除防具栏后装备区里不可能再有防具牌，"e"里永远选不出牌，所以选项是空的；
+			// 而且描述是"当【桃】以外的基本牌使用或打出"，应该可以选牌名。改成手牌/特殊区("hes")里的防具牌，并用chooseButton选牌名
 			viewas: {
 				audio: "luoyi",
-				enable: "chooseToUse",
-				viewAs: { name: "sha" },
-				position: "e",
-				viewAsFilter(player) {
-					return player.getCards("e", { subtype: "equip2" }).length;
+				enable: ["chooseToUse", "chooseToRespond"],
+				filter(event, player) {
+					if (!player.hasCards("hes", card => get.subtype(card) == "equip2")) {
+						return false;
+					}
+					return lib.inpile.some(name => name != "tao" && name != "du" && get.type(name) == "basic" && event.filterCard({ name, cards: player.getCards("hes", card => get.subtype(card) == "equip2") }, player, event));
 				},
-				filterCard(card, player) {
-					return get.subtype(card) == "equip2";
+				chooseButton: {
+					dialog(event, player) {
+						const vcards = [];
+						const cards = player.getCards("hes", card => get.subtype(card) == "equip2");
+						for (const name of lib.inpile) {
+							if (name == "tao" || name == "du" || get.type(name) != "basic") {
+								continue;
+							}
+							if (event.filterCard({ name, cards }, player, event)) {
+								vcards.push(["基本", "", name]);
+							}
+							if (name == "sha") {
+								for (const nature of lib.inpile_nature) {
+									if (event.filterCard({ name, nature, cards }, player, event)) {
+										vcards.push(["基本", "", name, nature]);
+									}
+								}
+							}
+						}
+						return ui.create.dialog("裸衣", [vcards, "vcard"]);
+					},
+					check(button, player) {
+						if (_status.event.getParent().type !== "phase") {
+							return 1;
+						}
+						return player.getUseValue({ name: button.link[2], nature: button.link[3] });
+					},
+					backup(links, player) {
+						return {
+							audio: "luoyi",
+							popname: true,
+							viewAs: { name: links[0][2], nature: links[0][3] },
+							filterCard(card, player) {
+								return get.subtype(card) == "equip2";
+							},
+							selectCard: 1,
+							position: "hes",
+							check(card) {
+								return 6 - get.value(card);
+							},
+						};
+					},
+					prompt(links, player) {
+						return "裸衣：将一张防具牌当" + (get.translation(links[0][3]) || "") + get.translation(links[0][2]) + "使用或打出";
+					},
 				},
-				popname: true,
-				check(card) {
-					return 5 - get.value(card);
+				hiddenCard(player, name) {
+					return name != "tao" && name != "du" && get.type(name) == "basic" && player.hasCards("hes", card => get.subtype(card) == "equip2");
 				},
-				prompt(links, player) {
-					return "裸衣：将一张防具牌当基本牌使用或打出";
+				ai: {
+					respondSha: true,
+					respondShan: true,
+					skillTagFilter(player) {
+						return player.hasCards("hes", card => get.subtype(card) == "equip2");
+					},
+					order: 4,
+					result: {
+						player: 1,
+					},
 				},
 			},
 			effect: {

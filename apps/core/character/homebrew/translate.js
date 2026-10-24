@@ -687,6 +687,8 @@ caocao: "曹操",
 	luoyi: "裸衣",
 	luoyi_info: "限定技，废除你的防具栏。本局游戏，你可以将一张防具牌当【桃】以外的基本牌使用或打出。你使用【杀】和【决斗】造成的伤害+1。",
 	luoyi_viewas: "裸衣",
+	luoyi_viewas_backup: "裸衣",
+	luoyi_effect: "裸衣",
 
 	guojia: "郭嘉",
 	tiandu2: "天妒",
