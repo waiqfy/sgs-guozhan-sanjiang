@@ -3360,7 +3360,7 @@ export default {
 						.chooseTarget(get.prompt("fakexuanbei"), "令一名其他角色变更副将", lib.filter.notMe)
 						.set("ai", target => {
 							const player = get.event().player;
-							const rank = get.guozhanRank(target.name2, target) <= 3;
+							const rank = !target.isUnseen(1) && get.guozhanRank(target.name2, target) <= 3;
 							const att = get.attitude(player, target);
 							if (att > 0) {
 								return (4 - rank) * att;
@@ -5102,7 +5102,7 @@ export default {
 						.set("forceDie", true)
 						.set("ai", function (target) {
 							var player = _status.event.player;
-							var rank = get.guozhanRank(target.name2, target) <= 3;
+							var rank = !target.isUnseen(1) && get.guozhanRank(target.name2, target) <= 3;
 							var att = get.attitude(player, target);
 							if (att > 0) {
 								return (4 - rank) * att;

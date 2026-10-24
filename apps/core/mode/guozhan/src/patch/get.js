@@ -210,20 +210,16 @@ export class GetGuozhan extends Get {
 	}
 
 	/**
-	 * 势力判断专用的"有效身份"猜测：已明置的直接用真实identity；未明置的按“会不会被挤野”
-	 * 二元猜一个（会挤野就当野心家，不会就当主将势力）。fid/tid 在 realAttitude/rawAttitude
-	 * 里各自都要用，抽成共享方法避免两处实现漂移。
+	 * 势力判断专用的"公开身份"：已明置的是他亮出来的势力，未明置的就是 "unknown"，
+	 * 不再去读暗置者的主将势力（见下面函数体里的说明）。
 	 *
 	 * @param {Player} player
 	 * @returns {string}
 	 */
 	_gzIdentity(player) {
-		if (player.isUnseen()) {
-			if (!player.wontYe()) {
-				return "ye";
-			}
-			return player.getGuozhanGroup(0);
-		}
+		// gz3: 只用公开信息，跟真人当面玩一样：已明置的看他亮出来的势力；没明置的就是
+		// "unknown"，不能去读他暗着的主将/副将是哪个势力（原版这里会读主将势力，等于
+		// AI 能看见别人的暗将牌）。自己的暗将是自己的信息，由调用方单独用 _gzPossibleGroups(自己)。
 		return player.identity;
 	}
 
@@ -280,6 +276,42 @@ export class GetGuozhan extends Get {
 			groups.push("ye");
 		}
 		return groups;
+	}
+
+	/**
+	 * from 通过【知己知彼】亲眼看过的、to 暗着的将牌所属势力（不含野心家）。没看过、或者
+	 * to 已经明置，返回空数组。这是 from 合法得到的信息，不是偷看。
+	 *
+	 * @param {Player} from
+	 * @param {Player} to
+	 * @returns {string[]}
+	 */
+	_gzKnownGroups(from, to) {
+		if (to.identity != "unknown") {
+			return [];
+		}
+		var seen = from.storage.zhibi_seen && from.storage.zhibi_seen[to.playerid];
+		if (!seen) {
+			return [];
+		}
+		return seen.filter(function (g) {
+			return g != "ye";
+		});
+	}
+
+	/**
+	 * 自己出手帮过（救人/给牌/回血）、还没亮将、且候选势力里有 group 的潜在队友人数。
+	 * 亮将选主将还是副将时要算进这个势力的"队友数"，不然会出现救了人、转头亮另一个
+	 * 势力反手去打对方。记录见 rest.js 的 _gzGoodwillCard。
+	 *
+	 * @param {Player} player
+	 * @param {string} group
+	 * @returns {number}
+	 */
+	_gzFavoredAllies(player, group) {
+		// gz3: 原来这里用 _gzPossibleGroups(别人) 偷看暗置者真实势力来数"潜在队友"，是开天眼，
+		// 已停用，恒返回 0。保留函数是因为 rest.js 里有几处调用。
+		return 0;
 	}
 
 	/**
@@ -343,29 +375,71 @@ export class GetGuozhan extends Get {
 	 * @returns
 	 */
 	realAttitude(from, to, difficulty, toidentity) {
-		var fid = this._gzIdentity(from);
-		if (from.identity != "unknown") {
-			// from 已经明置，身份是确定的，维持原来的强判断
-			if (fid == toidentity && toidentity != "ye") {
-				return 4 + difficulty;
-			}
-			return this._gzRealAttitudeCore(from, to, difficulty, toidentity, fid);
+		// gz3: 只用公开信息。"同势力就是队友"这类判断在 _gzRawAttitudeInner 里已经按
+		// "双方公开身份相同"或"对方亮出的势力跟我自己任意一张暗将的势力相同(主副一样权重)"
+		// 处理过了，走到这里说明没有这种明确关系，直接按公开的势力体量格局打分。
+		// 原来这里按"to 暗着的主将势力"和"from 候选势力的概率"做插值，读的是别人暗将，已删除。
+		var core = this._gzRealAttitudeCore(from, to, difficulty, toidentity, null);
+		if (to.identity != "unknown") {
+			return core;
 		}
-		// from 未明置：不再是“猜一个身份就当真/当假”的二元判断，而是按“这个势力目前
-		// 轮到我的概率”在“当队友”和下面常规聚类结果之间做连续插值。
-		var core = this._gzRealAttitudeCore(from, to, difficulty, toidentity, fid);
-		if (toidentity != "ye" && toidentity != "unknown") {
-			var candidates = this._gzCandidateGroups(from);
-			if (candidates.includes(toidentity)) {
-				var chance = 1 / Math.max(1, candidates.length);
-				if (fid == toidentity && from.wontYe()) {
-					chance = Math.max(chance, 0.6);
-				}
-				var allyScore = 4 + difficulty;
-				return core + (allyScore - core) * chance;
+		// 对方还暗着：真人没法知道他是哪国，只能猜——还有名额的势力里，他落进跟我同一个
+		// 势力的概率有多大，就在"当敌人"(core)和"当队友"之间按这个概率插值。
+		var chance = this._gzFriendChance(from);
+		if (chance <= 0) {
+			return core;
+		}
+		return core + (4 + difficulty - core) * chance;
+	}
+
+	/**
+	 * 一个还没亮的陌生人，最终跟 from 是同一势力的概率——只用公开信息（各势力现在的人数、
+	 * 名额上限）去猜：每个还有名额的势力，按剩余名额数当权重，假设他落进哪个势力是
+	 * "按剩余名额成比例"的。from 自己还暗着时，自己任意一张将牌的势力都算"我的势力"（主副
+	 * 权重一样）；已亮时就是自己亮出的势力，这个势力已经满员则概率为 0。
+	 *
+	 * @param {Player} from
+	 * @returns {number} 0~1
+	 */
+	_gzFriendChance(from) {
+		var mine = from.identity == "unknown" ? this._gzPossibleGroups(from) : [from.identity];
+		mine = mine.filter(function (g) {
+			return g != "ye" && g != "unknown";
+		});
+		if (!mine.length) {
+			return 0;
+		}
+		var maxPlayer = get.population() / 2;
+		var groups = ["wei", "shu", "wu", "qun"];
+		for (var i = 0; i < game.players.length; i++) {
+			var id = game.players[i].identity;
+			if (id != "unknown" && id != "ye" && !groups.includes(id)) {
+				groups.push(id);
 			}
 		}
-		return core;
+		for (var j = 0; j < mine.length; j++) {
+			if (!groups.includes(mine[j])) {
+				groups.push(mine[j]);
+			}
+		}
+		var banned = _status.bannedGroup ? _status.bannedGroup.slice(6) : null;
+		var total = 0,
+			mineWeight = 0;
+		for (var k = 0; k < groups.length; k++) {
+			var g = groups[k];
+			if (g == banned) {
+				continue;
+			}
+			var room = maxPlayer - get.totalPopulation(g);
+			if (room <= 0) {
+				continue;
+			}
+			total += room;
+			if (mine.includes(g)) {
+				mineWeight += room;
+			}
+		}
+		return total > 0 ? Math.min(1, mineWeight / total) : 0;
 	}
 
 	/**
@@ -412,7 +486,11 @@ export class GetGuozhan extends Get {
 		// 三将模式的第三将从一开始就明置，直接算。
 		var powerOf = function (p) {
 			var power = Math.max(0.5, p.hp);
-			power += get.guozhanRank(p.name1, p) / 4;
+			// gz3: 只有某张将牌已经明置，才能把它的强度算进体量——只亮了副将的人，暗着的
+			// 主将强度别人是不知道的。
+			if (!p.isUnseen(0)) {
+				power += get.guozhanRank(p.name1, p) / 4;
+			}
 			if (!p.isUnseen(1)) {
 				power += get.guozhanRank(p.name2, p) / 4;
 			}
@@ -499,7 +577,7 @@ export class GetGuozhan extends Get {
 			}
 		}
 
-		if (to.hasSkillTag && to.hasSkillTag("maixie", true)) {
+		if (to.identity != "unknown" && to.hasSkillTag && to.hasSkillTag("maixie", true)) {
 			var aliveRatio = game.players.length / Math.max(1, game.players.length + game.dead.length);
 			if (_status._aozhan || aliveRatio <= 0.6) {
 				result -= 1;
@@ -555,13 +633,24 @@ export class GetGuozhan extends Get {
 		if (from.identity == "unknown" && this._gzPossibleGroups(from).includes(to.identity)) {
 			return 4 + difficulty;
 		}
-		if (from.identity == "unknown" && to.identity == "unknown") {
-			var fromGroups = this._gzPossibleGroups(from);
-			var toGroups = this._gzPossibleGroups(to);
-			if (fromGroups.some(function (g) { return g != "ye" && toGroups.includes(g); })) {
+		// gz3: 用【知己知彼】等亲眼看过 to 暗将牌的情况——这是 from 正当得到的信息（真人看过
+		// 也会记住）。看过的将牌里只要有一张的势力对得上，就按潜在队友处理，看的是主将还是
+		// 副将、对得上自己的哪张牌都一样权重。from 已亮时还要看 to 亮这个势力还有没有名额。
+		var knownGroups = this._gzKnownGroups(from, to);
+		if (knownGroups.length) {
+			if (from.identity == "unknown") {
+				var ownGroups = this._gzPossibleGroups(from);
+				if (knownGroups.some(function (g) { return ownGroups.includes(g); })) {
+					return 4 + difficulty;
+				}
+			} else if (from.identity != "ye" && knownGroups.includes(from.identity) && to.wontYe(from.identity)) {
 				return 4 + difficulty;
 			}
 		}
+		// gz3: 这里原来有两条"to 还没亮时，偷看 to 真实主副将的势力来判断是不是队友"的
+		// 分支（from 已亮/to 暗；from 暗/to 也暗），相当于 AI 开天眼——别人暗着的将牌
+		// 本来是看不到的。已经删掉。from 自己的候选势力是自己的信息，可以用（上面那条
+		// 保留）；对暗置的别人只能靠公开信息和行为（好感度）推断，走下面的常规判断。
 		var att = get.realAttitude(from, to, difficulty, tid);
 		// gz3: 结构性的势力体量判断（att）只是"猜的"，但对方实际做过什么（打过我、
 		// 弃过我的牌、给我摸过牌/回过血）是打牌过程里公开可见的行为，不该跟结构性

@@ -17,6 +17,8 @@ export const start = async (event, trigger, player) => {
 	// _gzGoodwill、skill/character/rest.js 的 _gzGoodwillCard/_gzGoodwillRestraint。
 	game.addGlobalSkill("_gzGoodwillCard");
 	game.addGlobalSkill("_gzGoodwillRestraint");
+	game.addGlobalSkill("_gzNoFeedHidden");
+	game.addGlobalSkill("_gzAoeOpening");
 
 	// 首先检查是否在播放录像
 	const playback = localStorage.getItem(lib.configprefix + "playback");

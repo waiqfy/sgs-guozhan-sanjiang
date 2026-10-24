@@ -12,6 +12,20 @@ import { lib, game, ui, get, ai, _status } from "noname";
 function sameGroup(a, b) {
 	return !!a && !!b && a.identity !== "unknown" && b.identity !== "unknown" && a.isFriendOf(b);
 }
+/** gz3: 猜对方手牌里有没有满足条件的牌。已知的牌按实际判断；未知的牌（只用张数，不读具体是什么）每张按 density 的概率满足条件来猜，跟真人一样只能猜。同一个决策内结果稳定。 */
+function guessHasCard(viewer, target, filter, density, salt) {
+	const known = target.getKnownCards(viewer);
+	if (known.some(filter)) {
+		return true;
+	}
+	const unknown = target.countCards("h") - known.length;
+	if (unknown <= 0) {
+		return false;
+	}
+	const chance = 1 - Math.pow(1 - density, unknown);
+	const rand = _status.event && typeof _status.event.getRand == "function" ? _status.event.getRand("gz3guess" + salt + target.playerid + unknown) : Math.random();
+	return chance > rand;
+}
 // 本轮里排在after后面、还没轮到的存活角色(按座位号)：轮到这些人之前，"本轮"都还没结束。
 // 问天"失效到本轮结束"、眩惑"本轮不能再发动"这类以轮为单位的限制，代价取决于本轮还剩多少回合——
 // 如果after就是本轮最后一个回合(后面没有座位更靠后的人)，马上就是下一轮，限制几乎没有代价，AI可以随便用
@@ -743,11 +757,16 @@ export default {
 				})
 				.set("ai", function (target) {
 					var aim = _status.event.aim;
-					var cards = target.getCards("hs", function (card) {
+					// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+					var usable = function (card) {
 						return target.canUse(card, aim, false) && get.effect(aim, card, target, player) > 0 && get.effect(aim, card, target, target) > 0;
-					});
+					};
+					var cards = target.getKnownCards(player).filter(usable);
 					if (cards.length) {
 						return cards.some(card => get.tag(card, "damage")) ? 2 : 1;
+					}
+					if (guessHasCard(player, target, usable, 0.3, "tongling")) {
+						return 1;
 					}
 					return 0;
 				})
@@ -2010,8 +2029,8 @@ export default {
 						.event()
 						.controls.map(i => [
 							i,
-							target
-								.getCards("he")
+							// gz3: 只用已知牌，不能直接读别人手牌
+							known
 								.map(get.value)
 								.reduce((p, c) => p + c, 0),
 						])
@@ -3324,7 +3343,8 @@ export default {
 			const list = lib.skill.shenzhi.getAreas(target).map(pos => ({
 				type: "area",
 				area: pos,
-				cost: pos == "j" ? 0 : get.value(target.getCards(pos)[0], target),
+				// gz3: 只用已知牌，不能直接读别人手牌(别人的手牌区那张牌的价值取中性值5)
+					cost: pos == "j" ? 0 : pos == "h" && target != player ? 5 : get.value(target.getCards(pos)[0], target),
 			}));
 			if (player.countCards("h")) {
 				list.push({ type: "hand", cost: player.getCards("h").reduce((sum, card) => sum + get.value(card, player), 0) });
@@ -4326,8 +4346,11 @@ export default {
 			order: 10,
 			result: {
 				player(player) {
-					if (player.isUnseen() && player.wontYe()) {
-						if (get.population(player.group) >= game.players.length / 4) {
+					// gz3: 暗置时 player.group 是 "unknown"，get.population("unknown") 数的是别的暗置者；
+					// 亮哪张牌就是哪个势力，主副一样权重：按自己各张将牌的势力来数公开队友。
+					const safeGroups = player.isUnseen() ? get._gzPossibleGroups(player).filter(g => player.wontYe(g)) : [];
+					if (safeGroups.length) {
+						if (Math.max(...safeGroups.map(g => get.population(g))) >= game.players.length / 4) {
 							return 1;
 						}
 						return Math.random() > 0.7 ? 1 : 0;
@@ -4383,7 +4406,8 @@ export default {
 			// 之前用getNext一路绕圈数到自己，把已经过去的回合(和下一轮)也算进去了。本轮后面没有队友了，马上下一轮，
 			// 锁定没有代价，当然可以随便用
 			if (laterPlayersInRound(target).some(p => p != player && isAlly(p))) {
-				return target.countCards("h", card => get.name(card) == "tao") > 0;
+				// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+				return guessHasCard(player, target, card => get.name(card) == "tao", 0.1, "xuanhuo");
 			}
 			return true;
 		},
@@ -4443,7 +4467,8 @@ export default {
 					if (!hasFutureAlly) {
 						return 1;
 					}
-					if (target.countCards("h", card => get.name(card) == "tao")) {
+					// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+					if (guessHasCard(player, target, card => get.name(card) == "tao", 0.1, "xuanhuo")) {
 						return 1;
 					}
 					return 0;
@@ -5484,8 +5509,8 @@ export default {
 					},
 					ai(target) {
 						let att = get.attitude(get.player(), target);
-						const cards = target.getCards("h");
-						if (cards.length >= 2 && cards.some(card => card.name === "shan")) {
+						// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+						if (target.countCards("h") >= 2 && target.mayHaveShan(get.player(), "use")) {
 							att /= 1.5;
 						}
 						return att;
@@ -5660,7 +5685,8 @@ export default {
 			const players = game.filterPlayer();
 			for (let i = 0; i < players.length; i++) {
 				const nh = players[i].countCards("h");
-				if (players[i] != player && sameGroup(players[i], player) && get.attitude(players[i], player) > 2 && nh >= 3 && players[i].countCards("h", "sha")) {
+				// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+				if (players[i] != player && sameGroup(players[i], player) && get.attitude(players[i], player) > 2 && nh >= 3 && players[i].mayHaveSha(player, "use")) {
 					return 5 - get.value(card);
 				}
 			}
@@ -7374,7 +7400,8 @@ export default {
 			if (player.countCards("h", card => get.value(card, player) < 5)) {
 				return true;
 			}
-			if (target.countCards("he", card => get.value(card, target) > 6) && player.countCards("h", card => get.value(card, player) < 7)) {
+			// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+			if ((target.getCards("e").some(card => get.value(card, target) > 6) || guessHasCard(player, target, card => get.value(card, target) > 6, 0.2, "zyqiao")) && player.countCards("h", card => get.value(card, player) < 7)) {
 				return true;
 			}
 			return false;
@@ -7886,7 +7913,9 @@ export default {
 				.chooseButton(["请选择一个基本牌或普通锦囊牌的牌名", [get.inpileVCardList(info => ["basic", "trick"].includes(get.type(info[2])) && info[2] != "wuxie"), "vcard"]], true)
 				.set("ai", button => {
 					const cardname = button.link[2];
-					const targetCount = target.countCards("he", c => get.name(c) == cardname);
+					// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+					const knownCards = target.getKnownCards(player);
+					const targetCount = target.getCards("e").concat(knownCards).filter(c => get.name(c) == cardname).length + (target.countCards("h") - knownCards.length) * 0.15;
 					const selfCount = player.countCards("he", c => get.name(c) == cardname);
 					return targetCount - selfCount + Math.random() * 0.1;
 				})
@@ -8427,7 +8456,8 @@ export default {
 							if (attitude >= 0) {
 								return 0;
 							}
-							if (target.countCards("he", card => get.value(card) > 5)) {
+							// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+							if (target.getCards("e").some(card => get.value(card) > 5) || guessHasCard(player, target, card => get.value(card) > 5, 0.2, "zhaoran")) {
 								return -attitude;
 							}
 							return 0;
@@ -9961,7 +9991,8 @@ export default {
 						if (target.hasSkill("ziliang")) {
 							return 0.7;
 						}
-						return [0.5, Math.max(target.countCards("h") / 4, target.countCards("h", "sha") + target.countCards("h", "shan"))];
+						// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+						return [0.5, Math.max(target.countCards("h") / 4, target.mayHaveSha(player, "use", null, "count") + target.mayHaveShan(player, "use", null, "count"))];
 					}
 				},
 			},
@@ -13428,9 +13459,13 @@ export default {
 			if (num2 <= 0) {
 				return att <= 0;
 			}
-			var num = target.countCards("h", function (card) {
-				return target.hasValueTarget(card, null, true);
-			});
+			// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+			var knownCards = target.getKnownCards(player);
+			var num =
+				knownCards.filter(function (card) {
+					return target.hasValueTarget(card, null, true);
+				}).length +
+				(target.countCards("h") - knownCards.length) * 0.3;
 			if (!num) {
 				return att > 0;
 			}
@@ -15295,7 +15330,8 @@ export default {
 				ai: {
 					directHit_ai: true,
 					skillTagFilter(player, tag, arg) {
-						if (!arg || !arg.card || !arg.target || arg.card.name != "sha" || arg.target.countCards("h", "shan") > 1 || get.distance(player, arg.target) > 1) {
+						// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+						if (!arg || !arg.card || !arg.target || arg.card.name != "sha" || arg.target.mayHaveShan(player, "use", null, "count") > 1 || get.distance(player, arg.target) > 1) {
 							return false;
 						}
 					},
@@ -17412,16 +17448,22 @@ export default {
 					if (!ui.selected.targets.length) {
 						return -Math.sqrt(target.countCards("h"));
 					}
-					var h1 = ui.selected.targets[0].getCards("h"),
-						h2 = target.getCards("h");
-					if (h2.length > h1.length) {
+					// gz3: 只用已知牌，不能直接读别人手牌(数量可见；已知的牌按实际价值，未知的按中性值5估算)
+					var first = ui.selected.targets[0],
+						h1 = first.countCards("h"),
+						h2 = target.countCards("h");
+					if (h2 > h1) {
 						return 0;
 					}
-					var delval = get.value(h2, target) - get.value(h1, ui.selected.targets[0]);
+					var handValue = function (current) {
+						var known = current.getKnownCards(player);
+						return known.reduce((sum, card) => sum + get.value(card, current), 0) + (current.countCards("h") - known.length) * 5;
+					};
+					var delval = handValue(target) - handValue(first);
 					if (delval >= 0) {
 						return 0;
 					}
-					return -delval * (h1.length - h2.length);
+					return -delval * (h1 - h2);
 				},
 			},
 		},
@@ -17740,7 +17782,8 @@ export default {
 				if (!arg.target.inRange(player)) {
 					return false;
 				}
-				if (arg.card.name !== "sha" || arg.target.countCards("h", "shan") > 1) {
+				// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+				if (arg.card.name !== "sha" || arg.target.mayHaveShan(player, "use", null, "count") > 1) {
 					return false;
 				}
 			},
@@ -20531,7 +20574,8 @@ export default {
 			return target.countCards("e") > 0 && !player.getStorage("dingpan_used").includes(lib.skill.dingpan.groupKey(target));
 		},
 		groupKey(target) {
-			return target.identity == "unknown" ? "unknown:" + target.playerid : target.identity;
+			// gz3: 没亮的、野心家都各算各的（野心家不是一个势力）
+			return target.identity == "unknown" || target.identity == "ye" ? target.identity + ":" + target.playerid : target.identity;
 		},
 		async content(event, trigger, player) {
 			const { target } = event;
@@ -20620,7 +20664,7 @@ export default {
 		trigger: { player: "phaseDrawBegin1" },
 		check(event, player) {
 			var num = game.countPlayer(function (current) {
-				if (player.hasSkill("guiming") && current != player && current.group !== "unknown" && player.group !== "unknown" && current.group === player.group) {
+				if (player.hasSkill("guiming") && current != player && sameGroup(current, player)) {
 					return true;
 				}
 				return current.isDamaged();
@@ -20629,7 +20673,7 @@ export default {
 		},
 		prompt(event, player) {
 			var num = game.countPlayer(function (current) {
-				if (player.hasSkill("guiming") && current != player && current.group !== "unknown" && player.group !== "unknown" && current.group === player.group) {
+				if (player.hasSkill("guiming") && current != player && sameGroup(current, player)) {
 					return true;
 				}
 				return current.isDamaged();
@@ -20638,7 +20682,7 @@ export default {
 		},
 		content() {
 			var num = game.countPlayer(function (current) {
-				if (player.hasSkill("guiming") && current != player && current.group !== "unknown" && player.group !== "unknown" && current.group === player.group) {
+				if (player.hasSkill("guiming") && current != player && sameGroup(current, player)) {
 					return true;
 				}
 				return current.isDamaged();
@@ -21430,7 +21474,8 @@ export default {
 					// 队友(或自己)只会白白弃掉一张有用的黑色牌、什么好处也拿不到——这种情况不该
 					// 选这个目标。target==player(选自己)单独判一次，不完全依赖attitude>0——
 					// get.attitude(player,player)不一定总落在">0"这个区间
-					const hasRed = target.countCards("h", card => get.color(card, target) == "red") > 0;
+					// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+					const hasRed = guessHasCard(player, target, card => get.color(card, target) == "red", 0.5, "jiexun");
 					if ((target == player || attitude > 0) && !hasRed) {
 						return -1;
 					}
@@ -21951,7 +21996,8 @@ export default {
 			if (game.roundNumber < 3 || target.hp < 3) {
 				return false;
 			}
-			return target.countCards("h", "sha") > 0 || target.hasSkillTag("damage");
+			// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+			return target.mayHaveSha(player, "use") || target.hasSkillTag("damage");
 		},
 		async cost(event, trigger, player) {
 			// 有cost的技能引擎不会读顶层check，AI是否发动要自己在cost里判断(玩家本人手动决定不受影响)
@@ -23146,7 +23192,8 @@ export default {
 		ai: {
 			directHit_ai: true,
 			skillTagFilter(player, tag, arg) {
-				if (arg.card.name !== "sha" || arg.target.countCards("h", "shan") > 1) {
+				// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+				if (arg.card.name !== "sha" || arg.target.mayHaveShan(player, "use", null, "count") > 1) {
 					return false;
 				}
 			},
@@ -23183,7 +23230,8 @@ export default {
 		ai: {
 			directHit_ai: true,
 			skillTagFilter(player, tag, arg) {
-				if (arg.card.name !== "juedou" || Math.floor(arg.target.countCards("h", "sha") / 2) > player.countCards("h", "sha")) {
+				// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
+				if (arg.card.name !== "juedou" || Math.floor(arg.target.mayHaveSha(player, "use", null, "count") / 2) > player.countCards("h", "sha")) {
 					return false;
 				}
 			},
@@ -25887,7 +25935,7 @@ export default {
 				return false;
 			}
 			if (get.attitude(player, event.player) < 0) {
-				if (event.player.hp == 1 && event.player.countCards("e") < 2 && event.player.name2 != "gz_pangtong") {
+				if (event.player.hp == 1 && event.player.countCards("e") < 2 && (event.player.isUnseen(1) || event.player.name2 != "gz_pangtong")) {
 					return false;
 				}
 				return true;
@@ -26387,7 +26435,14 @@ export default {
 				.forResult();
 		},
 		async content(event, trigger, player) {
-			const x = new Set(game.filterPlayer().map(current => current.group)).size || 1;
+			// gz3: 数势力只数公开亮出的势力；没亮的不算一个势力，野心家各算各的
+			const x =
+				new Set(
+					game
+						.filterPlayer()
+						.filter(current => current.identity != "unknown")
+						.map(current => (current.identity == "ye" ? "ye:" + current.playerid : current.identity))
+				).size || 1;
 			await player.draw(x);
 			player.storage.zishou_x = x;
 			player.addTempSkill("zishou_buff", "phaseAfter");

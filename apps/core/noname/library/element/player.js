@@ -12876,7 +12876,8 @@ export class Player extends HTMLDivElement {
 					if (func && !func(target)) {
 						return false;
 					}
-					return target.identity == "ye" || lib.character[target.name1][1] != group;
+					// gz3: 国战阵营按亮出的将牌/公开身份判断，不再读别人暗着的主将势力；没亮的人谁都不算（既不是队友也不是敌人）。自己还暗着时，主副将任意一张的势力都算"我的势力"。
+					return target.identity != "unknown" && (target.identity == "ye" || !(get._gzPossibleGroups ? get._gzPossibleGroups(player) : [group]).includes(target.identity));
 				});
 			}
 		} else if (mode == "doudizhu") {
@@ -12982,7 +12983,8 @@ export class Player extends HTMLDivElement {
 					if (func && !func(target)) {
 						return false;
 					}
-					return target.identity != "ye" && lib.character[target.name1][1] == group;
+					// gz3: 同上，只认公开身份，不读暗置者的主将势力。
+					return target.identity != "unknown" && target.identity != "ye" && (get._gzPossibleGroups ? get._gzPossibleGroups(player) : [group]).includes(target.identity);
 				});
 			}
 		} else if (mode == "doudizhu") {

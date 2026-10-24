@@ -187,9 +187,20 @@ export default {
 				}
 			},
 			ai: {
-				wuxie(target, card, player, viewer) {
+				wuxie(target, card, player, viewer, state) {
 					if (get.mode() === "guozhan") {
 						if (!_status._aozhan) {
+							// gz3: 出牌人(player)是自己人时，这张牌生效对自己这边是好事，不该拿无懈拆
+							// （state>0 表示这张牌当前会生效）。之前只是"交给默认判断"，但默认判断
+							// 会把受益的敌方目标（残血/没手牌时收益权重被放大好几倍）算得比自己队友
+							// 摸的牌还重，照样会拆自己人的牌，所以这里直接返回0。state<0（这张牌
+							// 已经被别人无懈了）时再交给默认判断，让队友有机会反无懈。
+							if (get.attitude(viewer, player) > 0) {
+								if (state > 0) {
+									return 0;
+								}
+								return;
+							}
 							if (!player.isMajor()) {
 								if (!viewer.isMajor()) {
 									return 0;
@@ -306,9 +317,20 @@ export default {
 				}
 			},
 			ai: {
-				wuxie(target, card, player, viewer) {
+				wuxie(target, card, player, viewer, state) {
 					if (get.mode() === "guozhan") {
 						if (!_status._aozhan) {
+							// gz3: 出牌人(player)是自己人时，这张牌生效对自己这边是好事，不该拿无懈拆
+							// （state>0 表示这张牌当前会生效）。之前只是"交给默认判断"，但默认判断
+							// 会把受益的敌方目标（残血/没手牌时收益权重被放大好几倍）算得比自己队友
+							// 摸的牌还重，照样会拆自己人的牌，所以这里直接返回0。state<0（这张牌
+							// 已经被别人无懈了）时再交给默认判断，让队友有机会反无懈。
+							if (get.attitude(viewer, player) > 0) {
+								if (state > 0) {
+									return 0;
+								}
+								return;
+							}
 							if (!player.isMajor()) {
 								if (!viewer.isMajor()) {
 									return 0;
@@ -972,9 +994,20 @@ export default {
 				}
 			},
 			ai: {
-				wuxie(target, card, player, viewer) {
+				wuxie(target, card, player, viewer, state) {
 					if (get.mode() === "guozhan") {
 						if (!_status._aozhan) {
+							// gz3: 出牌人(player)是自己人时，这张牌生效对自己这边是好事，不该拿无懈拆
+							// （state>0 表示这张牌当前会生效）。之前只是"交给默认判断"，但默认判断
+							// 会把受益的敌方目标（残血/没手牌时收益权重被放大好几倍）算得比自己队友
+							// 摸的牌还重，照样会拆自己人的牌，所以这里直接返回0。state<0（这张牌
+							// 已经被别人无懈了）时再交给默认判断，让队友有机会反无懈。
+							if (get.attitude(viewer, player) > 0) {
+								if (state > 0) {
+									return 0;
+								}
+								return;
+							}
 							if (!player.isMajor()) {
 								if (!viewer.isMajor()) {
 									return 0;
@@ -1037,19 +1070,15 @@ export default {
 				// 弃装备/掉血反而是更划算的选择。
 				// gz3: 这个明置意愿也按武将定位调一调（get.revealBias）：过牌型更该沉住气，
 				// 爆发型更值得赌一把去搏组队机会；概率封顶 0.95，避免爆发型直接变成必亮。
-				const bias = get.revealBias(player.name1);
-				if (!player.wontYe()) {
+				// gz3: 敕令逼着明置时亮哪张牌自己选，主副一样权重：只要有一张亮了是安全的（不会被挤成野心家）就算安全；倾向系数取两张将牌的平均
+				const bias = (get.revealBias(player.name1) + get.revealBias(player.name2)) / 2;
+				if (!get._gzPossibleGroups(player).some(g => player.wontYe(g))) {
 					return Math.random() < Math.min(0.95, 0.05 * bias) ? "选项一" : "选项二";
 				}
-				const group = lib.character[player.name1][1];
-				const popu = get.population(group);
-				if (popu >= 2 || (popu == 1 && game.players.length <= 4)) {
-					return "选项一";
-				}
-				if (popu > 0) {
-					return Math.random() < Math.min(0.95, 0.8 * bias) ? "选项一" : "选项二";
-				}
-				return Math.random() < Math.min(0.95, 0.5 * bias) ? "选项一" : "选项二";
+				// gz3: 只要明置安全（不会被判野心家），就应该尽量明置而不是掉血——明置还能
+				// 白摸一张牌，没理由为了"再等等"去选掉血。己方人数只用来判断安不安全，
+				// 安全的情况下不再跟掉血比概率。
+				return "选项一";
 			},
 			async content(event, trigger, player) {
 				const target = event.target;
@@ -1309,9 +1338,20 @@ export default {
 				player.draw(3);
 			},
 			ai: {
-				wuxie(target, card, player, viewer) {
+				wuxie(target, card, player, viewer, state) {
 					if (get.mode() === "guozhan") {
 						if (!_status._aozhan) {
+							// gz3: 出牌人(player)是自己人时，这张牌生效对自己这边是好事，不该拿无懈拆
+							// （state>0 表示这张牌当前会生效）。之前只是"交给默认判断"，但默认判断
+							// 会把受益的敌方目标（残血/没手牌时收益权重被放大好几倍）算得比自己队友
+							// 摸的牌还重，照样会拆自己人的牌，所以这里直接返回0。state<0（这张牌
+							// 已经被别人无懈了）时再交给默认判断，让队友有机会反无懈。
+							if (get.attitude(viewer, player) > 0) {
+								if (state > 0) {
+									return 0;
+								}
+								return;
+							}
 							if (!player.isMajor()) {
 								if (!viewer.isMajor()) {
 									return 0;
@@ -1377,6 +1417,17 @@ export default {
 				// gz3: 记一下这次实际看的是哪一项，供辛宪英"忠鉴"这类"视为使用知己知彼"
 				// 的衍生技能在后续追加"是否明置刚才看到的武将牌"这类效果时读取。
 				player.storage.zhibi_lastViewed = control;
+					// gz3: 记下"这个人暗着的将牌里，我亲眼看过的是哪个势力"，AI 之后判断敌友只能
+					// 用这个（真人看了牌也会记住），见 patch/get.js 的 _gzKnownGroups。
+					if (control === "主将" || control === "副将") {
+						if (!player.storage.zhibi_seen) {
+							player.storage.zhibi_seen = {};
+						}
+						if (!player.storage.zhibi_seen[target.playerid]) {
+							player.storage.zhibi_seen[target.playerid] = [];
+						}
+						player.storage.zhibi_seen[target.playerid].push(lib.character[control === "主将" ? target.name1 : target.name2][1]);
+					}
 				let content;
 				const str = `${get.translation(target)}的`;
 				if (control === "手牌") {

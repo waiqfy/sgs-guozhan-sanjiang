@@ -2898,7 +2898,9 @@ export default {
 					.set(
 						"choice",
 						(() => {
-							let rank = get.guozhanRank(trigger.source.name1, trigger.source) - get.guozhanRank(trigger.source.name2, trigger.source);
+							// gz3: 还没亮的将牌强度是看不到的，只能猜一个中间值(4)，不能直接读
+							const rankOf = (p, vice) => (p.isUnseen(vice ? 1 : 0) ? 4 : get.guozhanRank(vice ? p.name2 : p.name1, p));
+							let rank = rankOf(trigger.source, false) - rankOf(trigger.source, true);
 							if (rank == 0) {
 								rank = Math.random() > 0.5 ? 1 : -1;
 							}

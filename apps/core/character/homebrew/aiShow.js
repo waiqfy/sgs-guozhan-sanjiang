@@ -79,14 +79,15 @@ export function shouldRiskShow(player, tag, opts = {}) {
  * @returns {boolean}
  */
 export function favorsGroupBias(player) {
-	const revealed = game.players.filter(p => p != player && !p.isUnseen(0));
+	// gz3: 势力按他公开亮出的身份算（副将先亮的人势力是副将的），没亮的、野心家不算一个势力
+	const revealed = game.players.filter(p => p != player && p.identity != "unknown" && p.identity != "ye");
 	if (!revealed.length) {
 		return true;
 	}
 	/** @type {Record<string, number>} */
 	const count = {};
 	for (const p of revealed) {
-		const group = p.getGuozhanGroup ? p.getGuozhanGroup(0) : lib.character[p.name1]?.[1];
+		const group = p.identity;
 		if (group) {
 			count[group] = (count[group] || 0) + 1;
 		}
@@ -102,8 +103,9 @@ export function favorsGroupBias(player) {
 	if (!majorGroup) {
 		return true;
 	}
-	const myGroup = player.getGuozhanGroup ? player.getGuozhanGroup(player.isUnseen(0) ? 1 : 0) : null;
-	return myGroup == majorGroup;
+	// 自己还暗着时，主副将任意一张的势力对得上都算（主副权重一样）
+	const myGroups = player.identity != "unknown" ? [player.identity] : get._gzPossibleGroups(player);
+	return myGroups.includes(majorGroup);
 }
 
 /**

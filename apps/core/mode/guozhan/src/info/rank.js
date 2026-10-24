@@ -24,37 +24,35 @@ export const aozhan = {
 
 export const guozhan = {
 	8: [
-		"caocao", "caozhi", "zhouyu", 
+		 "caochong",  "caozhen", "longyufei", "pangtong",   
+		  "xiaoqiao", "yuji", "zhanglu",  "zhaoyun",  "zhoutai", "zhouyu", "caozhi", "lvlingqi",
 	],
 	7: [
-		"caoren", "shamoke", "shixie", "sunjun", "sunru", "wenyang", "zhangfei", 
+		"caoren", "caoshuang", "cuimao", "diaochan", "dongzhuo", "ganning", "guojia", "liaohua", "liubei", "liuhong", "luji",  "pengyang", "simazhao", "sunhao", 
+		"sunjun", "wangyi", "weiyan", "yangwan",  "zhaotongguang", "zhonghui", "zhouyi",  "zuoci", "duyu", "guohuai",
 	],
 	6: [
-		"caopi", "chengpu", "dongzhuo", "fazheng", "liaohua", "lvbu", "lvlingqi", "niujin", "simaliang", "simayi", "sunce", "xiaoqiao", "zhangbao", "zhangliao", "zhaoyun", "zhonghui", 
+		"buzhi", "caoang", "caomao", "dongzhao",  "huangyueying", "liuzhang", "lvmeng", "meifang", "mengda", "miheng", "simayi", "sunce", "taoqian", 
+		"wanglang", "wangping", "xizhicai",  "xunyu", "xushao", "yj_jushou", "yl_luzhi", "zhugeke", "zhugezhan",  "caocao", "huatuo", "jiaxu", "sunquan", "zhugedan", "caiwenji", "caorui", "wujing",  "caopi",
 	],
 	5: [
-		"caomao", "caozhen", "chendong", "dengai", "diaochan", "ganning", "guohuai", "hanhaoshihuan", "hansui", "huanggai", "huangyueying", "huangzhong", "huangzu", "huaxin", "jiananfeng", 
-		"jiaxu", "koufeng", "liru", "liuchen", "lvdai", "lvmeng", "machao", "maliang", "mengda", "panfeng", "quyi", "sunhao", "sunjian", "sunliang", "tianyu", "wangji", "wanglang", "wangping", 
-		"wangyun", "weiyan", "wuyi", "xiahouba", "xiahouyuan", "xugong", "xushao", "xuyou", "xuzhu", "yangwan", "yanliangwenchou", "yl_luzhi", "yuanshao", "yuejin", "zangba", "zhanghe", 
-		"zhangjiao", "zhangren", "zhangzhang", "zhenji", "zhouchu", "zhouyi", "zhugedan", "zhugeke", "zoushi", 
+		"bulianshi", "dengzhi", "ganfuren", "haozhao", "huangzhong", "huaxin", "liuba", "lusu", "luyusheng", "lvdai", "lvfan", "machao", "simaliang", "sunchen", "sunhuan", "taishici", "wangji", "fazheng", "liushan", 
+		"yanbaihu", "yanfuren", "yanghu", "yuejin", "yujin", "zhangbao", "zhangchunhua", "zhanghe", "zhangzhang", "zhugeliang", "zhuran", "zumao", "beimihu", "caofang",  "fengxi", "zhangfei", "simashi", "sundeng", "sunxiu", "wuguotai", "chengong", "caifuren", "huanggai", "sunru", "sunyi",  "dengai", 
 	],
 	4: [
-		"caifuren", "caochong", "caofang", "caorui", "caoshuang", "chengong", "cuimao", "daqiao", "dingfeng", "dongzhao", "ganfuren", "guanqiujian", "guanyinping", "guojia", "handang", "hejin", 
-		"huatuo", "jianggan", "jiling", "lidian", "liuba", "liubei", "liubian", "liubiao", "liuhong", "liuqi", "liuyan", "liuzan", "luxun", "luzhi", "madai", "meifang", "menghuo", "miheng", 
-		"pengyang", "qinmi", "simazhao", "sunchen", "sunshangxiang", "sunyi", "taishici", "taoqian", "wangyi", "wujing", "xunchen", "xunyou", "xurong", "yanbaihu", "yanghu", "yangxiu", "yanyan", 
-		"yuji", "zhangchunhua", "zhanglu", "zhangsong", "zhangxingcai", "zhangyi", "zhoutai", "zhugezhan", "zumao", "zuoci", 
+		"caohong", "chengpu", "guanqiujian", "handang", "hanhaoshihuan", "hansui", "huanghao", "lidian", "liqueguosi", "liru", "liuzan", "lukang", "luzhi", "mateng", "mifuren", 
+		"mizhu", "quancong", "shixie", "sunluyu", "wenyang", "wuyi", "xuezong", "xunyou", "xuyou", "yangxiu", "yangyi", "yuanshao", "zhangliao",  "fuhuanghou", "manchong","panjun", "liubian", "liuyan",  "xurong", "yanyan", "zhenji", "sunshangxiang", "zhangjiao", "xunchen",
 	],
 	3: [
-		"beimihu", "bulianshi", "buzhi", "caiwenji", "chendao", "chengyu", "dengzhi", "dianwei", "dongyun", "duyu", "fengxi", "fushiren", "gaoshun", "guanping", "guanxing", "haozhao", "hetaihou", 
-		"huangfusong", "huanghao", "jiachong", "jiangqing", "jiangwanfeiyi", "jiangwei", "jianyong", "kanze", "lifeng", "lingtong", "liqueguosi", "liushan", "liuxie", "liuzhang", "longyufei", 
-		"luji", "lusu", "luyusheng", "manchong", "masu", "mifuren", "mizhu", "pangde", "pangtong", "panjun", "panzhangmazhong", "quancong", "simashi", "sundeng", "sunhuan", "sunluban", "sunluyu", 
-		"sunxiu", "wuguotai", "xiahoudun", "xizhicai", "xuezong", "xunyu", "xusheng", "yangyi", "yj_jushou", "yuanshu", "yujin", "zhangxiu", "zhaotongguang", "zhoucang", "zhoufang", "zhugejin", 
-		"zhugeliang", "zhuran", "zhurong", "zongyu", 
+		"dingfeng", "gaoshun", "guanping", "hetaihou", "huaxiong", "jiananfeng", "jiangqing", "jiling", "lifeng", "lingtong", "liubiao", "liuqi", "maliang", 
+		"menghuo", "niujin", "shamoke", "xiahouba", "xiahoudun", "xuhuang", "xusheng", "xuzhu", "zhangren", "zhangxingcai", "zhoufang", "zhurong", "zongyu", "huangfusong","kanze", "liuxie", "sunjian","sunliang", "zhugejin", "qinmi", 
 	],
 	2: [
-		"bianfuren", "caoang", "caohong", "fuhuanghou", "guanyu", "huaxiong", "kongrong", "lukang", "lvfan", "mateng", "sunquan", "tianfeng", "xinxianying", "xuhuang", "zhuzhi", 
+		 "chendao", "daqiao", "dongyun", "fushiren", "guanyinping", "hejin", "huangzu", "jiachong", "jiangwanfeiyi", "jiangwei", "kongrong", "liuchen",  
+		"luxun", "madai", "panfeng", "panzhangmazhong", "quyi", "tianfeng", "wangyun", "xiahouyuan", "xugong", "yuanshu", "zhoucang", "masu", "lvbu", "zhangsong", "sunluban", "zhuzhi",
 	],
 	1: [
-		"wenpin", "xushu", "yanfuren", 
+		"chendong", "chengyu", "dianwei","guanxing", "guanyu",  "jianggan", "jianyong", "koufeng",  
+		"pangde", "tianyu", "wenpin", "xinxianying", "xushu", "yanliangwenchou", "zangba","zhangxiu", "zhangyi", "zhouchu", "zoushi", "bianfuren", 
 	],
 };

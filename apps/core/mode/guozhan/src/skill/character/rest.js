@@ -3246,7 +3246,7 @@ export default {
 									if (
 										!get.event().competition ||
 										!game.hasPlayer(target => {
-											return target.isFriendOf(player) && target.hasViceCharacter() && get.guozhanRank(target.name2, target) > 4;
+											return target.isFriendOf(player) && target.hasViceCharacter() && !target.isUnseen(1) && get.guozhanRank(target.name2, target) > 4;
 										})
 									) {
 										return -get.value(card);
@@ -3280,7 +3280,7 @@ export default {
 										true
 									)
 									.set("group", group)
-									.set("ai", target => -get.guozhanRank(target.name2, target))
+									.set("ai", target => (target.isUnseen(1) ? -4 : -get.guozhanRank(target.name2, target)))
 									.forResult();
 								if (bool) {
 									const target = targets[0];
@@ -14290,8 +14290,11 @@ export default {
 			order: 10,
 			result: {
 				player(player) {
-					if (player.isUnseen() && player.wontYe()) {
-						if (get.population(player.group) >= game.players.length / 4) {
+					// gz3: 暗置时 player.group 是 "unknown"，get.population("unknown") 数的是别的暗置者；
+					// 亮哪张牌就是哪个势力，主副一样权重：按自己各张将牌的势力来数公开队友。
+					const safeGroups = player.isUnseen() ? get._gzPossibleGroups(player).filter(g => player.wontYe(g)) : [];
+					if (safeGroups.length) {
+						if (Math.max(...safeGroups.map(g => get.population(g))) >= game.players.length / 4) {
 							return 1;
 						}
 						return Math.random() > 0.7 ? 1 : 0;
@@ -18379,7 +18382,9 @@ export default {
 					.set(
 						"choice",
 						(function () {
-							var rank = get.guozhanRank(trigger.source.name1, trigger.source) - get.guozhanRank(trigger.source.name2, trigger.source);
+							// gz3: 还没亮的将牌强度是看不到的，只能猜一个中间值(4)，不能直接读
+							var rankOf = (p, vice) => (p.isUnseen(vice ? 1 : 0) ? 4 : get.guozhanRank(vice ? p.name2 : p.name1, p));
+							var rank = rankOf(trigger.source, false) - rankOf(trigger.source, true);
 							if (rank == 0) {
 								rank = Math.random() > 0.5 ? 1 : -1;
 							}
@@ -18737,6 +18742,15 @@ export default {
 				if (!delta) {
 					return;
 				}
+				// gz3: 出牌人帮了一个还没亮的人（救人/给牌/回血这类对对方有利的牌），说明
+				// 出牌人当时把对方当成潜在队友。记在出牌人身上，亮将时选主将还是副将要
+				// 参考这个——不然救完人转头亮另一个不同势力的将、反手去打被救的人。
+				if (delta > 0 && player.identity == "unknown") {
+					if (!trigger.player.storage.gzFavored) {
+						trigger.player.storage.gzFavored = {};
+					}
+					trigger.player.storage.gzFavored[player.playerid] = (trigger.player.storage.gzFavored[player.playerid] || 0) + 1;
+				}
 				delta = Math.max(-3, Math.min(3, delta)) * 0.3;
 				if (!player.storage.gzGoodwill) {
 					player.storage.gzGoodwill = {};
@@ -18754,6 +18768,78 @@ export default {
 			} catch (e) {
 				console.log("gz3 _gzGoodwillCard failed", e);
 			}
+		},
+	},
+	// gz3: 开局（第一轮、自己还没亮）无论 AI 什么性格，都应该主动用南蛮入侵/万箭齐发。
+	// 原因：开局大家都暗着，"潜在队友"判断会把场上一大半人都当友好，群体伤害牌的总收益
+	// 就被算成负的，AI 一直把牌攥着不用。这里对这两张牌在开局阶段：把目标侧的负收益
+	// 清零（不再因为"可能是队友"而不敢打），并给每个目标加一份固定正收益，让总分稳定
+	// 为正。性格只影响态度小幅修正，不参与这里，所以所有性格都一样会用。
+	_gzAoeOpening: {
+		ruleSkill: true,
+		ai: {
+			effect: {
+				player(card, player, target) {
+					try {
+						if (get.mode() != "guozhan" || !player || player.identity != "unknown") {
+							return;
+						}
+						if (card.name != "nanman" && card.name != "wanjian") {
+							return;
+						}
+						if ((game.roundNumber || 1) > 1) {
+							return;
+						}
+						return [1, 1];
+					} catch (e) {
+						console.log("gz3 _gzAoeOpening failed", e);
+					}
+				},
+				target(card, player, target) {
+					try {
+						if (get.mode() != "guozhan" || !player || player.identity != "unknown") {
+							return;
+						}
+						if (card.name != "nanman" && card.name != "wanjian") {
+							return;
+						}
+						if ((game.roundNumber || 1) > 1) {
+							return;
+						}
+						return "zerotarget";
+					} catch (e) {
+						console.log("gz3 _gzAoeOpening failed", e);
+					}
+				},
+			},
+		},
+	},
+	// gz3: 暗置的 AI 不该"卖血式"地去打还不能确定的潜在队友。引擎的卖血类技能（遗计、
+	// 节命这类，ai.effect.target 会把"打这个人"算成对队友有利）配上"潜在队友态度>0"，
+	// 就会让暗置的 AI 主动拿杀去打同势力字样的人——结果打完才发现不是自己人，或者是真队
+	// 友被白打一下。这里对"出牌人还没亮、目标态度>0、伤害牌"的组合把目标侧收益清零，
+	// 让它按"没有收益"处理，不会为了喂牌去打。已经亮明的真队友之间仍保持原来的卖血逻辑。
+	_gzNoFeedHidden: {
+		ruleSkill: true,
+		ai: {
+			effect: {
+				target(card, player, target) {
+					try {
+						if (!player || player == target || player.identity != "unknown") {
+							return;
+						}
+						if (!get.tag(card, "damage")) {
+							return;
+						}
+						if (get.attitude(player, target) <= 0) {
+							return;
+						}
+						return "zerotarget";
+					} catch (e) {
+						console.log("gz3 _gzNoFeedHidden failed", e);
+					}
+				},
+			},
 		},
 	},
 	// gz3: "这个人这回合手里明明还有能打我的牌，却没打我"——对怀疑对象的克制，也是一种
@@ -18917,7 +19003,8 @@ export default {
 						// 但没队友的垫底。
 						function scoreOfControl(safe, group) {
 							if (safe) {
-								var popu = get.population(group);
+								// 还没亮、但自己已经出手帮过（救过/给过牌）的潜在队友也算队友人数
+								var popu = get.population(group) + get._gzFavoredAllies(player, group);
 								return popu > 0 ? 10 + popu : 0;
 							}
 							return 5;
@@ -18941,14 +19028,15 @@ export default {
 						if (!mainSafe && !viceSafe) {
 							return Math.random() < 0.05 * bias ? pickControl() : 0;
 						}
-						var popu = get.population(lib.character[player.name1][1]);
+						// gz3: 主副将权重一样，不能只看主将那边有几个队友——取两边里更多的
+						var popu = Math.max(get.population(mainGroup), get.population(viceGroup));
 						if (popu >= 2 || (popu == 1 && game.players.length <= 4)) {
 							return pickControl();
 						}
 						if (choice == 0) {
 							return 0;
 						}
-						if (get.population(group) > 0) {
+						if (popu > 0) {
 							return Math.random() < 0.2 * bias ? pickControl() : 0;
 						}
 						var nming = 0;
@@ -19038,20 +19126,48 @@ export default {
 					// ai.maixie）的场景已经优先处理过了。这个概率按武将定位调整（get.revealBias）：
 					// 过牌型更该沉住气，爆发型更值得赌一把。
 					const bias = get.revealBias(player.name1);
-					if (!player.wontYe()) {
+					// gz3: 亮哪张将牌，最终身份就是那张牌的势力。这里原来不管技能是主将还是副将的，
+					// 一律拿主将势力去判断"安不安全、有几个队友"——副将技能触发时，实际亮出来的是
+					// 副将的势力，导致 AI 因为"主将那边有队友"而去亮了副将、变成另一个势力，然后
+					// 反手打原来该组队的人。改成按"真正会亮出来的那张牌"的势力判断；技能主副都有
+					// 时取更好的那边；并且如果另一张牌的势力明显队友更多，就不要为了这个技能去亮。
+					const mainGroup = lib.character[player.name1][1];
+					const viceGroup = lib.character[player.name2][1];
+					const evalGroup = g => ({
+						group: g,
+						safe: player.wontYe(g),
+						popu: get.population(g) + get._gzFavoredAllies(player, g),
+					});
+					const ownerGroups = bool1 && bool2 ? [mainGroup, viceGroup] : [bool1 ? mainGroup : viceGroup];
+					let best = evalGroup(ownerGroups[0]);
+					if (ownerGroups.length > 1 && ownerGroups[1] != ownerGroups[0]) {
+						const other = evalGroup(ownerGroups[1]);
+						if ((other.safe && !best.safe) || (other.safe == best.safe && other.popu > best.popu)) {
+							best = other;
+						}
+					}
+					if (!best.safe) {
 						return Math.random() < 0.05 * bias;
+					}
+					if (ownerGroups.length == 1) {
+						const otherGroup = bool1 ? viceGroup : mainGroup;
+						if (otherGroup != best.group) {
+							const other = evalGroup(otherGroup);
+							if (other.safe && other.popu > best.popu) {
+								return Math.random() < 0.05 * bias;
+							}
+						}
 					}
 					// gz3: 原来这里有个不管技能值不值、队友情况如何都先五五开的判断，导致随便
 					// 一个不起眼的暗置技能（比如单纯换手牌这种）想触发，AI 就有一半概率在别人
 					// 回合里突然亮出来——跟"没事不要贸然暴露身份"的原则相悖。去掉这一步，统一
 					// 走下面按"己方公开人数"衡量的同一套判断（跟 bumingzhi 的自愿明置一致），
 					// 只有确实看起来安全、划算时才愿意为了技能去亮。
-					const group = lib.character[player.name1][1];
-					const popu = get.population(lib.character[player.name1][1]);
+					const popu = best.popu;
 					if (popu >= 2 || (popu == 1 && game.players.length <= 4)) {
 						return true;
 					}
-					if (get.population(group) > 0) {
+					if (popu > 0) {
 						return Math.random() < 0.2 * bias ? true : false;
 					}
 					let nming = 0;
@@ -19091,7 +19207,7 @@ export default {
 							if (!safe) {
 								return 5;
 							}
-							var popu = get.population(group);
+							var popu = get.population(group) + get._gzFavoredAllies(player, group);
 							return popu > 0 ? 10 + popu : 0;
 						})
 						.set("choice", choice)

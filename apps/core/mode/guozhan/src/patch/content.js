@@ -1159,13 +1159,15 @@ export const showYexingsContent = async (event, _trigger, player) => {
 			function check(_event, _player) {
 				const player = get.player();
 				const source = get.event().source;
-				const friendsCount = target.getFriends(true, false).length;
+				// gz3: 数队友只能数公开已亮明的同势力角色，不能用 getFriends（它会读暗置者的主将势力）。
+					const publicFriends = p => game.countPlayer(c => c == p || (c.identity != "unknown" && p.isFriendOf(c)));
+					const friendsCount = publicFriends(target);
 
 				if (game.players.length <= 2 * friendsCount) {
 					return false;
 				}
 				// @ts-expect-error 祖宗之法就是这么写的
-				if (source.getFriends(true).length + friendsCount > game.players.length / 2) {
+				if (publicFriends(source) + friendsCount > game.players.length / 2) {
 					return true;
 				}
 

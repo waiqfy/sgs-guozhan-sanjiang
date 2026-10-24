@@ -1610,7 +1610,7 @@ export default {
 						if (get.mode() === "identity" && target.identity === "fan") {
 							res += 2.4;
 						}
-						if ((get.mode() === "guozhan" && player.identity !== "ye" && player.identity === target.identity) || (get.mode() === "identity" && player.identity === "zhu" && (target.identity === "zhong" || target.identity === "mingzhong"))) {
+						if ((get.mode() === "guozhan" && player.isFriendOf(target)) || (get.mode() === "identity" && player.identity === "zhu" && (target.identity === "zhong" || target.identity === "mingzhong"))) {
 							res -= 0.8 * player.countCards("he");
 						}
 						return res;
@@ -1986,7 +1986,7 @@ export default {
 						if (get.mode() === "identity" && target.identity === "fan") {
 							res += 2.4;
 						}
-						if ((get.mode() === "guozhan" && player.identity !== "ye" && player.identity === target.identity) || (get.mode() === "identity" && player.identity === "zhu" && (target.identity === "zhong" || target.identity === "mingzhong"))) {
+						if ((get.mode() === "guozhan" && player.isFriendOf(target)) || (get.mode() === "identity" && player.identity === "zhu" && (target.identity === "zhong" || target.identity === "mingzhong"))) {
 							res -= 0.8 * player.countCards("he");
 						}
 						return res;
@@ -4394,6 +4394,11 @@ export default {
 									const target = evtmap.target;
 									const source = evtmap.player;
 									const info = get.info(card);
+									// gz3: 不无懈队友的牌——出牌人是队友/自己、且这张牌当前会生效(state>0)时，
+									// 一律不拆。默认的按目标收益算分会把敌方目标的小收益放大，导致拆队友的牌。
+									if (state > 0 && get.attitude(_status.event.player, source) >= 3) {
+										return 0;
+									}
 									if (info.ai && info.ai.wuxie) {
 										const aiii = info.ai.wuxie(target, card, source, _status.event.player, state);
 										if (typeof aiii === "number") {
@@ -4419,6 +4424,10 @@ export default {
 								const card = evtmap.card;
 								const source = evtmap.player;
 								const info = get.info(card);
+								// gz3: 同上，不无懈队友的牌。
+								if (state > 0 && get.attitude(_status.event.player, source) >= 3) {
+									return 0;
+								}
 								if (info.ai && info.ai.wuxie) {
 									const aiii = info.ai.wuxie(undefined, card, source, _status.event.player, state);
 									if (typeof aiii === "number") {
