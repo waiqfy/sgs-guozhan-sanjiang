@@ -4596,7 +4596,7 @@ export default {
 	// 青龙：锁定技，当你使用的【杀】被目标角色使用的【闪】抵消后，你可以对其使用一张【杀】。 参考pshuiqiang(offline)
 	qinglong: {
 		trigger: { player: ["shaMiss", "eventNeutralized"] },
-		forced: true,
+		// 描述是"你可以对其使用一张杀"(可选，且不计入次数)，不是锁定技：之前写了forced:true，会被当成锁定技显示/判断
 		direct: true,
 		clearTime: true,
 		filter(event, player) {
@@ -25484,7 +25484,9 @@ export default {
 			await player.draw(2);
 			await player.gainMaxHp(2);
 			await player.recover(2);
-			for (const other of game.players.slice()) {
+			// "其他角色依次"：座次顺序从发动者的下家开始依次轮一圈(sortBySeat(player))；之前直接取game.players，
+			// 永远从1号位开始，发动者不是1号位时顺序就错了
+			for (const other of game.filterPlayer(current => current != player).sortBySeat(player)) {
 				if (!player.isIn() || other == player || !other.isIn()) {
 					continue;
 				}
@@ -25493,6 +25495,8 @@ export default {
 				}
 				const result = await other
 					.chooseCard("h", card => get.name(card) == "sha", `扬威：是否对${get.translation(player)}使用一张无距离限制的【杀】？`)
+					// AI：只对敌人出杀(chooseCard不写ai时AI按默认逻辑，可能对队友出杀)
+					.set("ai", card => (get.attitude(other, player) < 0 ? 6 - get.value(card, other) : 0))
 					.forResult();
 				if (!result.bool || !result.cards?.length) {
 					continue;
