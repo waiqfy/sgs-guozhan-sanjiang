@@ -5383,6 +5383,16 @@ export default {
 					return get.is.ordinaryCard(event.card) && get.type(event.card, "trick") == player.storage.qiangzhi_draw;
 				},
 				async content(event, trigger, player) {
+					// 此类别的非转化牌"无次数"：使用次数在useCard开始时就已经计入(content.ts的useCard第一步)，这里把这次使用退回去，
+					// 并标记addCount=false，这样出杀摸牌之后还可以再出杀(否则杀只能出一次)
+					if (trigger.addCount !== false) {
+						trigger.addCount = false;
+						const stat = player.getStat().card;
+						const name = trigger.card.name;
+						if (typeof stat[name] == "number") {
+							stat[name]--;
+						}
+					}
 					player.draw("nodelay");
 				},
 				onremove: true,
