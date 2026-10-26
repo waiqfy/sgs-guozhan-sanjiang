@@ -5378,7 +5378,9 @@ export default {
 				prompt: "是否执行【强识】的效果摸一张牌？",
 				sourceSkill: "qiangzhi",
 				filter(event, player) {
-					return !event.card.viewAs && get.type(event.card, "trick") == player.storage.qiangzhi_draw;
+					// "非转化牌"：event.card在事件里是VCard，没有viewAs属性(那是实体牌的属性)，原来的!event.card.viewAs恒为真，
+					// 转化/视为使用的牌也会触发；改用引擎的get.is.ordinaryCard(实体牌直接使用)
+					return get.is.ordinaryCard(event.card) && get.type(event.card, "trick") == player.storage.qiangzhi_draw;
 				},
 				async content(event, trigger, player) {
 					player.draw("nodelay");
@@ -5394,7 +5396,7 @@ export default {
 		},
 	},
 
-	// 献图：其他角色出牌阶段开始时，你可以摸两张牌，然后交给其等量牌。此阶段结束时，若本回合没有角色进入濒死状态，你失去1点体力。 参考xiantu(yijiang)
+	// 献图：其他角色出牌阶段开始时，你可以摸两张牌，然后交给其等量牌。此阶段结束时，若本回合没有角色受到伤害，你失去1点体力。 参考xiantu(yijiang)
 	xiantu: {
 		audio: 2,
 		logAudio(event) {
@@ -5459,7 +5461,8 @@ export default {
 					.step(async (event, trigger, player) => {
 						if (
 							game.hasGlobalHistory("everything", evt => {
-								if (evt.name != "dying") {
+								// 加强：条件从"本回合没有角色进入濒死状态"改为"本回合没有角色受到伤害"(受到伤害比濒死容易达成得多)
+								if (evt.name != "damage") {
 									return false;
 								}
 								return evt.getParent(trigger.name, true) == trigger;
@@ -5481,7 +5484,7 @@ export default {
 		charlotte: true,
 		onremove: true,
 		intro: {
-			content: "此阶段结束时，若本回合没有角色进入濒死状态，你将失去1点体力",
+			content: "此阶段结束时，若本回合没有角色受到伤害，你将失去1点体力",
 		},
 	},
 
