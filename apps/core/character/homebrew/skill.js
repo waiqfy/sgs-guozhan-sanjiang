@@ -745,23 +745,24 @@ export default {
 			return player.isPhaseUsing() && event.player.isIn() && !player.hasSkill("tongling_used");
 		},
 		direct: true,
-		content() {
-			"step 0";
-			var str = "";
+		// 之前是旧式"step N"写法，会被StepCompiler拆开重新编译，里面ai回调用到的模块函数guessHasCard找不到
+		// (ReferenceError)；改成async写法，逻辑不变
+		async content(event, trigger, player) {
+			let str = "";
 			if (get.itemtype(trigger.cards) == "cards" && trigger.cards.filterInD().length) {
 				str += "；未造成伤害，其获得" + get.translation(trigger.cards.filterInD());
 			}
-			player
+			const result = await player
 				.chooseTarget(get.prompt("tongling"), "令一名势力与你相同的角色选择是否对其使用一张牌。若使用且此牌：造成伤害，你与其各摸两张牌" + str, function (card, player, target) {
 					return target.isFriendOf(player);
 				})
 				.set("ai", function (target) {
-					var aim = _status.event.aim;
+					const aim = _status.event.aim;
 					// gz3: 已知牌按实际，未知牌按概率猜，不能直接读别人手牌
-					var usable = function (card) {
+					const usable = function (card) {
 						return target.canUse(card, aim, false) && get.effect(aim, card, target, player) > 0 && get.effect(aim, card, target, target) > 0;
 					};
-					var cards = target.getKnownCards(player).filter(usable);
+					const cards = target.getKnownCards(player).filter(usable);
 					if (cards.length) {
 						return cards.some(card => get.tag(card, "damage")) ? 2 : 1;
 					}
@@ -770,44 +771,40 @@ export default {
 					}
 					return 0;
 				})
-				.set("aim", trigger.player);
-			"step 1";
-			if (result.bool) {
-				var target = result.targets[0];
-				event.target = target;
-				player.logSkill("tongling", target);
-				player.addTempSkill("tongling_used", "phaseUseAfter");
-				player.line2([target, trigger.player]);
-				target
-					.chooseToUse(
-						function (card, player, event) {
-							return lib.filter.filterCard.apply(this, arguments);
-						},
-						"通令：是否对" + get.translation(trigger.player) + "使用一张牌？"
-					)
-					.set("targetRequired", true)
-					.set("complexSelect", true)
-					.set("complexTarget", true)
-					.set("filterTarget", function (card, player, target) {
-						if (target != _status.event.sourcex && !ui.selected.targets.includes(_status.event.sourcex)) {
-							return false;
-						}
-						return lib.filter.targetEnabled.apply(this, arguments);
-					})
-					.set("sourcex", trigger.player)
-					.set("addCount", false);
-			} else {
-				event.finish();
+				.set("aim", trigger.player)
+				.forResult();
+			if (!result.bool) {
+				return;
 			}
-			"step 2";
-			if (result.bool) {
-				if (target.hasHistory("sourceDamage", evt => evt.getParent(4).name == "tongling")) {
+			const target = result.targets[0];
+			player.logSkill("tongling", target);
+			player.addTempSkill("tongling_used", "phaseUseAfter");
+			player.line2([target, trigger.player]);
+			const useResult = await target
+				.chooseToUse(
+					function (card, player, event) {
+						return lib.filter.filterCard.apply(this, arguments);
+					},
+					"通令：是否对" + get.translation(trigger.player) + "使用一张牌？"
+				)
+				.set("targetRequired", true)
+				.set("complexSelect", true)
+				.set("complexTarget", true)
+				.set("filterTarget", function (card, player, target) {
+					if (target != _status.event.sourcex && !ui.selected.targets.includes(_status.event.sourcex)) {
+						return false;
+					}
+					return lib.filter.targetEnabled.apply(this, arguments);
+				})
+				.set("sourcex", trigger.player)
+				.set("addCount", false)
+				.forResult();
+			if (useResult && useResult.bool) {
+				if (target.hasHistory("sourceDamage", evt => evt.getParent("tongling") === event)) {
 					player.draw(2, "nodelay");
 					target.draw(2);
-				} else {
-					if (get.itemtype(trigger.cards) == "cards" && trigger.cards.filterInD().length && trigger.player.isIn()) {
-						trigger.player.gain(trigger.cards.filterInD(), "gain2");
-					}
+				} else if (get.itemtype(trigger.cards) == "cards" && trigger.cards.filterInD().length && trigger.player.isIn()) {
+					trigger.player.gain(trigger.cards.filterInD(), "gain2");
 				}
 			}
 		},
@@ -20735,7 +20732,8 @@ export default {
 			});
 			return "残蚀：是否发动，多摸" + get.cnNumber(num) + "张牌？";
 		},
-		content() {
+		// 非async的content()会被StepCompiler拆开重新编译，模块作用域里的sameGroup在那里找不到(ReferenceError)；改成async
+		async content(event, trigger, player) {
 			var num = game.countPlayer(function (current) {
 				if (player.hasSkill("guiming") && current != player && sameGroup(current, player)) {
 					return true;
