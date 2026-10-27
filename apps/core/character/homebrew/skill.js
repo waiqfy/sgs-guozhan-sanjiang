@@ -18108,39 +18108,47 @@ export default {
 	},
 
 // ========== xusheng 徐盛 ==========
-	// 疑城：当一名与你势力相同的角色使用【杀】指定第一个目标后，或成为【杀】的目标后，其可以摸一张牌，然后弃置一张牌。 参考gz_yicheng_new
+	// 疑城：同势力的角色成为【杀】的目标后，你可以令其摸一张牌，当前回合结束时，其弃置一张牌。 参考gz_yicheng_new
 	yicheng: {
 		audio: "yicheng",
-		trigger: {
-			global: ["useCardToPlayered", "useCardToTargeted"],
+		trigger: { global: "useCardToTargeted" },
+		filter(event, player) {
+			return event.card.name == "sha" && event.target.isFriendOf(player);
 		},
-		filter(event, player, name) {
-			const bool = name === "useCardToPlayered";
-			if (bool && !event.isFirstTarget) {
-				return false;
-			}
-			return event.card.name == "sha" && event[bool ? "player" : "target"].isFriendOf(player);
-		},
-		logTarget(event, player, name) {
-			return event?.[name === "useCardToPlayered" ? "player" : "target"];
-		},
-		// 官方gz_yicheng_new没有cost，是"你(徐盛)可以令其摸牌弃牌"——决定权在徐盛(引擎默认的
-		// 是否发动兜底问的就是徐盛)，不是让被摸牌弃牌的那个队友自己决定；之前额外加的cost把
-		// 决定权错误地转移给了目标，而且多出一个可以拒绝的步骤，跟官方"没有单独的是否发动"
-		// (相当于锁定技)的效果不一致
+		logTarget: "target",
 		async content(event, trigger, player) {
-			await event.targets[0].draw();
-			await event.targets[0].chooseToDiscard("he", true);
+			const target = trigger.target;
+			await target.draw();
+			target.addSkill("yicheng2");
+			target.storage.yicheng2 = (target.storage.yicheng2 || 0) + 1;
+		},
+	},
+	yicheng2: {
+		trigger: { global: "phaseEnd" },
+		forced: true,
+		popup: false,
+		charlotte: true,
+		sourceSkill: "yicheng",
+		filter(event, player) {
+			return player.storage.yicheng2 > 0;
+		},
+		async content(event, trigger, player) {
+			let num = player.storage.yicheng2;
+			player.removeSkill("yicheng2");
+			delete player.storage.yicheng2;
+			while (num-- > 0 && player.countCards("he")) {
+				await player.chooseToDiscard("he", true);
+			}
 		},
 	},
 
-	// 破军：当你于出牌阶段使用【杀】指定目标后，你可以将该角色的至多X张牌置于其武将牌上，本回合结束后，其获得这些牌（X为其体力值）。 参考repojun(refresh)
+	// 破军：当你使用【杀】指定一个目标后，你可以将其至多X张牌扣置于该角色的武将牌旁（X为其体力值）；若如此做，当前回合结束后，该角色获得这些牌。 参考repojun(refresh)
 	pojun: {
 		audio: 2,
 		trigger: { player: "useCardToPlayered" },
 		direct: true,
 		filter(event, player) {
-			return player.isPhaseUsing() && event.card.name == "sha" && event.target.hp > 0 && event.target.countCards("he") > 0;
+			return event.card.name == "sha" && event.target.hp > 0 && event.target.countCards("he") > 0;
 		},
 		preHidden: true,
 		async content(event, trigger, player) {
