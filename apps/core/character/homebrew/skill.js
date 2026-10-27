@@ -25690,10 +25690,34 @@ export default {
 					continue;
 				}
 				// 没有ai时这一步默认选不中任何牌，队友什么都交不出去；补上ai——倾向交出价值最低的牌
-				// 卡面是"任意张牌"：可以一张都不给(下限0)，数量不限；AI只交价值低的牌(价值≥8的留着)
+				// 卡面是"任意张牌"：可以一张都不给(下限0)，数量不限
 				const result = await target
 					.chooseCard("he", [0, Infinity], `伪帝：交给${get.translation(player)}任意张牌`)
-					.set("ai", card => 8 - get.value(card))
+					.set("ai", card => {
+						// 队友(同势力)给袁术的是好牌，不是废牌：伤害锦囊最好；袁术缺的装备栏就给装备；
+						// 袁术血少给桃(自己血量够才给)；自己手牌多出体力值的部分(价值最低的几张)也可以给
+						const me = get.player();
+						const boss = _status.event.boss;
+						if (get.position(card) == "e") {
+							return 0;
+						}
+						if (get.name(card) == "tao") {
+							return boss.hp <= 2 && me.hp >= 2 ? 10 : 0;
+						}
+						if (get.type(card) == "trick" && get.tag(card, "damage")) {
+							return 9;
+						}
+						if (get.type(card) == "equip") {
+							const sub = get.subtype(card);
+							const cur = boss.getEquip(sub);
+							if (!cur || get.equipValue(card, boss) > get.equipValue(cur, boss)) {
+								return 8;
+							}
+						}
+						const hs = me.getCards("h", c => get.name(c) != "tao").sort((x, y) => get.value(x, me) - get.value(y, me));
+						return hs.slice(0, Math.max(0, hs.length - me.hp)).includes(card) ? 1 : 0;
+					})
+					.set("boss", player)
 					.forResult();
 				if (result.bool && result.cards && result.cards.length) {
 					await target.give(result.cards, player);
