@@ -14676,7 +14676,7 @@ export default {
 		async content(event, trigger, player) {
 			const result = await player.judge(card => (get.suit(card) == "spade" ? -1 : 1)).forResult();
 			if (result.color == "black" && get.suit(result.card) == "spade") {
-				await player.damage("thunder", "nosource");
+				await player.damage(2, "thunder", "nosource");
 			}
 		},
 		subSkill: {
