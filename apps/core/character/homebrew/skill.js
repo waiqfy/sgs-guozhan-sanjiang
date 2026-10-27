@@ -25690,9 +25690,9 @@ export default {
 					continue;
 				}
 				// 没有ai时这一步默认选不中任何牌，队友什么都交不出去；补上ai——倾向交出价值最低的牌
-				// 卡面是"任意张牌"，不是一张：至少交一张(forced)，数量不限；AI把价值低的牌尽量交出去(价值≥8的留着，但至少交一张)
+				// 卡面是"任意张牌"：可以一张都不给(下限0)，数量不限；AI只交价值低的牌(价值≥8的留着)
 				const result = await target
-					.chooseCard("he", [1, Infinity], true, `伪帝：交给${get.translation(player)}任意张牌`)
+					.chooseCard("he", [0, Infinity], `伪帝：交给${get.translation(player)}任意张牌`)
 					.set("ai", card => 8 - get.value(card))
 					.forResult();
 				if (result.bool && result.cards && result.cards.length) {
