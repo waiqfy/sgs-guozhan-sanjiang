@@ -8070,8 +8070,15 @@ export default {
 					if (!hs.length) {
 						return 0;
 					}
+					// 优先摸牌：含锦囊就能摸一张，锦囊牌本身转化后等于"换一张牌+摸一张"，不算代价，
+					// 所以把锦囊的价值从代价里扣掉；手牌里有锦囊时摸牌收益也远大于普通转化
+					const hasTrick = hs.some(card => get.type(card, null, player) === "trick");
 					const vals = hs.map(card => get.value(card, player));
-					const cost = vals.reduce((sum, v) => sum + v, 0) - Math.max(...vals);
+					let cost = vals.reduce((sum, v) => sum + v, 0) - Math.max(...vals);
+					if (hasTrick) {
+						cost -= hs.filter(card => get.type(card, null, player) === "trick").reduce((sum, card) => sum + get.value(card, player), 0) / 2;
+						cost = Math.max(cost, 0);
+					}
 					let gain;
 					if (evt.dying) {
 						if (get.attitude(player, evt.dying) <= 0) {
@@ -8081,11 +8088,15 @@ export default {
 					} else if (evt.type === "phase") {
 						// 出牌阶段主动转化：order很低所以是其它牌用完后才轮到；收益只剩锦囊摸牌/阵绝清手牌
 						gain = 0;
+						if (hasTrick) {
+							// 出牌阶段含锦囊也值得转化：多摸一张牌，而且手牌打光后阵绝还能再摸
+							gain = 8;
+						}
 					} else {
 						gain = player.hp <= 1 ? 10 : player.hp <= 2 ? 6 : 4;
 					}
-					if (hs.some(card => get.type(card, null, player) === "trick")) {
-						gain += 3;
+					if (hasTrick && evt.type !== "phase") {
+						gain += 8;
 					}
 					if (player.hasSkill("zhenjue")) {
 						gain += 4;
