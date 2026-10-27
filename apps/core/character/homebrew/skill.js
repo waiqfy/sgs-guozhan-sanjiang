@@ -18120,7 +18120,7 @@ export default {
 			const target = trigger.target;
 			await target.draw();
 			target.addSkill("yicheng2");
-			target.storage.yicheng2 = (target.storage.yicheng2 || 0) + 1;
+			target.storage.yicheng2 = 1;
 		},
 	},
 	yicheng2: {
@@ -18133,7 +18133,7 @@ export default {
 			return player.storage.yicheng2 > 0;
 		},
 		async content(event, trigger, player) {
-			let num = player.storage.yicheng2;
+			let num = 1;
 			player.removeSkill("yicheng2");
 			delete player.storage.yicheng2;
 			while (num-- > 0 && player.countCards("he")) {
