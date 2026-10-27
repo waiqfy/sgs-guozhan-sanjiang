@@ -14608,7 +14608,7 @@ export default {
 						if (_status.event.getParent().type !== "phase") {
 							return 1;
 						}
-						return player.getUseValue({ name: button.link[2], nature: button.link[3] });
+						return get.player().getUseValue({ name: button.link[2], nature: button.link[3] });
 					},
 					backup(links, player) {
 						return {
@@ -22187,9 +22187,29 @@ export default {
 		// 多余的永久标记，只依赖usable
 		filterCard: true,
 		viewAs: { name: "diaohulishan" },
+		// AI善用：这个技能本质是"拿一张废牌过牌"——阵法(队列/围攻)成立时摸X张，几乎白赚；
+		// 否则也只花一张价值低的牌换调虎离山(队友被指定还能摸牌取消)，所以只拿最差的那张牌出，价值高的牌不动
+		check(card) {
+			return 7 - get.value(card);
+		},
 		ai: {
 			threaten: 1.1,
 			order: 6,
+			result: {
+				player(player) {
+					let num = 0;
+					if (player.siege()) {
+						num = 2;
+					} else if (player.inline()) {
+						num = 1 + game.players.filter(current => current !== player && player.inline(current)).length;
+					}
+					if (num > 0) {
+						return num + 1;
+					}
+					// 没形成阵法：手里有明显废牌(价值≤4)才用，且手牌不能太少
+					return player.hasCard(card => get.value(card, player) <= 4, "he") && player.countCards("h") >= 3 ? 0.5 : 0;
+				},
+			},
 		},
 	},
 	diaogui_draw: {
@@ -25670,7 +25690,11 @@ export default {
 					continue;
 				}
 				// 没有ai时这一步默认选不中任何牌，队友什么都交不出去；补上ai——倾向交出价值最低的牌
-				const result = await target.chooseCard("he", true, get.prompt2("weidi")).set("ai", card => 8 - get.value(card)).forResult();
+				// 卡面是"任意张牌"，不是一张：至少交一张(forced)，数量不限；AI把价值低的牌尽量交出去(价值≥8的留着，但至少交一张)
+				const result = await target
+					.chooseCard("he", [1, Infinity], true, `伪帝：交给${get.translation(player)}任意张牌`)
+					.set("ai", card => 8 - get.value(card))
+					.forResult();
 				if (result.bool && result.cards && result.cards.length) {
 					await target.give(result.cards, player);
 				}
